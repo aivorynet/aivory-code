@@ -269,9 +269,11 @@ pub fn install_from_archive(archive: &Path, models: &Path) -> Result<(), String>
 // ---- the recognizer -------------------------------------------------------------------------
 
 /// The sample rate that the model wants.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows recognizer uses it
 pub const MODEL_RATE: u32 = 16_000;
 
 /// The mean of the channels of an interleaved buffer.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows recognizer uses it
 pub fn downmix(data: &[f32], channels: usize) -> Vec<f32> {
     if channels <= 1 {
         return data.to_vec();
@@ -282,6 +284,7 @@ pub fn downmix(data: &[f32], channels: usize) -> Vec<f32> {
 }
 
 /// A linear resampler that keeps its place between buffers.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows recognizer uses it
 #[derive(Debug)]
 pub struct Resampler {
     /// Input samples per output sample.
@@ -291,6 +294,7 @@ pub struct Resampler {
     last: f32,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows recognizer uses it
 impl Resampler {
     pub fn new(from: u32, to: u32) -> Self {
         Self {
@@ -321,6 +325,7 @@ impl Resampler {
 }
 
 /// The text of the model (capital letters, no punctuation) as a sentence.
+#[cfg_attr(not(windows), allow(dead_code))] // only the Windows recognizer uses it
 pub fn tidy(text: &str) -> String {
     let lower = text.trim().to_lowercase();
     let mut out = String::with_capacity(lower.len());

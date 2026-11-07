@@ -53,7 +53,12 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test --exclude-tags golden
-      - run: flutter build apk --debug
+      # The phone link library (Rust) for the emulator ABI.
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: x86_64-linux-android
+      - run: cargo install cargo-ndk --locked
+      - run: flutter build apk --debug --target-platform android-x64
   ios:
     runs-on: macos-latest
     defaults:
