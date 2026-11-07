@@ -431,11 +431,17 @@ fn two_sessions_that_edit_one_file_get_a_claim_overlap_a_radar_hit_and_a_conflic
         is_idle(w, &a).filter(|p| p.tail.iter().any(|l| l.text == "three"))
     });
 
-    // "Dismiss" closes the item.
+    // "Dismiss" closes the item. A radar pass can replace the item (a new id) while the turns
+    // run, so answer the conflict item that is open now.
+    let open: InboxList = typed(&d, "inbox/list", json!({"filter": "conflicts"}));
+    let current = open
+        .items
+        .first()
+        .map_or_else(|| item.id.clone(), |i| i.id.clone());
     let done = ok(
         &d,
         "inbox/answer",
-        json!({"id": item.id, "option": "Dismiss"}),
+        json!({"id": current, "option": "Dismiss"}),
     );
     assert_eq!(done["result"], "dismissed");
     let after: InboxList = typed(&d, "inbox/list", json!({"filter": "conflicts"}));
