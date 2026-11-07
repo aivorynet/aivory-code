@@ -409,6 +409,17 @@ fn two_sessions_that_edit_one_file_get_a_claim_overlap_a_radar_hit_and_a_conflic
         "{file}"
     );
 
+    // "Dismiss" closes the item. Answer it now: the sweep closes it by itself when the claim
+    // lease ends, and the turns below can take that long on a slow CI runner.
+    let done = ok(
+        &d,
+        "inbox/answer",
+        json!({"id": item.id, "option": "Dismiss"}),
+    );
+    assert_eq!(done["result"], "dismissed");
+    let after: InboxList = typed(&d, "inbox/list", json!({"filter": "conflicts"}));
+    assert!(after.items.is_empty());
+
     // The mail arrives in front of the next input: the fake gets "> ..." as the first word and
     // does not know the command (it would answer "two" to a plain "say two").
     ok(&d, "session/send", json!({"id": a, "text": "say two"}));
@@ -430,22 +441,6 @@ fn two_sessions_that_edit_one_file_get_a_claim_overlap_a_radar_hit_and_a_conflic
     wait_for(&d, "the third turn of A", |w| {
         is_idle(w, &a).filter(|p| p.tail.iter().any(|l| l.text == "three"))
     });
-
-    // "Dismiss" closes the item. A radar pass can replace the item (a new id) while the turns
-    // run, so answer the conflict item that is open now.
-    let open: InboxList = typed(&d, "inbox/list", json!({"filter": "conflicts"}));
-    let current = open
-        .items
-        .first()
-        .map_or_else(|| item.id.clone(), |i| i.id.clone());
-    let done = ok(
-        &d,
-        "inbox/answer",
-        json!({"id": current, "option": "Dismiss"}),
-    );
-    assert_eq!(done["result"], "dismissed");
-    let after: InboxList = typed(&d, "inbox/list", json!({"filter": "conflicts"}));
-    assert!(after.items.is_empty());
 }
 
 #[test]
