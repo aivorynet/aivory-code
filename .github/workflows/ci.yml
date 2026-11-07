@@ -24,7 +24,7 @@ jobs:
             libx11-xcb-dev libxcb1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libfontconfig-dev libfreetype-dev libasound2-dev libssl-dev \
             libdbus-1-dev libxdo-dev libgbm-dev libdrm-dev pkg-config clang cmake \
-            libpipewire-0.3-dev libspa-0.2-dev
+            libpipewire-0.3-dev libspa-0.2-dev libegl-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
@@ -41,6 +41,11 @@ jobs:
         working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
+      # Gradle of the Android build needs Java 17; the runner default is newer.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
