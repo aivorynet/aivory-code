@@ -1,0 +1,4 @@
+[toolchain]
+# The tested version. CI and contributors use the same one.
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]
