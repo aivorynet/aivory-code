@@ -1,0 +1,258 @@
+{
+  "account": {
+    "hub": "",
+    "hubState": "off",
+    "license": "MIT",
+    "relay": "",
+    "renews": "",
+    "seats": 1,
+    "team": ""
+  },
+  "budget": {
+    "limit": 600.0,
+    "month": "2026-10",
+    "spent": 412.0,
+    "warnPct": 80
+  },
+  "daemons": [
+    {
+      "detail": "aivoryd 0.9.2 · Windows 11",
+      "id": "desktop",
+      "kind": "local",
+      "name": "desktop · this machine",
+      "running": true,
+      "sessions": 14
+    },
+    {
+      "detail": "ssh pp@build-01 · aivoryd 0.9.2",
+      "id": "build-01",
+      "kind": "ssh",
+      "name": "build-01",
+      "running": true,
+      "sessions": 5
+    },
+    {
+      "detail": "cloud runner · eu-central",
+      "id": "runner-eu",
+      "kind": "cloud",
+      "name": "runner-eu",
+      "running": true,
+      "sessions": 2
+    }
+  ],
+  "devices": [
+    {
+      "id": "pixel-9-pro",
+      "lastSeen": 1792593480000,
+      "name": "Pixel 9 Pro",
+      "online": true,
+      "os": "Android 16",
+      "paired": 1790769600000
+    },
+    {
+      "id": "iphone-16",
+      "lastSeen": 1792507200000,
+      "name": "iPhone 16",
+      "online": false,
+      "os": "iOS 26",
+      "paired": 1790942400000
+    }
+  ],
+  "providers": [
+    {
+      "auth": "subscription · Max · signed in",
+      "id": "claude",
+      "models": [
+        "opus-5.5",
+        "sonnet-5.5",
+        "haiku-5.5"
+      ],
+      "monogram": "C",
+      "name": "Claude Code",
+      "status": "connected",
+      "usage": [
+        {
+          "label": "5 h window",
+          "pct": 62,
+          "provider": "claude",
+          "resetsAt": 1792601520000,
+          "used": 1860000
+        },
+        {
+          "label": "Week",
+          "pct": 41,
+          "provider": "claude",
+          "resetsAt": 1792877400000,
+          "used": 12300000
+        }
+      ]
+    },
+    {
+      "auth": "ChatGPT Pro · signed in",
+      "id": "codex",
+      "models": [
+        "gpt-5.2-codex",
+        "gpt-5.2"
+      ],
+      "monogram": "X",
+      "name": "Codex",
+      "status": "connected",
+      "usage": [
+        {
+          "label": "5 h window",
+          "pct": 31,
+          "provider": "codex",
+          "resetsAt": 1792596420000,
+          "used": 620000
+        },
+        {
+          "label": "Week",
+          "pct": 22,
+          "provider": "codex",
+          "resetsAt": 1793030100000,
+          "used": 4400000
+        }
+      ]
+    },
+    {
+      "auth": "API key · $18.20 this month",
+      "id": "gemini",
+      "models": [
+        "3-pro",
+        "3-flash"
+      ],
+      "monogram": "G",
+      "name": "Gemini CLI",
+      "status": "connected",
+      "usage": [
+        {
+          "label": "Daily quota",
+          "pct": 18,
+          "provider": "gemini",
+          "resetsAt": 1792627200000
+        },
+        {
+          "label": "Monthly budget $60",
+          "pct": 30,
+          "provider": "gemini",
+          "resetsAt": 1794148800000
+        }
+      ]
+    },
+    {
+      "auth": "ACP agent · local · kimi-k2 through OpenRouter",
+      "id": "opencode",
+      "models": [
+        "kimi-k2",
+        "qwen3-coder"
+      ],
+      "monogram": "O",
+      "name": "OpenCode",
+      "status": "acp"
+    },
+    {
+      "auth": "ACP agent · local",
+      "id": "goose",
+      "models": [
+        "goose-1.9"
+      ],
+      "monogram": "G",
+      "name": "Goose",
+      "status": "acp"
+    }
+  ],
+  "settings": {
+    "acp": [],
+    "autopilot": {
+      "maxPerCodebase": 4,
+      "maxRunning": 14,
+      "on": true,
+      "order": "priority",
+      "parkAfterMin": 15,
+      "startQueued": true
+    },
+    "coffeeReminder": true,
+    "display": {
+      "background": "white",
+      "customTheme": null,
+      "font": "JetBrains Mono",
+      "fontSize": 14,
+      "look": "minimal",
+      "perRow": null,
+      "theme": "light",
+      "uiScale": 115
+    },
+    "ledger": {
+      "snapshots": true
+    },
+    "notify": {
+      "autopilot": {
+        "desktop": true,
+        "email": false,
+        "phone": false
+      },
+      "conflict": {
+        "desktop": true,
+        "email": false,
+        "phone": true
+      },
+      "error": {
+        "desktop": true,
+        "email": true,
+        "phone": true
+      },
+      "needsAnswer": {
+        "desktop": true,
+        "email": false,
+        "phone": true
+      },
+      "review": {
+        "desktop": true,
+        "email": false,
+        "phone": true
+      }
+    },
+    "pinned": [],
+    "providers": {
+      "claude": {
+        "effort": "high",
+        "enabled": true,
+        "mode": "edit",
+        "model": "opus-5.5"
+      },
+      "codex": {
+        "effort": "high",
+        "enabled": true,
+        "mode": "edit",
+        "model": "gpt-5.2-codex"
+      },
+      "gemini": {
+        "effort": "high",
+        "enabled": true,
+        "mode": "edit",
+        "model": "3-pro"
+      },
+      "goose": {
+        "effort": "high",
+        "enabled": false,
+        "mode": "edit",
+        "model": "goose-1.9"
+      },
+      "opencode": {
+        "effort": "high",
+        "enabled": true,
+        "mode": "edit",
+        "model": "kimi-k2"
+      }
+    },
+    "quietHours": {
+      "from": "22:00",
+      "on": true,
+      "to": "07:00"
+    },
+    "remote": {
+      "pushUrl": "",
+      "relay": ""
+    }
+  }
+}

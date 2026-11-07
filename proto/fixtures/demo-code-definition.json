@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "col": 11,
+      "container": "Budget",
+      "kind": "method",
+      "len": 5,
+      "line": 18,
+      "name": "check",
+      "path": "crates/orch/src/budget.rs",
+      "preview": "pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError>"
+    }
+  ],
+  "name": "check",
+  "page": 1,
+  "perPage": 20,
+  "source": "index",
+  "total": 1
+}

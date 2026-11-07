@@ -1,0 +1,6 @@
+{
+ "agentType": "general-purpose",
+ "description": "Write tests",
+ "toolUseId": "tu-lost",
+ "spawnDepth": 1
+}

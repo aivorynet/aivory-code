@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session deep dive</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.app{height:100vh;min-height:640px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px;text-decoration:none}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 32px;min-height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08)}
+.back{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#4A5568!important;text-decoration:none;padding:6px 10px 6px 6px;border-radius:8px}
+.back:hover{background:#F1F3F6;color:#1A1A2E!important}
+.crumb{font-size:11.5px;color:#5A6578}
+.hd h1{margin:0;font-size:16px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;background:#EEF1F8;color:#1A1A2E}
+.sp{flex:1}
+.hb{height:32px;padding:0 12px!important;border-radius:8px;border:1px solid rgba(13,13,14,.14)!important;font-size:12.5px;white-space:nowrap}
+.hb:hover{border-color:#1A1A2E!important}
+.hb.danger{color:#B91C1C!important}
+.hb.danger:hover{border-color:#B91C1C!important}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.i{background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}.dot.d{background:#16A34A}.dot.ok{background:#16A34A}.dot.wait{background:transparent;box-shadow:inset 0 0 0 1.5px #F97316}
+.stats{flex:none;display:flex;flex-wrap:wrap;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08);padding:0 32px}
+.cell{padding:10px 20px 11px 0;margin-right:20px;border-right:1px solid rgba(13,13,14,.08);display:flex;flex-direction:column;gap:3px;min-width:0}
+.cell:last-child{border-right:0}
+.cell .k{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578}
+.cell .v{font-family:'JetBrains Mono',monospace;font-size:13px;white-space:nowrap}
+.cell .v.w{color:#15803D}
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 360px}
+.left{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid rgba(13,13,14,.08)}
+.bar{flex:none;display:flex;align-items:center;gap:16px;padding:10px 24px 10px 32px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08);flex-wrap:wrap}
+.tabs{display:flex;gap:2px;padding:2px;background:#F1F3F6;border-radius:8px}
+.tab{height:30px;padding:0 14px!important;border-radius:6px;font-size:12.5px;color:#4A5568!important}
+.tab:hover{color:#1A1A2E!important}
+.tab.on{background:#FFFFFF;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.srch{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid rgba(13,13,14,.14);border-radius:8px;min-width:240px;color:#5A6578}
+.srch input{border:0;outline:none;background:transparent;font:inherit;font-size:12.5px;color:#1A1A2E;flex:1;min-width:0}
+.chips{display:flex;gap:6px}
+.chip{height:28px;padding:0 10px!important;border-radius:999px;border:1px solid rgba(13,13,14,.12)!important;font-size:12px;color:#4A5568!important;display:flex;align-items:center;gap:6px}
+.chip:hover{border-color:rgba(13,13,14,.3)!important}
+.chip.on{background:#1A1A2E!important;border-color:#1A1A2E!important;color:#FFFFFF!important}
+.chip .sw{width:8px;height:8px;border-radius:2px}
+.count{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;margin-left:auto}
+.view{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;background:#FFFFFF}
+.wf-h{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:420px minmax(0,1fr) 84px;align-items:end;height:34px;padding:0 24px 0 32px;background:#FAFBFC;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578}
+.wf-h > span{padding-bottom:8px}
+.ticks{position:relative;height:100%}
+.ticks span{position:absolute;bottom:8px;transform:translateX(-50%);font-weight:400;letter-spacing:0;text-transform:none;font-size:10.5px;white-space:nowrap}
+.ticks span:first-child{transform:none}
+.chev svg{transition:transform .15s}
+.chev.open svg{transform:rotate(90deg)}
+.wf-h .du{text-align:right}
+.row{position:relative;display:grid;grid-template-columns:420px minmax(0,1fr) 84px;align-items:center;height:34px;padding:0 24px 0 32px;border-bottom:1px solid rgba(13,13,14,.05);cursor:pointer}
+.row:hover{background:#F8F9FB}
+.row{cursor:default}
+.pk{display:flex;align-items:center;gap:7px;min-width:0;flex:1;height:34px;text-align:left;font-family:'JetBrains Mono',monospace!important;font-size:12px}
+.row.sel{background:#EEF3FE;box-shadow:inset 3px 0 0 #3574F0}
+.row.dim{opacity:.35}
+.op{display:flex;align-items:center;gap:7px;min-width:0;font-family:'JetBrains Mono',monospace;font-size:12px}
+.chev{width:16px;height:16px;display:grid;place-items:center;border-radius:4px;color:#5A6578!important;flex:none;font-size:10px}
+.chev:hover{background:#E6E9EE}
+.chev.none{visibility:hidden}
+.kq{width:9px;height:9px;border-radius:2px;flex:none}
+.on1{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kl{font-size:9.5px;color:#5A6578;letter-spacing:.06em;flex:none}
+.tl{position:relative;height:100%}
+.tl .grid{position:absolute;top:0;bottom:0;width:1px;background:rgba(13,13,14,.05)}
+.tl .now{position:absolute;top:0;bottom:0;width:1px;background:rgba(53,116,240,.5)}
+.tb{position:absolute;top:11px;height:12px;border-radius:3px;min-width:3px}
+.tb.run{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 4px,transparent 4px 8px)}
+.du{font-family:'JetBrains Mono',monospace;font-size:11.5px;text-align:right;color:#4A5568}
+.dag{position:relative;min-width:1200px;height:440px;margin:32px}
+.dag svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.node{position:absolute;width:200px;height:96px;padding:12px 14px;background:#FFFFFF;border:1px solid rgba(13,13,14,.12);border-radius:10px;text-align:left;display:flex;flex-direction:column;gap:6px;box-shadow:0 1px 2px rgba(13,13,14,.04)}
+.node:hover{border-color:rgba(13,13,14,.32)}
+.node.sel{border-color:#3574F0;box-shadow:0 0 0 3px rgba(53,116,240,.15)}
+.nh{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A6578}
+.nst{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600}
+.nst.d{background:#EAF7EE;color:#15803D}.nst.w{background:#EEF1F8;color:#1A1A2E}.nst.q{background:#FFF1E6;color:#C2410C}.nst.p{background:#F1F3F6;color:#5A6578}
+.nt{font-size:13px;font-weight:600;line-height:1.3}
+.na{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;margin-top:auto}
+.tr{max-width:980px;margin:0 auto;padding:24px 32px 32px}
+.ln{font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:#1A1A2E}
+.k-x,.k-o{color:#5A6578}
+.k-u{background:#F3F5F8;margin:10px -8px 4px;padding:4px 8px;border-radius:6px}
+.k-u .pf{color:#5A6578}
+.k-t .pf{font-weight:700;display:inline-block}
+.k-t .pf::first-letter{color:#16A34A}
+.k-p{color:#15803D;background:#F0FAF3;margin:0 -8px;padding:0 8px}
+.k-m{color:#B91C1C;background:#FEF3F3;margin:0 -8px;padding:0 8px}
+.k-s{color:#6D28D9}
+.k-h{font-family:'IBM Plex Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:.04em;color:#5A6578;margin-top:18px;padding-top:12px;border-top:1px solid rgba(13,13,14,.08)}
+.df{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100%}
+.fl{border-right:1px solid rgba(13,13,14,.08);padding:12px 0;background:#FAFBFC}
+.fi{display:flex;align-items:center;gap:8px;width:100%;height:34px;padding:0 16px!important;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:left}
+.fi:hover{background:#F1F3F6}
+.fi.on{background:#EEF3FE;box-shadow:inset 3px 0 0 #3574F0}
+.fi .fn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi .ad{color:#15803D}.fi .rm{color:#B91C1C}
+.dv{padding:0 0 24px}
+.dvh{position:sticky;top:0;display:flex;align-items:center;gap:10px;height:40px;padding:0 20px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:12px}
+.dl{display:grid;grid-template-columns:48px 48px minmax(0,1fr);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.75}
+.dl span{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.dl .no{color:#8A93A6;text-align:right;padding-right:10px;user-select:none}
+.dl.a{background:#F0FAF3}.dl.a span:last-child{color:#15803D}
+.dl.r{background:#FEF3F3}.dl.r span:last-child{color:#B91C1C}
+.dl.h{background:#F3F5F8;color:#5A6578}
+.cmpw{flex:none;padding:12px 24px 14px 32px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);display:flex;flex-direction:column;gap:8px}
+.qa{display:flex;gap:6px;flex-wrap:wrap}
+.qa button{height:26px;padding:0 10px!important;border-radius:999px;background:#F1F3F6!important;font-size:12px;color:#4A5568!important}
+.qa button:hover{background:#E6E9EE!important;color:#1A1A2E!important}
+.qa .act{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#7C3AED;align-self:center}
+.gz{position:relative;display:flex;align-items:stretch;background:#FFFFFF;border:1px solid #CDD2DA;border-radius:12px;transition:border-color .15s,box-shadow .15s}
+.gz:focus-within{border-color:#3574F0;box-shadow:0 0 0 3px rgba(53,116,240,.14)}
+.gz-l,.gz-r{display:flex;flex-direction:column;justify-content:space-between;padding:4px;flex:none}
+.gz-c{flex:1;min-width:0;display:flex;flex-direction:column;padding:6px 0 4px}
+.gt{width:100%;min-height:40px;resize:none;border:0;outline:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.45;color:#1A1A2E;padding:2px 2px 0}
+.gt::placeholder{color:#8A93A6}
+.gz-row{display:flex;align-items:center;gap:2px;margin-left:-4px}
+.gd{height:22px;padding:0 6px!important;border-radius:4px;font-size:12px;color:#4A5568!important;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.gd:hover,.gd.on{background:#EBECF0!important;color:#1A1A2E!important}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:999px}
+.gi{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:#5A6578!important}
+.gi:hover{background:#EBECF0!important;color:#1A1A2E!important}
+.gi.rec{background:#FDECEC!important;color:#DC2626!important}
+.gs{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#3574F0!important;color:#FFFFFF!important}
+.gs:hover{background:#2C63D2!important}
+.menu{position:absolute;bottom:calc(100% + 6px);min-width:160px;background:#FFFFFF;border:1px solid rgba(13,13,14,.12);border-radius:8px;box-shadow:0 2px 4px rgba(13,13,14,.06),0 12px 28px rgba(13,13,14,.12);padding:4px;z-index:6}
+.mi{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;height:28px;padding:0 10px!important;border-radius:5px;font-size:12.5px;text-align:left}
+.mi:hover{background:#F1F3F6!important}
+.mi.on{font-weight:600}
+.mi.on::after{content:'✓';color:#3574F0}
+.ev{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;background:#FFFFFF;padding:20px 22px 28px;display:flex;flex-direction:column;gap:18px}
+.ev-k{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578}
+.ev-t{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ev-t h2{margin:4px 0 0;font-size:16px;font-weight:600;line-height:1.35}
+.ev-st{flex:none;padding:3px 9px;border-radius:999px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600}
+.ev-st.d{background:#EAF7EE;color:#15803D}.ev-st.w{background:#EEF1F8;color:#1A1A2E}.ev-st.q{background:#FFF1E6;color:#C2410C}
+.ev-g{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;padding-top:16px;border-top:1px solid rgba(13,13,14,.08)}
+.ev-g div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ev-g b{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-b{display:flex;flex-direction:column;gap:8px;padding-top:16px;border-top:1px solid rgba(13,13,14,.08)}
+.ev-b pre{margin:0;padding:10px 12px;background:#F6F7F9;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#1A1A2E}
+.ev-a{display:flex;gap:8px;flex-wrap:wrap}
+.gb{height:30px;padding:0 12px!important;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+@media (max-width:1100px){.work{grid-template-columns:minmax(0,1fr)}.ev{display:none}}
+@media (max-width:720px){.app{grid-template-columns:minmax(0,1fr)}.rail{display:none}.hd,.stats,.bar{padding-left:16px;padding-right:16px}.wf-h,.row{grid-template-columns:220px minmax(0,1fr) 60px;padding:0 12px}.srch{min-width:0}}
+@media (prefers-reduced-motion:reduce){.app *{transition:none!important}}
+</style>
+</helmet>
+<div class="app">
+<div class="rbw" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri on" href="Main.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri" href="Inbox.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<span class="bd">4</span></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri" href="Repos.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri" href="Settings.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+<header class="hd">
+<a class="back" href="Main.dc.html"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 3L5 8l5 5"></path></svg>War room</a>
+<span class="crumb mono">aivory-code / orchestrator · claude opus-5.5</span>
+<h1>Subagent fan-out limits</h1>
+<span class="pill"><i class="dot"></i>working · 23 min</span>
+<span class="sp"></span>
+<button class="hb">Pause</button>
+<button class="hb">Park</button>
+<button class="hb">Fork turn</button>
+<button class="hb">Handoff</button>
+<button class="hb danger">Stop</button>
+</header>
+
+<div class="stats" aria-label="Session summary">
+<sc-for list="{{stats}}" as="c" hint-placeholder-count="10"><div class="cell"><span class="k">{{c.k}}</span><span class="v {{c.cls}}">{{c.v}}</span></div></sc-for>
+</div>
+
+<div class="work">
+<div class="left">
+<div class="bar">
+<div class="tabs" role="tablist" aria-label="Session views"><sc-for list="{{tabs}}" as="t" hint-placeholder-count="4"><button class="tab {{t.on}}" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}">{{t.label}}</button></sc-for></div>
+<sc-if value="{{isWf}}" hint-placeholder-val="{{true}}">
+<label class="srch"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg><input aria-label="Search spans" placeholder="Search tool, agent, file…"></label>
+<div class="chips" role="group" aria-label="Span kind"><sc-for list="{{kinds}}" as="k" hint-placeholder-count="5"><button class="chip {{k.on}}" aria-pressed="{{k.pressed}}" onClick="{{k.pick}}"><i class="sw" style="background: {{k.c}}"></i>{{k.label}}</button></sc-for></div>
+</sc-if>
+</div>
+
+<div class="view">
+<sc-if value="{{isWf}}" hint-placeholder-val="{{true}}">
+<div class="wf-h"><span>Operation</span><div class="ticks"><sc-for list="{{ticks}}" as="t"><span style="left: {{t.x}}%">{{t.l}}</span></sc-for></div><span class="du">Duration</span></div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="20">
+<div class="row {{r.cls}}">
+<div class="op" style="padding-left: {{r.ind}}px"><button class="chev {{r.chevCls}}" aria-label="{{r.chevLabel}}" onClick="{{r.toggle}}"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 3l5 5-5 5"></path></svg></button><button class="pk" onClick="{{r.pick}}"><i class="kq" style="background: {{r.c}}"></i><span class="on1">{{r.n}}</span><span class="kl">{{r.kl}}</span></button></div>
+<div class="tl"><sc-for list="{{ticks}}" as="t"><i class="grid" style="left: {{t.x}}%"></i></sc-for><i class="now" style="left: {{nowX}}%"></i><i class="tb {{r.runCls}}" style="left: {{r.x}}%; width: {{r.w}}%; background-color: {{r.c}}"></i></div>
+<span class="du">{{r.dur}}</span>
+</div>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{isDag}}" hint-placeholder-val="{{false}}">
+<div class="dag">
+<svg aria-hidden="true"><sc-for list="{{edges}}" as="e"><path d="{{e.d}}" fill="none" stroke="{{e.c}}" stroke-width="1.5" stroke-dasharray="{{e.dash}}"></path></sc-for></svg>
+<sc-for list="{{nodes}}" as="n" hint-placeholder-count="6">
+<button class="node {{n.cls}}" style="left: {{n.x}}px; top: {{n.y}}px" onClick="{{n.pick}}">
+<span class="nh"><span>{{n.id}}</span><span class="nst {{n.st}}">{{n.stl}}</span></span>
+<span class="nt">{{n.t}}</span>
+<span class="na"><span>{{n.a}}</span><span>{{n.d}}</span></span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isTr}}" hint-placeholder-val="{{false}}">
+<div class="tr"><sc-for list="{{tr}}" as="l"><div class="ln k-{{l.k}}"><span class="pf">{{l.a}}</span>{{l.b}}</div></sc-for></div>
+</sc-if>
+
+<sc-if value="{{isDf}}" hint-placeholder-val="{{false}}">
+<div class="df">
+<div class="fl"><sc-for list="{{files}}" as="f"><button class="fi {{f.on}}" onClick="{{f.pick}}"><span class="fn">{{f.n}}</span><span class="ad">+{{f.a}}</span><span class="rm">−{{f.r}}</span></button></sc-for></div>
+<div class="dv"><div class="dvh"><span>{{file.n}}</span><span class="count">+{{file.a}} −{{file.r}} · turn 2</span></div><sc-for list="{{file.lines}}" as="d"><div class="dl {{d.t}}"><span class="no">{{d.o}}</span><span class="no">{{d.n}}</span><span>{{d.s}}</span></div></sc-for></div>
+</div>
+</sc-if>
+</div>
+
+<div class="cmpw">
+<div class="qa"><button>Continue</button><button>Run tests</button><button>Explain the last turn</button><button>Ask another session</button><span class="act">Running Bash · cargo test -p orch budget::exceeds</span></div>
+<div class="gz">
+<div class="gz-l">
+<button class="gi" aria-label="Capture a screen area for context"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 13.5l7-7M8.5 5.5l2 2"></path><path d="M12 1.5v3M10.5 3h3M13.5 7v2M12.5 8h2M5.5 2v2M4.5 3h2"></path></svg></button>
+<button class="gi" aria-label="Attach a file"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M13 7.5l-5.2 5.2a3 3 0 0 1-4.3-4.3l5.6-5.6a2 2 0 0 1 2.9 2.9L6.4 11.3a1 1 0 0 1-1.4-1.4l4.9-4.9"></path></svg></button>
+</div>
+<div class="gz-c">
+<textarea class="gt" rows="2" aria-label="Message the session" placeholder="{{ph}}"></textarea>
+<div class="gz-row">
+<button class="gd {{cm.onMode}}" aria-label="Permission mode" onClick="{{cm.openMode}}">{{cm.mode}} ▾</button>
+<button class="gd {{cm.onProv}}" aria-label="Provider" onClick="{{cm.openProv}}"><i class="pdot" style="background: {{cm.pc}}"></i>{{cm.prov}} ▾</button>
+<button class="gd {{cm.onModel}}" aria-label="Model" onClick="{{cm.openModel}}">{{cm.model}} ▾</button>
+<button class="gd {{cm.onEff}}" aria-label="Effort" onClick="{{cm.openEff}}">{{cm.effort}} ▾</button>
+<button class="gd" aria-label="Send to">to: {{target}} ▾</button>
+</div>
+</div>
+<div class="gz-r">
+<button class="gi {{recCls}}" aria-label="Voice input" aria-pressed="{{recPressed}}" onClick="{{recPick}}"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"></rect><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"></path></svg></button>
+<button class="gs" aria-label="Send"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg></button>
+</div>
+<sc-if value="{{cm.menuOpen}}" hint-placeholder-val="{{false}}"><div class="menu" style="left: {{cm.mx}}px"><sc-for list="{{cm.items}}" as="m"><button class="mi {{m.on}}" onClick="{{m.pick}}">{{m.t}}</button></sc-for></div></sc-if>
+</div>
+</div>
+</div>
+
+<aside class="ev" aria-label="Span evidence">
+<div>
+<span class="ev-k">{{ev.head}}</span>
+<div class="ev-t"><h2>{{ev.n}}</h2><span class="ev-st {{ev.stc}}">{{ev.stl}}</span></div>
+</div>
+<div class="ev-g"><sc-for list="{{ev.fields}}" as="f"><div><span class="ev-k">{{f.k}}</span><b>{{f.v}}</b></div></sc-for></div>
+<div class="ev-b"><span class="ev-k">Input</span><pre>{{ev.inp}}</pre></div>
+<div class="ev-b"><span class="ev-k">Output</span><pre>{{ev.out}}</pre></div>
+<div class="ev-a"><button class="gb pri">Open in transcript</button><button class="gb">Fork from here</button></div>
+</aside>
+</div>
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>session a01c · worktree .aivory/wt/a01c</span>
+<span>claude 5 h window 62%</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span><i class="dot ok"></i>relay</span>
+<span>14:40</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const KC = { run: '#1A1A2E', turn: '#4B5BDB', llm: '#8B5CF6', tool: '#E8A23B', agent: '#0EA5A4' };
+const KL = { run: 'RUN', turn: 'TURN', llm: 'LLM', tool: 'TOOL', agent: 'AGENT' };
+const T = 24, NOW = 23.4;
+const SP = [
+  { id: 's1', p: '', k: 'run', n: 'session a01c', a: 'main', s: 0, e: NOW, st: 'w', tin: 412380, tout: 38912, cost: 3.12, inp: 'cap subagent fan-out per session and per codebase', out: '3 turns · 47 tool calls · 3 subagents' },
+  { id: 's2', p: 's1', k: 'turn', n: 'turn 1 · cap subagent fan-out', a: 'main', s: 0, e: 6.2, st: 'd', tin: 96210, tout: 8140, cost: 0.71, inp: 'cap subagent fan-out per session and per codebase', out: 'Plan: 1. map spawn sites  2. budget struct  3. wire into spawn  4. tests' },
+  { id: 's3', p: 's2', k: 'llm', n: 'chat', a: 'main', s: 0, e: 0.6, st: 'd', tin: 18420, tout: 1210, cost: 0.12, inp: 'system + user prompt + .aivory/map.toml', out: 'I start with the spawn code in part "orchestrator".' },
+  { id: 's4', p: 's2', k: 'tool', n: 'Read crates/orch/src/spawn.rs', a: 'main', s: 0.6, e: 0.62, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'file_read', inp: 'crates/orch/src/spawn.rs', out: '218 lines' },
+  { id: 's5', p: 's2', k: 'agent', n: 'invoke explorer', a: 'explorer', s: 0.7, e: 4.9, st: 'd', tin: 41200, tout: 3020, cost: 0.29, inp: 'map every spawn call site', out: '14 call sites in 6 files' },
+  { id: 's6', p: 's5', k: 'llm', n: 'chat', a: 'explorer', s: 0.7, e: 1.4, st: 'd', tin: 12800, tout: 640, cost: 0.08, inp: 'map every spawn call site', out: 'I search for spawn_child.' },
+  { id: 's7', p: 's5', k: 'tool', n: 'Bash rg -n "spawn_child" crates/', a: 'explorer', s: 1.4, e: 1.5, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'bash', inp: 'rg -n "spawn_child" crates/', out: '14 matches in 6 files' },
+  { id: 's8', p: 's5', k: 'llm', n: 'chat · summarize', a: 'explorer', s: 1.5, e: 4.8, st: 'd', tin: 28400, tout: 2380, cost: 0.21, inp: '14 matches', out: 'Call sites grouped by crate: orch 8, sessions 4, agents 2.' },
+  { id: 's9', p: 's2', k: 'llm', n: 'chat · plan', a: 'main', s: 4.9, e: 6.2, st: 'd', tin: 23400, tout: 3870, cost: 0.30, inp: 'explorer result', out: '4-step plan' },
+  { id: 's10', p: 's1', k: 'turn', n: 'turn 2 · write the budget struct', a: 'main', s: 6.2, e: 14.8, st: 'd', tin: 148900, tout: 14400, cost: 1.18, inp: 'go ahead with step 2', out: 'Budget struct in place. 22 tests pass.' },
+  { id: 's11', p: 's10', k: 'tool', n: 'Edit crates/orch/src/budget.rs', a: 'main', s: 6.5, e: 6.6, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'file_edit', inp: 'crates/orch/src/budget.rs', out: '+38 −4' },
+  { id: 's12', p: 's10', k: 'agent', n: 'invoke test-writer', a: 'test-writer', s: 7.0, e: NOW, st: 'w', tin: 61300, tout: 5980, cost: 0.44, inp: 'write tests for budget::exceeds', out: 'running 5 tests' },
+  { id: 's13', p: 's12', k: 'llm', n: 'chat', a: 'test-writer', s: 7.0, e: 9.1, st: 'd', tin: 20100, tout: 2240, cost: 0.15, inp: 'write tests for budget::exceeds', out: 'Five cases: zero, at limit, over limit, nested, per codebase.' },
+  { id: 's14', p: 's12', k: 'tool', n: 'Write tests/budget_exceeds.rs', a: 'test-writer', s: 9.1, e: 9.2, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'file_write', inp: 'tests/budget_exceeds.rs', out: '96 lines' },
+  { id: 's15', p: 's12', k: 'tool', n: 'Bash cargo test -p orch budget::exceeds', a: 'test-writer', s: 21.9, e: NOW, st: 'w', tin: 0, tout: 0, cost: 0, tool: 'bash', inp: 'cargo test -p orch budget::exceeds', out: 'running 5 tests …' },
+  { id: 's16', p: 's10', k: 'tool', n: 'Bash cargo test -p orch budget', a: 'main', s: 12.0, e: 14.1, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'bash', inp: 'cargo test -p orch budget', out: 'test result: ok. 22 passed; 0 failed' },
+  { id: 's17', p: 's1', k: 'turn', n: 'turn 3 · wire budget into spawn', a: 'main', s: 14.8, e: NOW, st: 'w', tin: 167270, tout: 16372, cost: 1.23, inp: 'now wire the budget into the spawn path', out: 'in progress' },
+  { id: 's18', p: 's17', k: 'llm', n: 'chat', a: 'main', s: 14.8, e: 16.9, st: 'd', tin: 31000, tout: 2900, cost: 0.24, inp: 'wire the budget into spawn', out: 'I change spawn_child to check the budget first.' },
+  { id: 's19', p: 's17', k: 'agent', n: 'invoke reviewer', a: 'reviewer', s: 15.2, e: NOW, st: 'q', tin: 4200, tout: 310, cost: 0.03, inp: 'review the budget diff when it is ready', out: 'waits for the main agent' },
+  { id: 's20', p: 's17', k: 'tool', n: 'Edit crates/orch/src/spawn.rs', a: 'main', s: 17.0, e: 17.1, st: 'd', tin: 0, tout: 0, cost: 0, tool: 'file_edit', inp: 'crates/orch/src/spawn.rs', out: '+21 −6' },
+  { id: 's21', p: 's17', k: 'llm', n: 'chat', a: 'main', s: 17.1, e: NOW, st: 'w', tin: 52000, tout: 4100, cost: 0.38, inp: 'spawn.rs diff + test status', out: 'streaming…' }
+];
+const NODES = [
+  { id: 'n1', t: 'Map spawn call sites', a: 'explorer', d: '4.2 min', st: 'd', x: 0, y: 150, span: 's5' },
+  { id: 'n2', t: 'Write the budget struct', a: 'main', d: '8.6 min', st: 'd', x: 260, y: 150, span: 's10' },
+  { id: 'n3', t: 'Write budget tests', a: 'test-writer', d: '16.4 min', st: 'w', x: 520, y: 40, span: 's12' },
+  { id: 'n4', t: 'Wire budget into spawn', a: 'main', d: '8.6 min', st: 'w', x: 520, y: 260, span: 's17' },
+  { id: 'n5', t: 'Review the budget diff', a: 'reviewer', d: 'waits', st: 'q', x: 780, y: 150, span: 's19' },
+  { id: 'n6', t: 'Run the full test suite', a: 'main', d: 'planned', st: 'p', x: 1040, y: 150, span: '' }
+];
+const EDGES = [['n1', 'n2'], ['n2', 'n3'], ['n2', 'n4'], ['n3', 'n5'], ['n4', 'n5'], ['n5', 'n6']];
+const STL = { d: 'done', w: 'running', q: 'waiting', p: 'planned' };
+const TR = [
+  ['x', '', 'claude opus-5.5 · aivory-code · session a01c · worktree .aivory/wt/a01c'],
+  ['u', '› ', 'cap subagent fan-out per session and per codebase'],
+  ['a', '', 'I start with the spawn code in part "orchestrator" (crates/orch/).'],
+  ['t', '● Read', '  crates/orch/src/spawn.rs'], ['o', '  └ ', '218 lines'],
+  ['s', '', '↳ explorer  map every spawn call site'], ['o', '  └ ', '14 call sites in 6 files'],
+  ['a', '', 'Plan: 1. map the spawn sites  2. add a budget struct  3. wire it into spawn  4. tests.'],
+  ['h', '', 'TURN 2 · 6.2 min'],
+  ['u', '› ', 'go ahead with step 2'],
+  ['t', '● Edit', '  crates/orch/src/budget.rs'],
+  ['p', '', '+ pub struct Budget {'], ['p', '', '+     pub max_children: u8,      // default 4'], ['p', '', '+     pub max_per_codebase: u8, // default 12'], ['p', '', '+ }'],
+  ['s', '', '↳ test-writer  write tests for budget::exceeds'],
+  ['t', '● Bash', '  cargo test -p orch budget'], ['o', '  └ ', 'test result: ok. 22 passed; 0 failed'],
+  ['h', '', 'TURN 3 · 14.8 min'],
+  ['u', '› ', 'now wire the budget into the spawn path'],
+  ['a', '', 'I change spawn_child so that it checks the budget before it starts a child.'],
+  ['t', '● Edit', '  crates/orch/src/spawn.rs'],
+  ['m', '', '-     let child = Session::spawn(cfg)?;'], ['p', '', '+     self.budget.check(&cfg.codebase)?;'], ['p', '', '+     let child = Session::spawn(cfg)?;'],
+  ['s', '', '↳ reviewer  waits for the diff'],
+  ['a', '', 'The test-writer runs the new cases now. I wait for the result, then ask the reviewer.']
+];
+const FILES = [
+  { n: 'crates/orch/src/budget.rs', a: 38, r: 4, lines: [['h', '', '', '@@ -1,12 +1,46 @@'], ['', '1', '1', 'use crate::session::Codebase;'], ['a', '', '2', 'use std::collections::HashMap;'], ['', '2', '3', ''], ['a', '', '4', 'pub struct Budget {'], ['a', '', '5', '    pub max_children: u8,      // default 4'], ['a', '', '6', '    pub max_per_codebase: u8, // default 12'], ['a', '', '7', '    running: HashMap<Codebase, u8>,'], ['a', '', '8', '}'], ['', '3', '9', ''], ['r', '4', '', 'pub fn budget_ok() -> bool { true }'], ['a', '', '10', 'impl Budget {'], ['a', '', '11', '    pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError> {'], ['a', '', '12', '        let n = self.running.get(cb).copied().unwrap_or(0);'], ['a', '', '13', '        if n >= self.max_per_codebase { return Err(BudgetError::Codebase(n)); }'], ['a', '', '14', '        Ok(())'], ['a', '', '15', '    }'], ['a', '', '16', '}']] },
+  { n: 'crates/orch/src/spawn.rs', a: 21, r: 6, lines: [['h', '', '', '@@ -88,9 +88,24 @@ impl Orchestrator'], ['', '88', '88', '    pub fn spawn_child(&mut self, cfg: ChildCfg) -> Result<SessionId> {'], ['r', '89', '', '        let child = Session::spawn(cfg)?;'], ['a', '', '89', '        self.budget.check(&cfg.codebase)?;'], ['a', '', '90', '        let child = Session::spawn(cfg)?;'], ['', '90', '91', '        self.children.push(child.id);']] },
+  { n: 'tests/budget_exceeds.rs', a: 96, r: 0, lines: [['h', '', '', '@@ -0,0 +1,96 @@'], ['a', '', '1', '#[test]'], ['a', '', '2', 'fn rejects_the_13th_session_in_a_codebase() {'], ['a', '', '3', '    let b = Budget::new(4, 12);'], ['a', '', '4', '    assert!(b.with_running("code", 12).check(&"code".into()).is_err());'], ['a', '', '5', '}']] },
+  { n: 'crates/orch/src/lib.rs', a: 1, r: 0, lines: [['h', '', '', '@@ -3,6 +3,7 @@'], ['', '3', '3', 'pub mod spawn;'], ['a', '', '4', 'pub mod budget;']] }
+];
+const PM = { claude: ['opus-5.5', 'sonnet-5.5', 'haiku-5.5'], codex: ['gpt-5.2-codex', 'gpt-5.2'], gemini: ['3-pro', '3-flash'], opencode: ['kimi-k2', 'qwen3-coder'], goose: ['goose-1.9'] };
+const PVC = { claude: '#D97757', codex: '#1A1A2E', gemini: '#4B5BDB', opencode: '#7C3AED', goose: '#0D9488' };
+const MODES = ['Plan', 'Edit', 'Auto'];
+const EFF = ['low', 'medium', 'high', 'max'];
+const r1 = x => Math.round(x * 10) / 10;
+const fmtDur = m => m < 1 ? Math.round(m * 60) + ' s' : r1(m) + ' min';
+const clock = m => { const t = 14 * 60 + 40 - NOW + m, h = Math.floor(t / 60), mm = Math.floor(t % 60), s = Math.round((t * 60) % 60); return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(s).padStart(2, '0'); };
+
+class Component extends DCLogic {
+  state = { tab: 'waterfall', sel: 's12', collapsed: {}, kind: 'all', file: 0, menu: '', cmp: {}, rec: false };
+
+  composer() {
+    const cs = this.state.cmp, open = this.state.menu;
+    const pk = cs.pv || 'claude', md = cs.model || (pk === 'claude' ? 'opus-5.5' : PM[pk][0]), mode = cs.mode || 'Edit', eff = cs.effort || 'high';
+    const set = patch => this.setState({ cmp: { ...cs, ...patch }, menu: '' });
+    const toggle = key => () => this.setState({ menu: open === key ? '' : key });
+    const lists = {
+      mode: MODES.map(x => ({ t: x, on: x === mode ? 'on' : '', pick: () => set({ mode: x }) })),
+      prov: Object.keys(PM).map(x => ({ t: x, on: x === pk ? 'on' : '', pick: () => set({ pv: x, model: PM[x][0] }) })),
+      model: PM[pk].map(x => ({ t: x, on: x === md ? 'on' : '', pick: () => set({ model: x }) })),
+      eff: EFF.map(x => ({ t: x + ' effort', on: x === eff ? 'on' : '', pick: () => set({ effort: x }) }))
+    };
+    const mx = { mode: 34, prov: 84, model: 160, eff: 250 };
+    return {
+      mode, prov: pk, pc: PVC[pk], model: md, effort: eff,
+      openMode: toggle('mode'), openProv: toggle('prov'), openModel: toggle('model'), openEff: toggle('eff'),
+      onMode: open === 'mode' ? 'on' : '', onProv: open === 'prov' ? 'on' : '', onModel: open === 'model' ? 'on' : '', onEff: open === 'eff' ? 'on' : '',
+      menuOpen: !!lists[open], items: lists[open] || [], mx: mx[open] || 0
+    };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const kids = id => SP.some(x => x.p === id);
+    const hidden = x => { let p = x.p; while (p) { if (st.collapsed[p]) return true; p = (SP.find(y => y.id === p) || {}).p; } return false; };
+    const depth = x => { let d = 0, p = x.p; while (p) { d++; p = (SP.find(y => y.id === p) || {}).p; } return d; };
+    const vis = SP.filter(x => !hidden(x));
+    const rows = vis.map(x => {
+      const has = kids(x.id), col = !!st.collapsed[x.id];
+      return {
+        n: x.n, kl: KL[x.k], c: KC[x.k], ind: depth(x) * 18,
+        x: r1(x.s / T * 100), w: r1(Math.max(0.35, (x.e - x.s) / T * 100)), dur: fmtDur(x.e - x.s), runCls: x.st === 'w' ? 'run' : '',
+        cls: (x.id === st.sel ? 'sel ' : '') + (st.kind !== 'all' && x.k !== st.kind ? 'dim' : ''),
+        chevCls: has ? (col ? '' : 'open') : 'none', chevLabel: col ? 'Expand' : 'Collapse',
+        toggle: e => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ collapsed: { ...this.state.collapsed, [x.id]: !this.state.collapsed[x.id] } }); },
+        pick: () => this.setState({ sel: x.id })
+      };
+    });
+    const sel = SP.find(x => x.id === st.sel) || SP[0];
+    const ev = {
+      head: KL[sel.k] + ' evidence', n: sel.n, stc: sel.st, stl: STL[sel.st] || 'done',
+      fields: [
+        { k: 'Kind', v: sel.k }, { k: 'Duration', v: fmtDur(sel.e - sel.s) },
+        { k: 'Agent', v: sel.a }, { k: 'Model', v: sel.a === 'main' ? 'opus-5.5' : 'sonnet-5.5' },
+        { k: 'Provider', v: 'Claude Code' }, { k: 'Tool', v: sel.tool || '—' },
+        { k: 'Input tokens', v: sel.tin ? sel.tin.toLocaleString('en-US') : '0' }, { k: 'Output tokens', v: sel.tout ? sel.tout.toLocaleString('en-US') : '0' },
+        { k: 'Cost', v: '$' + sel.cost.toFixed(2) }, { k: 'Span', v: sel.id },
+        { k: 'Start', v: clock(sel.s) }, { k: 'End', v: sel.st === 'w' || sel.st === 'q' ? 'running' : clock(sel.e) }
+      ],
+      inp: sel.inp, out: sel.out
+    };
+    const N = id => NODES.find(n => n.id === id);
+    const edges = EDGES.map(([a, b]) => {
+      const A = N(a), B = N(b), x1 = A.x + 200, y1 = A.y + 48, x2 = B.x, y2 = B.y + 48, xm = (x1 + x2) / 2;
+      return { d: 'M' + x1 + ',' + y1 + ' C' + xm + ',' + y1 + ' ' + xm + ',' + y2 + ' ' + x2 + ',' + y2, c: B.st === 'p' ? '#C9CED8' : '#8A93A6', dash: B.st === 'p' || B.st === 'q' ? '4 4' : '' };
+    });
+    const nodes = NODES.map(n => ({ ...n, stl: STL[n.st], cls: n.span && n.span === st.sel ? 'sel' : '', pick: () => n.span && this.setState({ sel: n.span }) }));
+    const file = FILES[st.file];
+    const tabsDef = [['waterfall', 'Waterfall'], ['dag', 'DAG'], ['transcript', 'Transcript'], ['diff', 'Diff · 4 files']];
+    const kindsDef = [['all', 'All', '#1A1A2E'], ['llm', 'LLM', KC.llm], ['tool', 'Tool', KC.tool], ['agent', 'Agent', KC.agent], ['turn', 'Turn', KC.turn]];
+    return {
+      stats: [
+        { k: 'Agents', v: '1 + 3 sub' }, { k: 'Turns', v: '3' }, { k: 'Tool calls', v: '47' }, { k: 'Cost', v: '$3.12' }, { k: 'Context', v: '41%' }
+      ],
+      tabs: tabsDef.map(([k, label]) => ({ label, on: st.tab === k ? 'on' : '', sel: st.tab === k ? 'true' : 'false', pick: () => this.setState({ tab: k }) })),
+      isWf: st.tab === 'waterfall', isDag: st.tab === 'dag', isTr: st.tab === 'transcript', isDf: st.tab === 'diff',
+      kinds: kindsDef.map(([k, label, c]) => ({ label, c, on: st.kind === k ? 'on' : '', pressed: st.kind === k ? 'true' : 'false', pick: () => this.setState({ kind: k }) })),
+      spanCount: vis.length + ' / ' + SP.length + ' spans',
+      ticks: [0, 5, 10, 15, 20].map(m => ({ x: r1(m / T * 100), l: m + ' min' })), nowX: r1(NOW / T * 100),
+      rows, ev, edges, nodes,
+      tr: TR.map(([k, a, b]) => ({ k, a, b })),
+      files: FILES.map((f, i) => ({ n: f.n, a: f.a, r: f.r, on: i === st.file ? 'on' : '', pick: () => this.setState({ file: i }) })),
+      file: { n: file.n, a: file.a, r: file.r, lines: file.lines.map(([t, o, n, s]) => ({ t, o, n, s })) },
+      cm: this.composer(), target: 'main',
+      ph: st.rec ? 'Listening… speak now' : 'Message the session, or @ a subagent…',
+      recCls: st.rec ? 'rec' : '', recPressed: st.rec ? 'true' : 'false', recPick: () => this.setState({ rec: !this.state.rec })
+    };
+  }
+}
+</script>
+</body>
+</html>

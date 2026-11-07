@@ -1,0 +1,28 @@
+[package]
+name = "aivory-link"
+description = "AIVory Code remote link: iroh endpoint and device keys for the phone"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+iroh = { version = "1.4", default-features = false, features = ["tls-ring"] }
+tokio = { version = "1", features = ["rt-multi-thread", "io-util", "time", "sync"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+getrandom = "0.3"
+base64 = "0.22"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+rand_core = { version = "0.6", features = ["getrandom"] }
+sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[lints]
+workspace = true

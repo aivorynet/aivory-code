@@ -1,0 +1,1 @@
+{"type":"user","uuid":"u-2222-15","timestamp":"2026-03-01T10:00:01.000Z","sessionId":"22222222-aaaa-4aaa-8aaa-222222222222","cwd":"C:\\synthetic\\app","gitBranch":"main","isSidechain":false,"version":"2.1.0-test","message":{"role":"user","content":"Run the tests"}}

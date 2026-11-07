@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400&amp;family=Fira+Code:wght@400&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.app{height:100vh;min-height:640px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px;text-decoration:none}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:16px;padding:12px 32px;min-height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08)}
+.hd h1{margin:0;font-size:16px;font-weight:600}
+.hd .mono{font-size:12px;color:#4A5568}
+.body2{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr)}
+.nav{padding:20px 16px 20px 32px;display:flex;flex-direction:column;gap:2px;border-right:1px solid rgba(13,13,14,.08);min-height:0;overflow-y:auto}
+.nv{display:flex;align-items:center;gap:10px;height:36px;padding:0 12px!important;border-radius:8px;font-size:13px;color:#4A5568!important;text-align:left;width:100%}
+.nv:hover{background:#ECEEF2!important;color:#1A1A2E!important}
+.nv.on{background:#FFFFFF!important;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.06),0 0 0 1px rgba(13,13,14,.06)}
+.nv .n{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.cont{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;padding:28px 32px 48px}
+.inner{max-width:880px;display:flex;flex-direction:column;gap:20px}
+.inner h2{margin:0;font-size:20px;font-weight:600}
+.lead{margin:-10px 0 0;font-size:13.5px;line-height:1.55;color:#4A5568}
+.card{background:#FFFFFF;border-radius:12px;box-shadow:0 1px 2px rgba(13,13,14,.04),0 8px 24px rgba(13,13,14,.06)}
+.pv{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.pv1{display:flex;align-items:center;gap:12px}
+.pvm{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#FFFFFF;font-weight:700;font-size:14px;flex:none}
+.pvt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.pvt b{font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 28px;padding-top:14px;border-top:1px solid rgba(13,13,14,.06)}
+.cg{display:flex;flex-direction:column;gap:6px}
+.cg .k{font-size:11.5px;color:#5A6578}
+.pvt span{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578}
+.badge{padding:2px 9px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap}
+.badge.ok{background:#EAF7EE;color:#15803D}.badge.off{background:#F1F3F6;color:#5A6578}.badge.warn{background:#FFF1E6;color:#C2410C}
+.usage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ub{display:flex;flex-direction:column;gap:6px}
+.ub .l{display:flex;justify-content:space-between;font-size:12px;color:#4A5568}
+.ub .l b{font-family:'JetBrains Mono',monospace;font-weight:500;color:#1A1A2E}
+.track{height:6px;border-radius:3px;background:#ECEEF2;overflow:hidden}
+.track i{display:block;height:100%;border-radius:3px;background:#1A1A2E}
+.track i.hi{background:#F97316}
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-top:1px solid rgba(13,13,14,.06)}
+.row:first-child{border-top:0}
+.rl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.rl b{font-size:13.5px;font-weight:500}
+.rl span{font-size:12.5px;color:#5A6578;line-height:1.45}
+.pvr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pvr .k{font-size:12px;color:#5A6578;min-width:110px}
+.seg{display:flex;gap:2px;padding:2px;background:#F1F3F6;border-radius:8px;flex-wrap:wrap}
+.sb{height:28px;padding:0 11px!important;border-radius:6px;font-size:12.5px;color:#4A5568!important;white-space:nowrap}
+.sb:hover{color:#1A1A2E!important}
+.sb.on{background:#FFFFFF;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.sb.mono{font-family:'JetBrains Mono',monospace!important;font-size:12px}
+.tg{width:36px;height:20px;border-radius:999px;background:#C9CED8!important;position:relative;display:block;flex:none;transition:background .15s}
+.tg i{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(13,13,14,.2);transition:left .15s}
+.tg.on{background:#3574F0!important}
+.tg.on i{left:18px}
+.stp{display:flex;align-items:center;border:1px solid rgba(13,13,14,.14);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;flex:none}
+.stp button{width:30px;height:30px;font-size:14px;color:#4A5568!important}
+.stp button:hover{background:#F6F7F9!important;color:#1A1A2E!important}
+.stp span{min-width:64px;text-align:center}
+.gb{height:32px;padding:0 12px!important;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px;white-space:nowrap}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.dv{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:14px 20px;border-top:1px solid rgba(13,13,14,.06)}
+.dv:first-child{border-top:0}
+.dvi{width:36px;height:36px;border-radius:10px;background:#F1F3F6;display:grid;place-items:center;color:#4A5568}
+.dvt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dvt b{font-size:13.5px;font-weight:500}
+.dvt span{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qr{display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;align-items:center;padding:18px 20px}
+.qrb{width:120px;height:120px;border-radius:10px;background:repeating-linear-gradient(0deg,#1A1A2E 0 6px,#FFFFFF 6px 12px),repeating-linear-gradient(90deg,#1A1A2E 0 6px,#FFFFFF 6px 12px);background-blend-mode:difference;border:8px solid #FFFFFF;box-shadow:0 0 0 1px rgba(13,13,14,.1)}
+.nt{display:grid;grid-template-columns:minmax(0,1fr) 80px 80px 80px;align-items:center;padding:12px 20px;border-top:1px solid rgba(13,13,14,.06);gap:8px}
+.nt:first-child{border-top:0}
+.nt.h{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578}
+.nt .c{display:flex;justify-content:center}
+.pvw{padding:12px 14px;border-radius:8px;border:1px solid rgba(13,13,14,.08);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.ok{background:#16A34A}.dot.off{background:#A0AEC0}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+@media (max-width:900px){.body2{grid-template-columns:minmax(0,1fr)}.nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid rgba(13,13,14,.08);padding:12px 16px}.nv{width:auto;white-space:nowrap}.nv .n{display:none}}
+@media (max-width:720px){.app{grid-template-columns:minmax(0,1fr)}.rail{display:none}.cont{padding:20px 16px 40px}.hd{padding:12px 16px}.usage{grid-template-columns:minmax(0,1fr)}.row{flex-direction:column;align-items:flex-start}.nt{grid-template-columns:minmax(0,1fr) 56px 56px 56px}}
+</style>
+</helmet>
+<div class="app">
+<div class="rbw" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri" href="Main.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri" href="Inbox.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<span class="bd">6</span></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri" href="Repos.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri on" href="Settings.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+<header class="hd"><h1>Settings</h1><span class="mono">changes save at once</span></header>
+<div class="body2">
+<div class="nav" role="tablist" aria-label="Settings sections"><sc-for list="{{secs}}" as="s" hint-placeholder-count="6"><button class="nv {{s.on}}" role="tab" aria-selected="{{s.sel}}" onClick="{{s.pick}}">{{s.label}}<span class="n">{{s.n}}</span></button></sc-for></div>
+<div class="cont"><div class="inner">
+
+<sc-if value="{{is.providers}}" hint-placeholder-val="{{true}}">
+<h2>Providers and models</h2>
+<p class="lead">AIVory Code runs each provider's own agent. Set a default model, effort and permission mode per provider. A session can change them in its input box.</p>
+<sc-for list="{{providers}}" as="p" hint-placeholder-count="5">
+<div class="card pv">
+<div class="pv1"><span class="pvm" style="background: {{p.c}}">{{p.m}}</span><span class="pvt"><b>{{p.name}}</b><span>{{p.auth}}</span></span><span class="badge {{p.bc}}">{{p.badge}}</span><button class="tg {{p.onCls}}" aria-label="Enable {{p.name}}" aria-pressed="{{p.pressed}}" onClick="{{p.toggle}}"><i></i></button></div>
+<sc-if value="{{p.hasUsage}}" hint-placeholder-val="{{false}}"><div class="usage"><sc-for list="{{p.usage}}" as="u"><div class="ub"><span class="l">{{u.l}}<b>{{u.v}}</b></span><span class="track"><i class="{{u.hi}}" style="width: {{u.p}}%"></i></span></div></sc-for></div></sc-if>
+<div class="ctl">
+<div class="cg"><span class="k">Default model</span><div class="seg"><sc-for list="{{p.models}}" as="m"><button class="sb mono {{m.on}}" onClick="{{m.pick}}">{{m.t}}</button></sc-for></div></div>
+<div class="cg"><span class="k">Effort</span><div class="seg"><sc-for list="{{p.effs}}" as="m"><button class="sb {{m.on}}" onClick="{{m.pick}}">{{m.t}}</button></sc-for></div></div>
+<div class="cg"><span class="k">Permission mode</span><div class="seg"><sc-for list="{{p.modes}}" as="m"><button class="sb {{m.on}}" onClick="{{m.pick}}">{{m.t}}</button></sc-for></div></div>
+</div>
+</div>
+</sc-for>
+<div class="acts"><button class="gb pri">Add an ACP agent</button><button class="gb">Import from Claude Code settings</button></div>
+</sc-if>
+
+<sc-if value="{{is.autopilot}}" hint-placeholder-val="{{false}}">
+<h2>Autopilot</h2>
+<p class="lead">Autopilot parks idle sessions and starts queued tasks in free slots. It never answers a question or a permission for you.</p>
+<div class="card">
+<div class="row"><div class="rl"><b>Autopilot</b><span>{{apText}}</span></div><button class="tg {{apCls}}" aria-label="Autopilot" aria-pressed="{{apPressed}}" onClick="{{apToggle}}"><i></i></button></div>
+<sc-for list="{{rules}}" as="r"><div class="row"><div class="rl"><b>{{r.label}}</b><span>{{r.help}}</span></div><div class="stp"><button aria-label="Decrease" onClick="{{r.dec}}">−</button><span>{{r.v}}</span><button aria-label="Increase" onClick="{{r.inc}}">+</button></div></div></sc-for>
+<div class="row"><div class="rl"><b>Start queued tasks in free slots</b><span>6 tasks are in the queue now.</span></div><button class="tg {{sqCls}}" aria-label="Start queued tasks" aria-pressed="{{sqPressed}}" onClick="{{sqToggle}}"><i></i></button></div>
+<div class="row"><div class="rl"><b>Order of the queue</b><span>Which task starts first when a slot is free.</span></div><div class="seg"><sc-for list="{{orders}}" as="o"><button class="sb {{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.display}}" hint-placeholder-val="{{false}}">
+<h2>Display</h2>
+<p class="lead">Defaults for the war room. The Display menu in the war room changes them for the current view.</p>
+<div class="card">
+<div class="row"><div class="rl"><b>Theme</b><span>Light first. Dark uses the same tokens.</span></div><div class="seg"><sc-for list="{{themes}}" as="o"><button class="sb {{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div></div>
+<div class="row"><div class="rl"><b>Panes per row</b><span>Auto fits as many consoles as the window width allows.</span></div><div class="seg"><sc-for list="{{perRow}}" as="o"><button class="sb mono {{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div></div>
+<div class="row"><div class="rl"><b>Console font</b><span>Used in all session panes.</span></div><div class="seg"><sc-for list="{{fonts}}" as="o"><button class="sb {{o.on}}" style="font-family: {{o.css}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div></div>
+<div class="row"><div class="rl"><b>Console font size</b><span>9 to 18 px.</span></div><div class="stp"><button aria-label="Smaller" onClick="{{fsDec}}">−</button><span>{{fs}} px</span><button aria-label="Larger" onClick="{{fsInc}}">+</button></div></div>
+<div class="row"><div class="rl"><b>Console background</b><span>Text and diff colors follow the background.</span></div><div class="seg"><sc-for list="{{bgs}}" as="o"><button class="sb {{o.on}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div></div>
+<div class="row"><div class="pvw" style="width: 100%; background: {{bgC}}; color: {{bgT}}; font-family: {{ffCss}}; font-size: {{fs}}px">● Bash  cargo test -p orch budget    └ test result: ok. 22 passed</div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.devices}}" hint-placeholder-val="{{false}}">
+<h2>Daemons and devices</h2>
+<p class="lead">Daemons run the agents. Phones and other desktops connect to them through the hub.</p>
+<div class="card"><sc-for list="{{daemons}}" as="d"><div class="dv"><span class="dvi"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1.5"></rect><path d="M5 14h6"></path></svg></span><span class="dvt"><b>{{d.n}}</b><span>{{d.m}}</span></span><span class="badge {{d.bc}}">{{d.b}}</span><button class="gb">{{d.a}}</button></div></sc-for></div>
+<div class="card"><sc-for list="{{phones}}" as="d"><div class="dv"><span class="dvi"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"></rect><path d="M7 12.5h2"></path></svg></span><span class="dvt"><b>{{d.n}}</b><span>{{d.m}}</span></span><span class="badge {{d.bc}}">{{d.b}}</span><button class="gb">Remove</button></div></sc-for></div>
+<div class="card qr"><span class="qrb" role="img" aria-label="Pairing code"></span><div class="rl"><b>Pair a phone</b><span>Open AIVory Code on the phone, tap Me › Pair, and scan this code. The phone keeps its key in the Secure Enclave or the Android Keystore.</span><div class="acts" style="margin-top: 10px"><button class="gb pri">Show a new code</button><button class="gb">Pair by link</button></div></div></div>
+</sc-if>
+
+<sc-if value="{{is.notify}}" hint-placeholder-val="{{false}}">
+<h2>Notifications</h2>
+<p class="lead">Choose where each event reaches you. Phone pushes are end-to-end encrypted.</p>
+<div class="card">
+<div class="nt h"><span>Event</span><span class="c">Desktop</span><span class="c">Phone</span><span class="c">E-mail</span></div>
+<sc-for list="{{notes}}" as="n"><div class="nt"><div class="rl"><b>{{n.t}}</b><span>{{n.h}}</span></div><sc-for list="{{n.ch}}" as="c"><span class="c"><button class="tg {{c.cls}}" aria-label="{{c.label}}" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}"><i></i></button></span></sc-for></div></sc-for>
+</div>
+<div class="card"><div class="row"><div class="rl"><b>Quiet hours</b><span>No pushes between 22:00 and 07:00. Errors in production repos still come through.</span></div><button class="tg {{quietCls}}" aria-label="Quiet hours" aria-pressed="{{quietPressed}}" onClick="{{quietToggle}}"><i></i></button></div></div>
+</sc-if>
+
+<sc-if value="{{is.account}}" hint-placeholder-val="{{false}}">
+<h2>Account and license</h2>
+<div class="card">
+<div class="row"><div class="rl"><b>Your account</b><span>team "aivory" · 4 seats</span></div><button class="gb">Manage the team</button></div>
+<div class="row"><div class="rl"><b>License</b><span>AIVory Code Team · renews on 2027-01-04</span></div><span class="badge ok">active</span></div>
+<div class="row"><div class="rl"><b>Hub</b><span>hub.aivory.net · relay eu-central</span></div><span class="badge ok">connected</span></div>
+</div>
+</sc-if>
+
+</div></div>
+</div>
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>settings sync to 2 phones</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span>14:40</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const SECS = [['providers', 'Providers and models', '5'], ['autopilot', 'Autopilot', 'on'], ['display', 'Display', ''], ['devices', 'Daemons and devices', '5'], ['notify', 'Notifications', ''], ['account', 'Account and license', '']];
+const PROV = [
+  { k: 'claude', name: 'Claude Code', m: 'C', c: '#D97757', auth: 'subscription · Max · signed in', badge: 'connected', bc: 'ok', usage: [['5 h window', 62], ['Week', 41]], models: ['opus-5.5', 'sonnet-5.5', 'haiku-5.5'] },
+  { k: 'codex', name: 'Codex', m: 'X', c: '#1A1A2E', auth: 'ChatGPT Pro · signed in', badge: 'connected', bc: 'ok', usage: [['5 h window', 31], ['Week', 22]], models: ['gpt-5.2-codex', 'gpt-5.2'] },
+  { k: 'gemini', name: 'Gemini CLI', m: 'G', c: '#4B5BDB', auth: 'API key · $18.20 this month', badge: 'connected', bc: 'ok', usage: [['Daily quota', 18], ['Monthly budget $60', 30]], models: ['3-pro', '3-flash'] },
+  { k: 'opencode', name: 'OpenCode', m: 'O', c: '#7C3AED', auth: 'ACP agent · local · kimi-k2 through OpenRouter', badge: 'ACP', bc: 'off', usage: [], models: ['kimi-k2', 'qwen3-coder'] },
+  { k: 'goose', name: 'Goose', m: 'G', c: '#0D9488', auth: 'ACP agent · local', badge: 'ACP', bc: 'off', usage: [], models: ['goose-1.9'] }
+];
+const FONTS = ['JetBrains Mono', 'IBM Plex Mono', 'Fira Code'];
+const BGS = [['light', 'White', '#FFFFFF', '#1A1A2E'], ['grey', 'Grey', '#F4F5F7', '#1A1A2E'], ['dark', 'Dark', '#15161B', '#E4E5EA'], ['navy', 'Navy', '#0D1624', '#E4E7F0']];
+const NOTES = [['Needs an answer', 'Question, permission or plan'], ['Error', 'A session stops on an error'], ['Ready for review', 'A task reaches the review gate'], ['Conflict', 'Two sessions edit the same code'], ['Autopilot action', 'A session parks or a queued task starts']];
+
+class Component extends DCLogic {
+  state = { sec: 'providers', en: { claude: true, codex: true, gemini: true, opencode: true, goose: false }, model: {}, eff: {}, mode: {}, ap: true, park: 15, maxRun: 14, maxPer: 4, sq: true, order: 'Priority', theme: 'Light', perRow: 'Auto', ff: 'JetBrains Mono', fs: 12, bg: 'light', notes: { '0-0': true, '0-1': true, '1-0': true, '1-1': true, '1-2': true, '2-0': true, '2-1': true, '3-0': true, '3-1': true, '4-0': true }, quiet: true };
+
+  set(k, id, v) { this.setState({ [k]: { ...this.state[k], [id]: v } }); }
+
+  renderVals() {
+    const st = this.state;
+    const seg = (list, cur, fn) => list.map(t => ({ t, on: t === cur ? 'on' : '', pick: () => fn(t) }));
+    const step = (k, d, lo, hi) => () => this.setState({ [k]: Math.max(lo, Math.min(hi, this.state[k] + d)) });
+    const bg = BGS.find(b => b[0] === st.bg);
+    const is = {}; SECS.forEach(([k]) => { is[k] = st.sec === k; });
+    return {
+      secs: SECS.map(([k, label, n]) => ({ label, n, on: st.sec === k ? 'on' : '', sel: st.sec === k ? 'true' : 'false', pick: () => this.setState({ sec: k }) })),
+      is,
+      providers: PROV.map(p => {
+        const on = !!st.en[p.k];
+        return {
+          name: p.name, m: p.m, c: p.c, auth: p.auth, badge: on ? p.badge : 'off', bc: on ? p.bc : 'off', onCls: on ? 'on' : '', pressed: on ? 'true' : 'false', toggle: () => this.set('en', p.k, !on),
+          hasUsage: p.usage.length > 0, usage: p.usage.map(([l, v]) => ({ l, v: v + '%', p: v, hi: v > 75 ? 'hi' : '' })),
+          models: seg(p.models, st.model[p.k] || p.models[0], t => this.set('model', p.k, t)),
+          effs: seg(['low', 'medium', 'high', 'max'], st.eff[p.k] || 'high', t => this.set('eff', p.k, t)),
+          modes: seg(['Plan', 'Edit', 'Auto'], st.mode[p.k] || 'Edit', t => this.set('mode', p.k, t))
+        };
+      }),
+      apText: st.ap ? 'On. Parks idle sessions after ' + st.park + ' min and keeps at most ' + st.maxRun + ' running.' : 'Off. Idle sessions stay open.',
+      apCls: st.ap ? 'on' : '', apPressed: st.ap ? 'true' : 'false', apToggle: () => this.setState({ ap: !this.state.ap }),
+      rules: [
+        { label: 'Park idle sessions after', help: 'A parked session keeps its history and resumes in one click.', v: st.park + ' min', dec: step('park', -5, 5, 120), inc: step('park', 5, 5, 120) },
+        { label: 'Max running sessions', help: 'Across all codebases and daemons.', v: String(st.maxRun), dec: step('maxRun', -1, 1, 64), inc: step('maxRun', 1, 1, 64) },
+        { label: 'Max sessions per codebase', help: 'Keeps one repo from taking all slots.', v: String(st.maxPer), dec: step('maxPer', -1, 1, 16), inc: step('maxPer', 1, 1, 16) }
+      ],
+      sqCls: st.sq ? 'on' : '', sqPressed: st.sq ? 'true' : 'false', sqToggle: () => this.setState({ sq: !this.state.sq }),
+      orders: seg(['Priority', 'Oldest first', 'Smallest first'], st.order, t => this.setState({ order: t })),
+      themes: seg(['Light', 'Dark', 'System'], st.theme, t => this.setState({ theme: t })),
+      perRow: seg(['Auto', '1', '2', '3', '4', '8', '9', '16'], st.perRow, t => this.setState({ perRow: t })),
+      fonts: FONTS.map(f => ({ t: f, css: "'" + f + "', monospace", on: f === st.ff ? 'on' : '', pick: () => this.setState({ ff: f }) })),
+      fs: st.fs, fsDec: step('fs', -1, 9, 18), fsInc: step('fs', 1, 9, 18),
+      bgs: BGS.map(([k, t]) => ({ t, on: k === st.bg ? 'on' : '', pick: () => this.setState({ bg: k }) })),
+      bgC: bg[2], bgT: bg[3], ffCss: "'" + st.ff + "', monospace",
+      daemons: [
+        { n: 'desktop · this machine', m: 'aivoryd 0.9.2 · Windows 11 · 14 sessions', b: 'running', bc: 'ok', a: 'Restart' },
+        { n: 'build-01', m: 'ssh pp@build-01 · aivoryd 0.9.2 · 5 sessions', b: 'running', bc: 'ok', a: 'Open shell' },
+        { n: 'runner-eu', m: 'cloud runner · eu-central · 2 sessions', b: 'running', bc: 'ok', a: 'Scale' }
+      ],
+      phones: [
+        { n: 'Pixel 9 Pro', m: 'Android 16 · paired 2026-09-30 · last seen 2 min ago', b: 'online', bc: 'ok' },
+        { n: 'iPhone 16', m: 'iOS 26 · paired 2026-10-02 · last seen yesterday', b: 'offline', bc: 'off' }
+      ],
+      notes: NOTES.map(([t, h], i) => ({ t, h, ch: ['Desktop', 'Phone', 'E-mail'].map((c, j) => { const on = !!st.notes[i + '-' + j]; return { label: t + ' by ' + c, cls: on ? 'on' : '', pressed: on ? 'true' : 'false', pick: () => this.set('notes', i + '-' + j, !on) }; }) })),
+      quietCls: st.quiet ? 'on' : '', quietPressed: st.quiet ? 'true' : 'false', quietToggle: () => this.setState({ quiet: !this.state.quiet })
+    };
+  }
+}
+</script>
+</body>
+</html>

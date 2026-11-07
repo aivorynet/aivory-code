@@ -1,0 +1,8 @@
+{
+ "agentType": "Explore",
+ "description": "Find usages",
+ "toolUseId": "tu-a",
+ "spawnDepth": 1,
+ "model": "haiku",
+ "finished": true
+}

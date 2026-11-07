@@ -1,0 +1,337 @@
+{
+  "files": [
+    {
+      "added": 88,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -40,10 +40,52 @@"
+        },
+        {
+          "kind": "context",
+          "new": 40,
+          "old": 40,
+          "text": "impl Ledger {"
+        },
+        {
+          "blame": {
+            "at": 1792591920000,
+            "cost": 0.16,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 41,
+          "text": "    pub fn compact(&mut self, older_than: Days) -> Stats {"
+        },
+        {
+          "blame": {
+            "at": 1792591980000,
+            "cost": 0.19,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 42,
+          "text": "        let old = self.segments_older_than(older_than);"
+        },
+        {
+          "blame": {
+            "at": 1792592040000,
+            "cost": 0.22,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 3
+          },
+          "kind": "added",
+          "new": 43,
+          "text": "        let merged = old.chunks(2).map(|p| merge(&p[0], p.get(1)));"
+        },
+        {
+          "blame": {
+            "at": 1792592100000,
+            "cost": 0.25,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 44,
+          "text": "        self.replace(old, merged.collect())"
+        },
+        {
+          "blame": {
+            "at": 1792592160000,
+            "cost": 0.28,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 45,
+          "text": "    }"
+        },
+        {
+          "kind": "context",
+          "new": 46,
+          "old": 41,
+          "text": ""
+        },
+        {
+          "blame": {
+            "at": 1792592280000,
+            "cost": 0.34,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 47,
+          "text": "fn merge(a: &Segment, b: Option<&Segment>) -> Segment {"
+        },
+        {
+          "blame": {
+            "at": 1792592340000,
+            "cost": 0.37,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 48,
+          "text": "    let mut out = Segment::with_capacity(a.len() + b.map_or(0, |b| b.len()));"
+        },
+        {
+          "blame": {
+            "at": 1792592400000,
+            "cost": 0.4,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 3
+          },
+          "kind": "added",
+          "new": 49,
+          "text": "    out.extend(a.newest_per_key(b));"
+        },
+        {
+          "blame": {
+            "at": 1792592460000,
+            "cost": 0.43,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 50,
+          "text": "    out.entries.sort_unstable_by_key(|e| e.key);"
+        },
+        {
+          "blame": {
+            "at": 1792592520000,
+            "cost": 0.46,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 51,
+          "text": "    out.drop_tombstones_older_than(Days(7));"
+        },
+        {
+          "kind": "removed",
+          "old": 42,
+          "text": "    // TODO: compaction"
+        },
+        {
+          "kind": "context",
+          "new": 52,
+          "old": 43,
+          "text": "    out"
+        },
+        {
+          "kind": "context",
+          "new": 53,
+          "old": 44,
+          "text": "}"
+        }
+      ],
+      "path": "crates/ledger/src/compact.rs",
+      "removed": 12
+    },
+    {
+      "added": 34,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -12,8 +12,20 @@"
+        },
+        {
+          "kind": "context",
+          "new": 12,
+          "old": 12,
+          "text": "pub struct Segment {"
+        },
+        {
+          "kind": "context",
+          "new": 13,
+          "old": 13,
+          "text": "    pub entries: Vec<Entry>,"
+        },
+        {
+          "blame": {
+            "at": 1792591980000,
+            "cost": 0.19,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 14,
+          "text": "    pub sealed_at: Timestamp,"
+        },
+        {
+          "kind": "context",
+          "new": 15,
+          "old": 14,
+          "text": "}"
+        },
+        {
+          "kind": "removed",
+          "old": 15,
+          "text": "impl Segment { fn len(&self) -> usize { 0 } }"
+        },
+        {
+          "blame": {
+            "at": 1792592160000,
+            "cost": 0.28,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 16,
+          "text": "impl Segment {"
+        },
+        {
+          "blame": {
+            "at": 1792592220000,
+            "cost": 0.31,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 3
+          },
+          "kind": "added",
+          "new": 17,
+          "text": "    pub fn len(&self) -> usize { self.entries.len() }"
+        },
+        {
+          "blame": {
+            "at": 1792592280000,
+            "cost": 0.34,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 18,
+          "text": "}"
+        }
+      ],
+      "path": "crates/ledger/src/segment.rs",
+      "removed": 22
+    },
+    {
+      "added": 20,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -1,4 +1,20 @@"
+        },
+        {
+          "blame": {
+            "at": 1792591860000,
+            "cost": 0.13,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 3
+          },
+          "kind": "added",
+          "new": 1,
+          "text": "#[test]"
+        },
+        {
+          "blame": {
+            "at": 1792591920000,
+            "cost": 0.16,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 2,
+          "text": "fn drops_old_tombstones() {"
+        },
+        {
+          "blame": {
+            "at": 1792591980000,
+            "cost": 0.19,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 2
+          },
+          "kind": "added",
+          "new": 3,
+          "text": "    let mut l = Ledger::fixture(30);"
+        },
+        {
+          "blame": {
+            "at": 1792592040000,
+            "cost": 0.22,
+            "model": "sonnet-5.5",
+            "prompt": "keep the newest entry per key and drop old tombstones",
+            "session": "a7e2",
+            "turn": 3
+          },
+          "kind": "added",
+          "new": 4,
+          "text": "    assert_eq!(l.compact(Days(7)).dropped, 12);"
+        },
+        {
+          "blame": {
+            "at": 1792592100000,
+            "cost": 0.25,
+            "model": "sonnet-5.5",
+            "prompt": "compact ledger segments older than 7 days",
+            "session": "a7e2",
+            "turn": 4
+          },
+          "kind": "added",
+          "new": 5,
+          "text": "}"
+        }
+      ],
+      "path": "crates/ledger/tests/compact.rs",
+      "removed": 4
+    }
+  ],
+  "session": "a7e2"
+}

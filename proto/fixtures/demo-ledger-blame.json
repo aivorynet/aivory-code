@@ -1,0 +1,50 @@
+{
+  "hunks": [
+    {
+      "commit": {
+        "id": "3f2a91c0d4b8",
+        "summary": "Add the orchestrator skeleton",
+        "time": 1792334400000
+      },
+      "count": 4,
+      "line": 1
+    },
+    {
+      "count": 12,
+      "line": 5,
+      "turn": {
+        "cost": 0.71,
+        "model": "opus-5.5",
+        "n": 1,
+        "prompt": "cap subagent fan-out per session and per codebase",
+        "session": "a01c",
+        "time": 1792592520000
+      }
+    },
+    {
+      "count": 9,
+      "line": 17,
+      "turn": {
+        "cost": 0.88,
+        "model": "opus-5.5",
+        "n": 2,
+        "prompt": "check the limit before a child starts",
+        "session": "a01c",
+        "time": 1792592940000
+      }
+    },
+    {
+      "count": 5,
+      "line": 26,
+      "turn": {
+        "cost": 0.42,
+        "model": "opus-5.5",
+        "n": 3,
+        "prompt": "return a typed error when the limit is hit",
+        "session": "a01c",
+        "time": 1792593360000
+      }
+    }
+  ],
+  "path": "crates/orch/src/budget.rs"
+}

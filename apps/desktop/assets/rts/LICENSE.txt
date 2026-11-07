@@ -1,0 +1,15 @@
+Sprites of the Command look
+
+village/*.png: rendered with Blender by docs/design/looks/rts/tools/render_village.py, repainted
+with FLUX.1 Kontext dev and FLUX.1 schnell on DeepInfra (repaint.py, ground_tile.py), from
+"Fantasy Town Kit" by Kenney (www.kenney.nl), https://kenney.nl/assets/fantasy-town-kit
+License: CC0 1.0 (public domain dedication, http://creativecommons.org/publicdomain/zero/1.0/).
+No attribution needed; we credit the author anyway. The assemblies, the red roof color and the
+robot are original work of this project.
+
+uipanel.png, uibutton.png: cut from the boards RtsTasks.png and RtsSetup.png. These boards hold
+PixelLab images, made on the account of the project owner (Paul Piper). The PixelLab terms
+(updated 2026-10-30, section 1.3) give the user ownership for commercial and non-commercial use.
+
+FLUX: the outputs are AI-generated. The FLUX [dev] Non-Commercial License v2.0, section 2(d), allows
+any use of an output, also commercial. FLUX.1 schnell is Apache-2.0.

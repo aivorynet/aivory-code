@@ -1,0 +1,26 @@
+{"timestamp":"2026-03-01T10:00:00.000Z","type":"session_meta","payload":{"id":"cdx-1","timestamp":"2026-03-01T10:00:00.000Z","cwd":"C:\\synthetic\\app","cli_version":"0.0.0-test","originator":"test","git":{"branch":"main"},"base_instructions":{"text":"instructions"}}}
+{"timestamp":"2026-03-01T10:00:01.000Z","type":"turn_context","payload":{"model":"gpt-test-1","approval_policy":"on-request","cwd":"C:\\synthetic\\app"}}
+{"timestamp":"2026-03-01T10:00:02.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}
+{"timestamp":"2026-03-01T10:00:03.000Z","type":"event_msg","payload":{"type":"user_message","message":"List the files and fix the bug","images":[],"local_images":[],"text_elements":[]}}
+{"timestamp":"2026-03-01T10:00:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>noise</environment_context>"}]}}
+{"timestamp":"2026-03-01T10:00:04.000Z","type":"event_msg","payload":{"type":"agent_reasoning","text":"thinking"}}
+{"timestamp":"2026-03-01T10:00:04.000Z","type":"response_item","payload":{"type":"reasoning","summary":[],"encrypted_content":"x"}}
+{"timestamp":"2026-03-01T10:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\": \"ls -la\", \"workdir\": \"C:\\\\synthetic\\\\app\"}","call_id":"c1"}}
+{"timestamp":"2026-03-01T10:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"Exit code: 0\nWall time: 0.1 seconds\nOutput:\na\nb\nc\nd\ne"}}
+{"timestamp":"2026-03-01T10:00:06.000Z","type":"event_msg","payload":{"type":"token_count","info":null}}
+{"timestamp":"2026-03-01T10:00:07.000Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\": \"false\"}","call_id":"c2"}}
+{"timestamp":"2026-03-01T10:00:08.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c2","output":"Exit code: 1\nWall time: 0.1 seconds\nOutput:\ncommand failed"}}
+{"timestamp":"2026-03-01T10:00:09.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: src/a.rs\n@@\n context\n-old line\n+new line\n*** End Patch","call_id":"c3","status":"completed"}}
+{"timestamp":"2026-03-01T10:00:10.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c3","output":"{\"output\": \"Success. Updated the following files:\\nM src/a.rs\", \"metadata\": {\"exit_code\": 0, \"duration_seconds\": 0.0}}"}}
+{"timestamp":"2026-03-01T10:00:11.000Z","type":"response_item","payload":{"type":"function_call","name":"spawn_agent","arguments":"{\"agent_type\": \"explorer\", \"message\": \"Scan the repo\"}","call_id":"c4"}}
+{"timestamp":"2026-03-01T10:00:12.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c4","output":"agent started"}}
+{"timestamp":"2026-03-01T10:00:13.000Z","type":"response_item","payload":{"type":"web_search_call","status":"completed","action":{"type":"search","query":"rust serde"}}}
+{"timestamp":"2026-03-01T10:00:14.000Z","type":"event_msg","payl
+{"timestamp":"2026-03-01T10:00:15.000Z","type":"event_msg","payload":{"type":"agent_message","message":"I listed the files.\nThe bug is fixed."}}
+{"timestamp":"2026-03-01T10:00:15.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I listed the files.\nThe bug is fixed."}]}}
+{"timestamp":"2026-03-01T10:00:16.000Z","type":"event_msg","payload":{"type":"error","message":"stream disconnected","codex_error_info":"other"}}
+{"timestamp":"2026-03-01T10:00:17.000Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}
+{"timestamp":"2026-03-01T10:00:18.000Z","type":"turn_context","payload":{"model":"gpt-test-2","approval_policy":"on-request","cwd":"C:\\synthetic\\app"}}
+{"timestamp":"2026-03-01T10:00:19.000Z","type":"event_msg","payload":{"type":"user_message","message":"Try again"}}
+{"timestamp":"2026-03-01T10:00:20.000Z","type":"compacted","payload":{"message":"summary"}}
+{"timestamp":"2026-03-01T10:00:21.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"t1","last_agent_message":"x"}}

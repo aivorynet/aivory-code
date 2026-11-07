@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile · Me</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.scroll > *{flex-shrink:0}
+.phn *{box-sizing:border-box}
+:where(.phn) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phn{width:390px;height:844px;position:relative;overflow:hidden;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:#1A1A2E;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{flex:none;height:3px;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.top{flex:none;padding:28px 20px 12px}
+.top h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.sub{font-size:13px;color:#5A6578;margin-top:6px}
+.scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:4px 16px 100px;display:flex;flex-direction:column;gap:8px}
+.scroll::-webkit-scrollbar{display:none}
+.sh{font-size:12px;font-weight:600;color:#4A5568;text-transform:uppercase;letter-spacing:.06em;padding:14px 4px 4px}
+.grp{background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(13,13,14,.04)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(13,13,14,.06);min-height:56px;width:100%;text-align:left}
+.row:first-child{border-top:0}
+.ri{width:34px;height:34px;border-radius:10px;background:#F1F3F6;display:grid;place-items:center;color:#4A5568;flex:none}
+.rt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rt b{font-size:14.5px;font-weight:500}
+.rt span{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.badge.ok{background:#EAF7EE;color:#15803D}.badge.off{background:#F1F3F6;color:#5A6578}
+.ch{color:#8A93A6}
+.ub{display:flex;flex-direction:column;gap:7px;padding:12px 14px;border-top:1px solid rgba(13,13,14,.06)}
+.ub:first-child{border-top:0}
+.ub .l{display:flex;justify-content:space-between;font-size:13.5px}
+.ub .l span:last-child{font-family:'JetBrains Mono',monospace;font-size:12px;color:#4A5568}
+.track{height:8px;border-radius:4px;background:#ECEEF2;overflow:hidden}
+.track i{display:block;height:100%;border-radius:4px;background:#1A1A2E}
+.track i.hi{background:#F97316}
+.tg{width:48px;height:28px;border-radius:999px;background:#C9CED8!important;position:relative;display:block;flex:none;transition:background .15s}
+.tg i{position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(13,13,14,.2);transition:left .15s}
+.tg.on{background:#3574F0!important}
+.tg.on i{left:23px}
+.pair{width:100%;height:52px;border-radius:14px;background:#1A1A2E!important;color:#FFFFFF!important;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#16A34A;flex:none}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:80px;padding:8px 6px 22px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.tb{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;color:#5A6578!important;text-decoration:none;min-height:48px}
+.tb.on{color:#1A1A2E!important;font-weight:600}
+.tb .bd{position:absolute;top:2px;left:calc(50% + 4px);min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#FFFFFF;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+</style>
+</helmet>
+<div class="phn">
+<div class="rbw" aria-hidden="true"></div>
+<div class="top"><h1>Me</h1><div class="sub">team "aivory" · Team license</div></div>
+<div class="scroll">
+<div class="sh">Daemons</div>
+<div class="grp"><sc-for list="{{daemons}}" as="d"><button class="row"><span class="ri"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1.5"></rect><path d="M5 14h6"></path></svg></span><span class="rt"><b>{{d.n}}</b><span>{{d.m}}</span></span><span class="badge ok">{{d.b}}</span></button></sc-for></div>
+
+<div class="sh">Usage windows</div>
+<div class="grp"><sc-for list="{{usage}}" as="u"><div class="ub"><span class="l"><span>{{u.n}}</span><span>{{u.v}}</span></span><span class="track"><i class="{{u.hi}}" style="width: {{u.p}}%"></i></span></div></sc-for></div>
+
+<div class="sh">Budget · October</div>
+<div class="grp"><div class="ub"><span class="l"><span>$412 of $600</span><span>69%</span></span><span class="track"><i style="width: 69%"></i></span></div><button class="row"><span class="rt"><b>Warn me at 80%</b><span>push and e-mail</span></span><span class="ch">›</span></button></div>
+
+<div class="sh">Notifications</div>
+<div class="grp">
+<div class="row"><span class="rt"><b>Quiet hours</b><span>22:00 – 07:00 · errors still come through</span></span><button class="tg {{quietCls}}" aria-label="Quiet hours" aria-pressed="{{quietPressed}}" onClick="{{quietToggle}}"><i></i></button></div>
+<div class="row"><span class="rt"><b>Live Activity for running tasks</b><span>progress on the lock screen</span></span><button class="tg {{liveCls}}" aria-label="Live Activity" aria-pressed="{{livePressed}}" onClick="{{liveToggle}}"><i></i></button></div>
+</div>
+
+<div class="sh">This phone</div>
+<div class="grp">
+<div class="row"><span class="ri"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"></rect><path d="M7 12.5h2"></path></svg></span><span class="rt"><b>Pixel 9 Pro</b><span>key in Android Keystore · paired 2026-09-30</span></span><span class="badge ok">online</span></div>
+<div class="row"><span class="rt"><b>Offline queue</b><span>{{queueText}}</span></span><span class="badge off">{{queueBadge}}</span></div>
+</div>
+<button class="pair"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="4.5" height="4.5"></rect><rect x="9.5" y="2" width="4.5" height="4.5"></rect><rect x="2" y="9.5" width="4.5" height="4.5"></rect><path d="M9.5 9.5h2v2M14 9.5v4.5H9.5"></path></svg>Pair a desktop · scan the QR code</button>
+</div>
+
+<nav class="tabbar" aria-label="Tabs">
+<a class="tb" href="Focus.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.5"></circle><circle cx="8" cy="8" r="2"></circle></svg>Focus<span class="bd">5</span></a>
+<a class="tb" href="Sessions.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>Sessions</a>
+<button class="tb"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</button>
+<a class="tb" href="Diff.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"></path></svg>Code</a>
+<a class="tb on" href="Me.dc.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8"></circle><path d="M2.5 14c.8-2.6 3-4 5.5-4s4.7 1.4 5.5 4"></path></svg>Me</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  state = { quiet: true, live: true };
+
+  renderVals() {
+    const st = this.state;
+    return {
+      daemons: [
+        { n: 'desktop', m: 'aivoryd 0.9.2 · 14 sessions · via hub', b: 'running' },
+        { n: 'build-01', m: 'ssh · 5 sessions', b: 'running' },
+        { n: 'runner-eu', m: 'cloud runner · 2 sessions', b: 'running' }
+      ],
+      usage: [['Claude Code · 5 h window', 62], ['Claude Code · week', 41], ['Codex · 5 h window', 31], ['Gemini · daily quota', 18]].map(([n, p]) => ({ n, p, v: p + '%', hi: p > 60 ? 'hi' : '' })),
+      quietCls: st.quiet ? 'on' : '', quietPressed: st.quiet ? 'true' : 'false', quietToggle: () => this.setState({ quiet: !this.state.quiet }),
+      liveCls: st.live ? 'on' : '', livePressed: st.live ? 'true' : 'false', liveToggle: () => this.setState({ live: !this.state.live }),
+      queueText: 'answers wait here when you are offline', queueBadge: 'empty'
+    };
+  }
+}
+</script>
+</body>
+</html>

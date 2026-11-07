@@ -1,0 +1,35 @@
+{
+  "author": "claude opus-5.5",
+  "codebase": "aivory-code",
+  "parts": [
+    {
+      "name": "ui",
+      "paths": [
+        "crates/ui/**",
+        "assets/**"
+      ]
+    },
+    {
+      "name": "orchestrator",
+      "paths": [
+        "crates/orch/**"
+      ]
+    },
+    {
+      "name": "ledger",
+      "paths": [
+        "crates/ledger/**"
+      ]
+    },
+    {
+      "name": "sync",
+      "paths": [
+        "crates/sync/**",
+        ".aivory/map.toml"
+      ]
+    }
+  ],
+  "source": "# written by agents · reviewed by you\nversion = 3\nupdated = \"2026-10-21T14:12:00Z\"\n\n[[part]]\nname  = \"ui\"\npaths = [\"crates/ui/**\", \"assets/**\"]\n\n[[part]]\nname  = \"orchestrator\"\npaths = [\"crates/orch/**\"]\n\n[[part]]\nname  = \"ledger\"\npaths = [\"crates/ledger/**\"]\n\n[[part]]\nname  = \"sync\"\npaths = [\"crates/sync/**\", \".aivory/map.toml\"]\n",
+  "updated": 1792591920000,
+  "version": 3
+}

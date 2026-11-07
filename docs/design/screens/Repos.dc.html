@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Repos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.app{height:100vh;min-height:640px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px;text-decoration:none}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 32px;min-height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08)}
+.hd h1{margin:0;font-size:16px;font-weight:600}
+.hd .mono{font-size:12px;color:#4A5568}
+.sp{flex:1}
+.hb{height:32px;padding:0 12px!important;border-radius:8px;border:1px solid rgba(13,13,14,.14)!important;font-size:12.5px;white-space:nowrap}
+.hb:hover{border-color:#1A1A2E!important}
+.newb{height:32px;padding:0 14px!important;border-radius:8px;background:#0D0D0E!important;color:#FFFFFF!important;font-size:13px;font-weight:500;white-space:nowrap}
+.body2{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr)}
+.list{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;padding:16px 16px 24px 32px;display:flex;flex-direction:column;gap:6px;border-right:1px solid rgba(13,13,14,.08)}
+.rp{display:flex;flex-direction:column;gap:5px;width:100%;padding:12px 14px!important;border-radius:10px;text-align:left;border:1px solid transparent!important}
+.rp:hover{background:#FFFFFF!important;border-color:rgba(13,13,14,.08)!important}
+.rp.on{background:#FFFFFF!important;border-color:#3574F0!important;box-shadow:0 0 0 3px rgba(53,116,240,.12)}
+.rp1{display:flex;align-items:center;gap:8px}
+.rp1 b{flex:1;font-size:13.5px;font-weight:600}
+.rp1 .dots{display:flex;gap:3px}
+.rp2{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;display:flex;justify-content:space-between;gap:8px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.i{background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}.dot.p,.dot.d{background:#A0AEC0}.dot.ok{background:#16A34A}
+.det{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;padding:20px 32px 32px 28px;display:flex;flex-direction:column;gap:18px}
+.dh{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.dh h2{margin:0;font-size:20px;font-weight:600}
+.dh .mono{font-size:12px;color:#5A6578}
+.facts{display:flex;gap:8px;flex-wrap:wrap}
+.fact{height:26px;padding:0 10px;border-radius:999px;background:#FFFFFF;border:1px solid rgba(13,13,14,.08);display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568}
+.tabs{display:flex;gap:2px;padding:2px;background:#ECEEF2;border-radius:8px;align-self:flex-start}
+.tab{height:30px;padding:0 14px!important;border-radius:6px;font-size:12.5px;color:#4A5568!important}
+.tab.on{background:#FFFFFF;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.card{background:#FFFFFF;border-radius:12px;box-shadow:0 1px 2px rgba(13,13,14,.04),0 8px 24px rgba(13,13,14,.06)}
+.flow{padding:16px 18px}
+.fh{display:flex;align-items:baseline;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:10px}
+.fh b{font-weight:600}
+.fh span{color:#5A6578}
+.fbox{position:relative;height:120px}
+.fbox svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.lab{position:absolute;transform:translateY(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1;white-space:nowrap;color:#1A1A2E;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff}
+.lab.p{font-weight:600}.lab.sq{color:#C2410C;font-weight:600}.lab.se{color:#B91C1C;font-weight:600}.lab.si{color:#5A6578}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{text-align:left;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578;padding:12px 14px;border-bottom:1px solid rgba(13,13,14,.08)}
+.tbl td{padding:11px 14px;border-bottom:1px solid rgba(13,13,14,.06);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .pn{font-weight:600}
+.tbl .pa{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#4A5568}
+.tbl .ss{display:flex;gap:4px;align-items:center}
+.tbl .nm{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#4A5568;white-space:nowrap}
+.tw{overflow-x:auto}
+.ta{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(13,13,14,.08)}
+.gb{height:30px;padding:0 12px!important;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.code{background:#FFFFFF;border:1px solid rgba(13,13,14,.08)}
+.code-h{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:12px}
+.code-h span:last-child{margin-left:auto;color:#5A6578;font-size:11px}
+.cl{display:grid;grid-template-columns:36px minmax(0,1fr);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7}
+.cl .no{color:#A0A7B5;text-align:right;padding-right:10px}
+.cl .tx{white-space:pre;overflow:hidden;text-overflow:ellipsis;padding-right:12px}
+.c-c{color:#8A93A6}.c-k{color:#4B5BDB}.c-s{color:#15803D}.c-h{color:#7C3AED;font-weight:600}
+.tree{padding:8px 0}
+.tn{display:flex;align-items:center;gap:8px;height:30px;padding-right:14px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.tn:hover{background:#F8F9FB}
+.tn .ic{width:14px;color:#8A93A6;text-align:center}
+.tn .nm2{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptag{padding:1px 8px;border-radius:999px;font-size:10.5px;background:#F1F3F6;color:#4A5568}
+.claim{padding:1px 8px;border-radius:999px;font-size:10.5px;background:#EEF2FF;color:#4B5BDB}
+.claim.q{background:#FFF1E6;color:#C2410C}
+.ac{display:grid;grid-template-columns:64px 170px minmax(0,1fr) 90px 64px;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(13,13,14,.06);font-size:12.5px}
+.ac:last-child{border-bottom:0}
+.ac .mono{font-size:11.5px;color:#5A6578}
+.ac .who{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac .add{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
+.ac .add i{font-style:normal;color:#15803D}.ac .add em{font-style:normal;color:#B91C1C}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:999px;flex:none}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+.split.one{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1200px){.split{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:720px){.app{grid-template-columns:minmax(0,1fr)}.rail{display:none}.body2{grid-template-columns:minmax(0,1fr)}.list{display:none}.det{padding:16px}.hd{padding:12px 16px}.ac{grid-template-columns:56px minmax(0,1fr) 70px}.ac .who,.ac .add{display:none}}
+</style>
+</helmet>
+<div class="app">
+<div class="rbw" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri" href="Main.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri" href="Inbox.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<span class="bd">6</span></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri on" href="Repos.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri" href="Settings.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+<header class="hd">
+<h1>Repos</h1>
+<span class="mono">10 codebases · 3 daemons · 31 parts</span>
+<span class="sp"></span>
+<button class="hb">Add a repo</button>
+<button class="newb">New project</button>
+</header>
+
+<div class="body2">
+<div class="list" aria-label="Codebases">
+<sc-for list="{{repos}}" as="r" hint-placeholder-count="10">
+<button class="rp {{r.on}}" onClick="{{r.pick}}">
+<span class="rp1"><b>{{r.name}}</b><span class="dots"><sc-for list="{{r.dots}}" as="d"><i class="dot {{d}}"></i></sc-for></span></span>
+<span class="rp2"><span>{{r.meta}}</span><span>{{r.daemon}}</span></span>
+</button>
+</sc-for>
+</div>
+
+<div class="det">
+<div class="dh">
+<div><h2>{{repo.name}}</h2><span class="mono">{{repo.path}} · {{repo.factLine}}</span></div>
+<span class="sp"></span>
+<a class="hb" href="Main.dc.html" style="display: flex; align-items: center; text-decoration: none; color: #1A1A2E">Show in war room</a>
+</div>
+<div class="tabs" role="tablist" aria-label="Repo views"><sc-for list="{{tabs}}" as="t" hint-placeholder-count="3"><button class="tab {{t.on}}" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}">{{t.label}}</button></sc-for></div>
+
+<sc-if value="{{isParts}}" hint-placeholder-val="{{true}}">
+<sc-if value="{{repo.hasFlow}}" hint-placeholder-val="{{true}}">
+<div class="card flow">
+<div class="fh"><b>agents → parts → state</b><span>{{repo.flowMeta}}</span></div>
+<div class="fbox">
+<svg viewBox="{{flow.vb}}" preserveAspectRatio="none" aria-hidden="true">
+<sc-for list="{{flow.links}}" as="l"><path d="{{l.d}}" fill="none" stroke="{{l.c}}" stroke-opacity="{{l.o}}" stroke-width="{{l.w}}" vector-effect="non-scaling-stroke"></path></sc-for>
+<sc-for list="{{flow.nodes}}" as="n"><rect x="{{n.x}}" y="{{n.y}}" width="{{n.w}}" height="{{n.h}}" rx="2" fill="{{n.c}}"></rect></sc-for>
+</svg>
+<sc-for list="{{flow.labels}}" as="l"><div class="lab {{l.cls}}" style="top: {{l.y}}px; {{l.pos}}">{{l.t}}</div></sc-for>
+</div>
+</div>
+</sc-if>
+<div class="split {{splitCls}}">
+<div class="card">
+<div class="tw"><table class="tbl">
+<thead><tr><th>Part</th><th>Paths</th><th>Live sessions</th><th>Claims</th><th>Last change</th><th>Lines</th></tr></thead>
+<tbody><sc-for list="{{repo.parts}}" as="p"><tr><td class="pn">{{p.n}}</td><td class="pa">{{p.paths}}</td><td><span class="ss"><sc-for list="{{p.dots}}" as="d"><i class="dot {{d}}"></i></sc-for><span class="nm">{{p.sess}}</span></span></td><td class="nm">{{p.claims}}</td><td class="nm">{{p.last}}</td><td class="nm">{{p.lines}}</td></tr></sc-for></tbody>
+</table></div>
+<div class="ta"><button class="gb pri">Re-map parts with an agent</button><button class="gb">Add a part</button><button class="gb" aria-expanded="{{mapExpanded}}" onClick="{{toggleMap}}">{{mapBtn}}</button></div>
+</div>
+<sc-if value="{{showMap}}" hint-placeholder-val="{{false}}"><div class="code">
+<div class="code-h"><span>.aivory/map.toml</span><span>{{repo.mapBy}}</span></div>
+<div style="padding: 8px 0"><sc-for list="{{repo.map}}" as="m"><div class="cl"><span class="no">{{m.no}}</span><span class="tx {{m.c}}">{{m.t}}</span></div></sc-for></div>
+</div></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isFiles}}" hint-placeholder-val="{{false}}">
+<div class="code"><div class="code-h"><span>{{repo.path}}</span><span>part tags from map.toml · live claims</span></div>
+<div class="tree"><sc-for list="{{repo.files}}" as="f"><div class="tn" style="padding-left: {{f.ind}}px"><span class="ic">{{f.ic}}</span><span class="nm2">{{f.n}}</span><sc-if value="{{f.hasClaim}}" hint-placeholder-val="{{false}}"><span class="claim {{f.cc}}">{{f.claim}}</span></sc-if><sc-if value="{{f.hasPart}}" hint-placeholder-val="{{false}}"><span class="ptag">{{f.part}}</span></sc-if></div></sc-for></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isAct}}" hint-placeholder-val="{{false}}">
+<div class="card"><sc-for list="{{repo.activity}}" as="a"><div class="ac"><span class="mono">{{a.t}}</span><span class="who"><i class="pdot" style="background: {{a.pc}}"></i>{{a.who}}</span><span>{{a.what}}</span><span class="add"><i>+{{a.a}}</i> <em>−{{a.r}}</em></span><span class="mono">{{a.c}}</span></div></sc-for></div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>desktop · build-01 (ssh) · runner-eu</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span>14:40</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const CB = [
+  ['aivory-code', ['ui', 'orchestrator', 'ledger', 'sync'], '~/work/aivory-code', 'main · 4 worktrees', 'desktop', 'Rust'],
+  ['aivory-guard', ['scanner', 'api', 'rules', 'dashboard'], '~/work/aivory-guard', 'main · 3 worktrees', 'desktop', 'Python, TS'],
+  ['billing', ['payment', 'invoices', 'database'], '~/work/billing', 'main · 2 worktrees', 'build-01 (ssh)', 'Rust, SQL'],
+  ['smart-inference', ['router', 'cache', 'metering'], '~/work/smart-inference', 'main · 3 worktrees', 'build-01 (ssh)', 'Go'],
+  ['kronk', ['git', 'runner', 'mcp'], '~/work/kronk', 'main · 2 worktrees', 'desktop', 'Rust'],
+  ['slaide', ['editor', 'render', 'export'], '~/work/slaide', 'main · 3 worktrees', 'runner-eu', 'Python, TS'],
+  ['aivory-hugo', ['pages', 'theme', 'i18n'], '~/work/aivory-hugo', 'main · 1 worktree', 'desktop', 'Hugo'],
+  ['mobile', ['ui', 'sync', 'push'], '~/work/mobile', 'main · 1 worktree', 'desktop', 'Kotlin'],
+  ['docs', ['guides', 'api-ref'], '~/work/docs', 'main', 'desktop', 'Markdown'],
+  ['infra', ['k8s', 'ci'], '~/work/infra', 'main', 'runner-eu', 'YAML']
+];
+const S = [
+  ['7f3a', 'billing', 'payment', 'claude', 'q', 2], ['8a22', 'billing', 'invoices', 'gemini', 'w', 0], ['8d07', 'billing', 'database', 'claude', 'w', 0],
+  ['c218', 'aivory-code', 'ui', 'codex', 'q', 0], ['a01c', 'aivory-code', 'orchestrator', 'claude', 'w', 3], ['a7e2', 'aivory-code', 'ledger', 'claude', 'w', 0], ['d3f0', 'aivory-code', 'sync', 'goose', 'i', 0],
+  ['9b0e', 'aivory-guard', 'rules', 'gemini', 'q', 1], ['5e81', 'aivory-guard', 'scanner', 'claude', 'w', 2], ['6c40', 'aivory-guard', 'rules', 'claude', 'w', 1], ['6f19', 'aivory-guard', 'dashboard', 'gemini', 'i', 0],
+  ['41dd', 'smart-inference', 'cache', 'opencode', 'e', 0], ['90c4', 'smart-inference', 'router', 'claude', 'w', 1], ['93e8', 'smart-inference', 'metering', 'codex', 'w', 0],
+  ['k1b7', 'kronk', 'mcp', 'claude', 'w', 0], ['k4c2', 'kronk', 'runner', 'claude', 'w', 1],
+  ['s3d1', 'slaide', 'render', 'claude', 'w', 2], ['s7a0', 'slaide', 'editor', 'opencode', 'i', 0], ['s9e2', 'slaide', 'export', 'codex', 'w', 0],
+  ['h8f3', 'aivory-hugo', 'i18n', 'gemini', 'w', 1], ['m6b4', 'mobile', 'sync', 'claude', 'w', 0]
+];
+const PVC = { claude: '#D97757', codex: '#1A1A2E', gemini: '#4B5BDB', opencode: '#7C3AED', goose: '#0D9488' };
+const STL = { q: 'needs you', e: 'error', w: 'working', i: 'idle' };
+const ORD = { q: 0, e: 1, w: 2, i: 3 };
+const FLOW = { W: 1000, H: 120, lw: 90, rw: 120, nw: 4, pad: 12, maxU: 12 };
+const LINK = { w: ['#1A1A2E', 0.09], i: ['#8A96A8', 0.18], q: ['#F97316', 0.5], e: ['#DC2626', 0.5] };
+const STC = { w: '#1A1A2E', q: '#F97316', e: '#DC2626', i: '#A0AEC0' };
+const PATHS = {
+  ui: ['crates/ui/**', 'assets/**'], orchestrator: ['crates/orch/**'], ledger: ['crates/ledger/**'], sync: ['crates/sync/**', '.aivory/map.toml'],
+  scanner: ['guard/scanner/**'], api: ['guard/api/**'], rules: ['rules/**', 'guard/rules/**'], dashboard: ['web/**'],
+  payment: ['src/payment/**'], invoices: ['billing/invoices/**'], database: ['billing/db/**', 'migrations/**']
+};
+const r1 = x => Math.round(x * 10) / 10;
+
+class Component extends DCLogic {
+  state = { sel: 'aivory-code', tab: 'parts', showMap: false };
+
+  sankey(cb, list) {
+    const F = FLOW, v = s => 1 + s[5];
+    const parts = CB.find(c => c[0] === cb)[1];
+    const cols = [[], [], []], key = [s => s[3], s => s[2], s => s[4]];
+    list.forEach(s => key.forEach((f, c) => { const k = f(s); let n = cols[c].find(x => x.k === k); if (!n) cols[c].push(n = { k, v: 0 }); n.v += v(s); }));
+    cols[1].sort((a, b) => parts.indexOf(a.k) - parts.indexOf(b.k));
+    cols[2].sort((a, b) => ORD[a.k] - ORD[b.k]);
+    const tot = list.reduce((t, s) => t + v(s), 0);
+    const k = Math.min(F.maxU, ...cols.map(c => (F.H - F.pad * (c.length - 1)) / tot));
+    const xs = [F.lw, (F.lw + F.W - F.rw - F.nw) / 2, F.W - F.rw - F.nw];
+    cols.forEach((c, ci) => { let y = (F.H - tot * k - F.pad * (c.length - 1)) / 2; c.forEach((n, i) => { n.i = i; n.x = xs[ci]; n.y = y; n.h = n.v * k; n.oy = y; n.iy = y; y += n.h + F.pad; }); });
+    const find = (c, kk) => cols[c].find(n => n.k === kk);
+    const stages = [{}, {}];
+    list.forEach(s => { const a = [s[3], s[2], s[4]].join('|'), b = [s[2], s[4]].join('|'); stages[0][a] = (stages[0][a] || 0) + v(s); stages[1][b] = (stages[1][b] || 0) + v(s); });
+    const links = [], so = (a, b) => ORD[a.st] - ORD[b.st];
+    stages.forEach((m, si) => {
+      const L = Object.keys(m).map(kk => { const p = kk.split('|'), st = p[p.length - 1]; return { src: find(si, p[0]), dst: find(si + 1, si ? st : p[1]), st, h: m[kk] * k }; });
+      L.slice().sort((a, b) => a.dst.i - b.dst.i || so(a, b)).forEach(l => { l.y0 = l.src.oy + l.h / 2; l.src.oy += l.h; });
+      L.slice().sort((a, b) => a.src.i - b.src.i || so(a, b)).forEach(l => { l.y1 = l.dst.iy + l.h / 2; l.dst.iy += l.h; });
+      L.forEach(l => { const xa = r1(l.src.x + F.nw), xb = r1(l.dst.x), xm = r1((xa + xb) / 2), y0 = r1(l.y0), y1 = r1(l.y1); links.push({ o2: ORD[l.st], d: 'M' + xa + ',' + y0 + 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + xb + ',' + y1, w: r1(Math.max(1, l.h - 2)), c: LINK[l.st][0], o: LINK[l.st][1] }); });
+    });
+    links.sort((a, b) => b.o2 - a.o2);
+    const nodes = [], labels = [], pct = x => r1(x / F.W * 100);
+    cols.forEach((c, ci) => c.forEach(n => {
+      nodes.push({ x: r1(n.x), y: r1(n.y), w: F.nw, h: r1(Math.max(2, n.h)), c: ci === 2 ? STC[n.k] : '#1A1A2E' });
+      const y = r1(n.y + n.h / 2);
+      if (ci === 0) labels.push({ y, pos: 'right: ' + r1(100 - pct(n.x) + 0.8) + '%', cls: '', t: n.k + (n.v > 1 ? ' ×' + n.v : '') });
+      else if (ci === 1) labels.push({ y, pos: 'left: ' + r1(pct(n.x + F.nw) + 0.8) + '%', cls: 'p', t: n.k });
+      else labels.push({ y, pos: 'left: ' + r1(pct(n.x + F.nw) + 1) + '%', cls: 's' + n.k, t: STL[n.k] + ' ' + n.v });
+    }));
+    return { vb: '0 0 ' + F.W + ' ' + F.H, links, nodes, labels };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const repo = CB.find(c => c[0] === st.sel) || CB[0];
+    const [name, parts, path, branch, daemon, lang] = repo;
+    const live = S.filter(s => s[1] === name);
+    const pathsOf = p => PATHS[p] || [p + '/**'];
+    const hash = s => s.split('').reduce((t, ch) => t + ch.charCodeAt(0), 0);
+    const map = [['# written by agents · reviewed by you', 'c-c'], ['version = 3', ''], ['updated = "2026-10-21T14:12:00Z"', ''], ['', '']];
+    parts.forEach(p => { map.push(['[[part]]', 'c-h'], ['name  = "' + p + '"', 'c-k'], ['paths = [' + pathsOf(p).map(x => '"' + x + '"').join(', ') + ']', 'c-s'], ['', '']); });
+    const files = [];
+    parts.forEach(p => {
+      const root = pathsOf(p)[0].replace('/**', '');
+      files.push({ ind: 14, ic: '▾', n: root + '/', part: p, hasPart: true, claim: '', hasClaim: false, cc: '' });
+      ['mod.rs', p + '.rs', 'tests.rs'].forEach((f, i) => {
+        const s = live.find(x => x[2] === p);
+        const claimed = s && i === 1;
+        files.push({ ind: 36, ic: '·', n: f, part: '', hasPart: false, hasClaim: !!claimed, claim: claimed ? 'claimed by ' + s[0] : '', cc: claimed && s[4] === 'q' ? 'q' : '' });
+      });
+    });
+    const tabsDef = [['parts', 'Parts'], ['files', 'Files'], ['activity', 'Activity']];
+    return {
+      repos: CB.map(c => { const l = S.filter(s => s[1] === c[0]); return { name: c[0], path: c[2], branch: c[3].split(' · ')[0], daemon: c[4], meta: l.length ? l.length + ' sessions · ' + c[1].length + ' parts' : 'quiet · ' + c[1].length + ' parts', dots: l.map(s => s[4]), on: c[0] === st.sel ? 'on' : '', pick: () => this.setState({ sel: c[0] }) }; }),
+      tabs: tabsDef.map(([k, label]) => ({ label, on: st.tab === k ? 'on' : '', sel: st.tab === k ? 'true' : 'false', pick: () => this.setState({ tab: k }) })),
+      isParts: st.tab === 'parts', isFiles: st.tab === 'files', isAct: st.tab === 'activity',
+      showMap: st.showMap, splitCls: st.showMap ? '' : 'one', mapExpanded: st.showMap ? 'true' : 'false', mapBtn: st.showMap ? 'Hide map.toml' : 'View map.toml', toggleMap: () => this.setState({ showMap: !this.state.showMap }),
+      flow: live.length ? this.sankey(name, live) : { vb: '0 0 10 10', links: [], nodes: [], labels: [] },
+      repo: {
+        name, path, hasFlow: live.length > 0, flowMeta: live.length + ' sessions · ' + live.reduce((t, s) => t + 1 + s[5], 0) + ' agents',
+        factLine: branch + ' · ' + daemon + ' · ' + lang,
+        mapBy: 'by claude opus-5.5 · 26 min ago',
+        parts: parts.map(p => { const ps = live.filter(s => s[2] === p), h = hash(name + p); return { n: p, paths: pathsOf(p).join('  '), dots: ps.map(s => s[4]), sess: ps.length ? ps.map(s => s[0]).join(', ') : '—', claims: ps.length ? String(ps.length + h % 3) : '0', last: ps.length ? (2 + h % 20) + ' min ago' : (1 + h % 9) + ' days ago', lines: (1200 + (h * 37) % 9000).toLocaleString('en-US') }; }),
+        map: map.map(([t, c], i) => ({ no: i + 1, t: t || ' ', c })),
+        files,
+        activity: live.flatMap((s, i) => [[s, 0], [s, 1]]).slice(0, 8).map(([s, j], i) => { const h = hash(s[0] + j); return { t: '14:' + String(38 - i * 4).padStart(2, '0'), pc: PVC[s[3]], who: s[3] + ' · ' + s[0], what: (j ? 'Turn ' + (2 + h % 3) + ' in ' : 'Edit in ') + s[2] + ': ' + ['tests pass', 'new module', 'refactor', 'fix', 'docs'][h % 5], a: 4 + h % 60, r: h % 18, c: '$' + (0.05 + (h % 90) / 100).toFixed(2) }; })
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

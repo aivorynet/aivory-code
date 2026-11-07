@@ -1,0 +1,17 @@
+[package]
+name = "aivory-map"
+description = "AIVory Code part map: parse and write .aivory/map.toml, match files to parts, guess a first map"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-protocol.workspace = true
+globset.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true

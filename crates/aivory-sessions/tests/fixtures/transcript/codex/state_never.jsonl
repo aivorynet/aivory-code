@@ -1,0 +1,5 @@
+{"timestamp":"2026-03-01T10:00:00.000Z","type":"session_meta","payload":{"id":"cdx-1","timestamp":"2026-03-01T10:00:00.000Z","cwd":"C:\\synthetic\\app","cli_version":"0.0.0-test","originator":"test","git":{"branch":"main"},"base_instructions":{"text":"instructions"}}}
+{"timestamp":"2026-03-01T10:00:01.000Z","type":"turn_context","payload":{"model":"gpt-test-1","approval_policy":"never","cwd":"C:\\synthetic\\app"}}
+{"timestamp":"2026-03-01T10:00:02.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}
+{"timestamp":"2026-03-01T10:00:03.000Z","type":"event_msg","payload":{"type":"user_message","message":"Delete it"}}
+{"timestamp":"2026-03-01T10:00:04.000Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\": \"cargo build\"}","call_id":"c1"}}

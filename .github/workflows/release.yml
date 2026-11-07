@@ -1,0 +1,92 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x64, formats: nsis }
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64, formats: dmg }
+          - { os: macos-15-intel, target: x86_64-apple-darwin, name: macos-x64, formats: dmg }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, name: linux-x64, formats: "deb,appimage" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: GPUI system packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libfontconfig-dev libfreetype-dev libasound2-dev libssl-dev \
+            libdbus-1-dev libxdo-dev libgbm-dev libdrm-dev pkg-config clang cmake \
+            libfuse2 libgtk-3-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} -p aivoryd -p aivory-desktop
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
+      - name: Stage binaries where the packager config expects them
+        shell: bash
+        run: |
+          mkdir -p target/release
+          cp target/${{ matrix.target }}/release/aivory* target/release/ 2>/dev/null || true
+          ls target/release | grep -E '^aivory(d)?(\.exe)?$'
+      - name: Package (installer)
+        shell: bash
+        working-directory: apps/desktop
+        run: cargo packager --release --formats ${{ matrix.formats }}
+        env:
+          # Optional macOS signing and notarization; empty means unsigned.
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.PACKAGER_SIGN_PRIVATE_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Portable archive
+        shell: bash
+        run: |
+          mkdir -p out/aivory-${{ matrix.name }}
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/aivory.exe target/release/aivoryd.exe out/aivory-${{ matrix.name }}/
+            cd out && 7z a ../dist/aivory-${{ matrix.name }}.zip aivory-${{ matrix.name }}
+          else
+            cp target/release/aivory target/release/aivoryd out/aivory-${{ matrix.name }}/
+            cd out && tar czf ../dist/aivory-${{ matrix.name }}.tar.gz aivory-${{ matrix.name }}
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aivory-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Windows is the supported platform. The macOS and Linux builds are a preview.
+            The Windows build has no code signature yet, so SmartScreen shows a warning.

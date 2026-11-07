@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inbox</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.app{height:100vh;min-height:640px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px;text-decoration:none}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 32px;min-height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08)}
+.hd h1{margin:0;font-size:16px;font-weight:600}
+.hd .mono{font-size:12px;color:#4A5568}
+.sp{flex:1}
+.seg{display:flex;gap:2px;padding:2px;background:#F1F3F6;border-radius:8px}
+.sb{height:28px;padding:0 12px!important;border-radius:6px;font-size:12.5px;color:#4A5568!important;display:flex;align-items:center;gap:6px}
+.sb:hover{color:#1A1A2E!important}
+.sb.on{background:#FFFFFF;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.sb .n{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.hb{height:32px;padding:0 12px!important;border-radius:8px;border:1px solid rgba(13,13,14,.14)!important;font-size:12.5px;white-space:nowrap}
+.hb:hover{border-color:#1A1A2E!important}
+.body2{flex:1;min-height:0;display:grid;grid-template-columns:420px minmax(0,1fr)}
+.list{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent;padding:16px 16px 24px 32px;display:flex;flex-direction:column;gap:8px;border-right:1px solid rgba(13,13,14,.08)}
+.lh{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578;padding:8px 4px 2px}
+.it{flex-shrink:0;display:flex;flex-direction:column;gap:6px;width:100%;padding:12px 14px!important;background:#FFFFFF!important;border:1px solid rgba(13,13,14,.08)!important;border-radius:10px;text-align:left;transition:border-color .15s,box-shadow .15s}
+.it:hover{border-color:rgba(13,13,14,.2)!important}
+.it.on{border-color:#3574F0!important;box-shadow:0 0 0 3px rgba(53,116,240,.12)}
+.it.done{opacity:.6}
+.it1{display:flex;align-items:center;gap:8px;min-width:0}
+.kd{flex:none;padding:1px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+.kd.q{background:#FFF1E6;color:#C2410C}.kd.e{background:#FDECEC;color:#B91C1C}.kd.r{background:#EAF7EE;color:#15803D}.kd.c{background:#F3EEFF;color:#6D28D9}.kd.d{background:#F1F3F6;color:#5A6578}
+.it1 .tt{flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it1 .ag{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;white-space:nowrap}
+.it2{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.it3{font-size:12.5px;line-height:1.5;color:#4A5568;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.det{min-height:0;display:flex;flex-direction:column;padding:16px 32px 16px 24px;gap:12px}
+.why{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:#4A5568}
+.why b{color:#1A1A2E;font-weight:600}
+.why .nav{margin-left:auto;display:flex;gap:6px}
+.nb{height:30px;padding:0 10px!important;border-radius:8px;border:1px solid rgba(13,13,14,.14)!important;font-size:12px;display:flex;align-items:center;gap:6px;background:#FFFFFF!important}
+.nb:hover{border-color:#1A1A2E!important}
+.nb:disabled{opacity:.4;cursor:default}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid rgba(13,13,14,.08);overflow:hidden}
+.pane.st-q{box-shadow:inset 0 2px 0 #F97316}.pane.st-e{box-shadow:inset 0 2px 0 #DC2626}.pane.st-r{box-shadow:inset 0 2px 0 #16A34A}
+.ph{flex:none;display:flex;flex-direction:column;gap:4px;padding:12px 16px 11px;border-bottom:1px solid rgba(13,13,14,.08)}
+.ph1{display:flex;align-items:center;gap:9px;min-width:0}
+.ph1 .tt{flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph1 a{font-size:12.5px;text-decoration:none;white-space:nowrap}
+.ph2{display:flex;align-items:center;gap:10px;padding-left:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;min-width:0;white-space:nowrap;overflow:hidden}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:999px;margin-right:6px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.r{background:#16A34A}.dot.c{background:#7C3AED}.dot.ok{background:#16A34A}
+.tbody{flex:1;min-height:0;display:flex;flex-direction:column-reverse;overflow-y:auto;scrollbar-width:none;padding:10px 16px 12px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 48px);mask-image:linear-gradient(to bottom,transparent 0,#000 48px)}
+.tbody::-webkit-scrollbar{display:none}
+.ln{font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:#1A1A2E}
+.k-x,.k-o{color:#5A6578}
+.k-u{background:#F3F5F8;margin:8px -6px 3px;padding:3px 6px;border-radius:4px}
+.k-u .pf{color:#5A6578}
+.k-t .pf{font-weight:700;display:inline-block}
+.k-t .pf::first-letter{color:#16A34A}
+.k-p{color:#15803D;background:#F0FAF3;margin:0 -6px;padding:0 6px}
+.k-m{color:#B91C1C;background:#FEF3F3;margin:0 -6px;padding:0 6px}
+.k-s{color:#6D28D9}.k-e{color:#B91C1C}
+.ask{flex:none;margin:0 12px 10px;border:1px solid #F1D9B5;background:#FFFBF4;border-radius:8px;overflow:hidden}
+.ask-h{padding:8px 12px;background:#FDF1DE;color:#92400E;font-size:12px;font-weight:600}
+.ask-b{padding:10px 12px 4px;font-size:13px;line-height:1.5}
+.ask-permission .ask-b{font-family:'JetBrains Mono',monospace;font-size:12.5px}
+.ask-s{margin:0;padding:2px 12px 2px 32px;font-size:12.5px;line-height:1.6}
+.ask-f{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 12px}
+.ask-error{border-color:#F2C7C7;background:#FFF8F8}.ask-error .ask-h{background:#FCE8E8;color:#991B1B}
+.ask-review{border-color:#BFE5CB;background:#F6FCF8}.ask-review .ask-h{background:#E5F5EA;color:#166534}
+.ask-conflict{border-color:#DCCFFB;background:#FAF7FF}.ask-conflict .ask-h{background:#EFE8FE;color:#5B21B6}
+.gates{display:flex;gap:8px;flex-wrap:wrap;padding:6px 12px 0}
+.gate{display:flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:#FFFFFF;border:1px solid rgba(13,13,14,.1);font-family:'JetBrains Mono',monospace;font-size:11px}
+.gate.ok{color:#15803D}.gate.bad{color:#B91C1C}
+.gb{height:30px;padding:0 12px!important;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.gb.pri:hover{background:#2C63D2!important}
+.cf{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 10px}
+.cfp{border:1px solid rgba(13,13,14,.08);background:#FAFBFC;padding:8px 10px}
+.cfp b{display:block;font-size:12px;margin-bottom:4px}
+.cfp .ln{font-size:11.5px}
+.cmpw{flex:none;padding:6px 12px 12px;display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(13,13,14,.08)}
+.act{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#7C3AED;padding:0 2px}
+.act span:last-child{color:#5A6578}
+.gz{display:flex;align-items:stretch;background:#FFFFFF;border:1px solid #CDD2DA;border-radius:12px}
+.gz:focus-within{border-color:#3574F0;box-shadow:0 0 0 3px rgba(53,116,240,.14)}
+.gz-l,.gz-r{display:flex;flex-direction:column;justify-content:space-between;padding:4px;flex:none}
+.gz-c{flex:1;min-width:0;display:flex;flex-direction:column;padding:6px 0 4px}
+.gt{width:100%;min-height:38px;resize:none;border:0;outline:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.45;color:#1A1A2E;padding:2px 2px 0}
+.gt::placeholder{color:#8A93A6}
+.gz-row{display:flex;align-items:center;gap:2px;margin-left:-4px}
+.gd{height:22px;padding:0 6px!important;border-radius:4px;font-size:12px;color:#4A5568!important;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.gd:hover{background:#EBECF0!important;color:#1A1A2E!important}
+.gi{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:#5A6578!important}
+.gi:hover{background:#EBECF0!important;color:#1A1A2E!important}
+.gs{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#3574F0!important;color:#FFFFFF!important}
+.empty{flex:1;display:grid;place-items:center;color:#5A6578;font-size:14px}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+@media (max-width:1000px){.body2{grid-template-columns:320px minmax(0,1fr)}}
+@media (max-width:720px){.app{grid-template-columns:minmax(0,1fr)}.rail{display:none}.body2{grid-template-columns:minmax(0,1fr)}.det{display:none}.list{padding:16px}.hd{padding:12px 16px}}
+</style>
+</helmet>
+<div class="app">
+<div class="rbw" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri" href="Main.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri on" href="Inbox.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<sc-if value="{{hasOpen}}" hint-placeholder-val="{{true}}"><span class="bd">{{openCount}}</span></sc-if></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri" href="Repos.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri" href="Settings.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+<header class="hd">
+<h1>Inbox</h1>
+<span class="mono">{{openCount}} open · oldest waits {{oldest}}</span>
+<span class="sp"></span>
+<div class="seg" role="group" aria-label="Filter"><sc-for list="{{filters}}" as="f" hint-placeholder-count="5"><button class="sb {{f.on}}" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}">{{f.label}}<span class="n">{{f.n}}</span></button></sc-for></div>
+<button class="hb">Snooze all for 30 min</button>
+</header>
+
+<div class="body2">
+<div class="list" aria-label="Items">
+<sc-for list="{{openItems}}" as="i" hint-placeholder-count="6">
+<button class="it {{i.on}}" onClick="{{i.pick}}">
+<span class="it1"><span class="kd {{i.kc}}">{{i.kl}}</span><span class="tt">{{i.t}}</span><span class="ag">{{i.age}}</span></span>
+<span class="it2">{{i.where}} · {{i.ag}}</span>
+<span class="it3">{{i.line}}</span>
+</button>
+</sc-for>
+<sc-if value="{{hasDone}}" hint-placeholder-val="{{false}}"><div class="lh">Done in this session</div></sc-if>
+<sc-for list="{{doneItems}}" as="i"><button class="it done {{i.on}}" onClick="{{i.pick}}"><span class="it1"><span class="kd d">{{i.res}}</span><span class="tt">{{i.t}}</span><span class="ag">just now</span></span><span class="it2">{{i.where}} · {{i.ag}}</span></button></sc-for>
+</div>
+
+<div class="det">
+<sc-if value="{{hasSel}}" hint-placeholder-val="{{true}}">
+<div class="why"><span class="mono" style="font-size: 12px; color: #5A6578">{{posText}}</span>
+<span class="nav"><button class="nb" onClick="{{prev}}" disabled="{{atFirst}}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 10l5-5 5 5"></path></svg>Previous</button><button class="nb" onClick="{{next}}" disabled="{{atLast}}">Next<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6l5 5 5-5"></path></svg></button></span></div>
+<article class="pane st-{{sel.kc}}">
+<div class="ph">
+<div class="ph1"><span class="kd {{sel.kc}}">{{sel.kl}}</span><span class="tt">{{sel.t}}</span><span class="mono" style="font-size: 11px; color: #5A6578">waits {{sel.age}}</span><a href="Session.dc.html">Open deep dive →</a></div>
+<div class="ph2"><span><i class="pdot" style="background: {{sel.pc}}"></i>{{sel.ag}}</span><span>{{sel.where}}</span><span>session {{sel.id}}</span><span>{{sel.cost}}</span></div>
+</div>
+<div class="tbody"><div><sc-for list="{{sel.lines}}" as="l"><div class="ln k-{{l.k}}"><span class="pf">{{l.a}}</span>{{l.b}}</div></sc-for></div></div>
+<sc-if value="{{sel.isConflict}}" hint-placeholder-val="{{false}}"><div class="cf"><sc-for list="{{sel.sides}}" as="c"><div class="cfp"><b>{{c.t}}</b><sc-for list="{{c.lines}}" as="l"><div class="ln k-{{l.k}}">{{l.b}}</div></sc-for></div></sc-for></div></sc-if>
+<div class="ask ask-{{sel.kind}}">
+<div class="ask-h">{{sel.askHead}}</div>
+<div class="ask-b">{{sel.askText}}</div>
+<sc-if value="{{sel.hasSteps}}" hint-placeholder-val="{{false}}"><ol class="ask-s"><sc-for list="{{sel.steps}}" as="x"><li>{{x}}</li></sc-for></ol></sc-if>
+<sc-if value="{{sel.hasGates}}" hint-placeholder-val="{{false}}"><div class="gates"><sc-for list="{{sel.gates}}" as="g"><span class="gate {{g.c}}">{{g.t}}</span></sc-for></div></sc-if>
+<div class="ask-f"><sc-for list="{{sel.opts}}" as="o"><button class="gb {{o.cls}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+</div>
+<div class="cmpw">
+<div class="act"><span>{{sel.act}}</span><span>{{sel.ctx}}</span></div>
+<div class="gz">
+<div class="gz-l"><button class="gi" aria-label="Capture a screen area for context"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 13.5l7-7M8.5 5.5l2 2"></path><path d="M12 1.5v3M10.5 3h3M13.5 7v2M12.5 8h2M5.5 2v2M4.5 3h2"></path></svg></button><button class="gi" aria-label="Attach a file"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M13 7.5l-5.2 5.2a3 3 0 0 1-4.3-4.3l5.6-5.6a2 2 0 0 1 2.9 2.9L6.4 11.3a1 1 0 0 1-1.4-1.4l4.9-4.9"></path></svg></button></div>
+<div class="gz-c"><textarea class="gt" rows="2" aria-label="Answer in your own words" placeholder="Or type your own answer…"></textarea><div class="gz-row"><button class="gd">Edit ▾</button><button class="gd">{{sel.agShort}} ▾</button><button class="gd">high ▾</button></div></div>
+<div class="gz-r"><button class="gi" aria-label="Voice input"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"></rect><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"></path></svg></button><button class="gs" aria-label="Send"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg></button></div>
+</div>
+</div>
+</article>
+</sc-if>
+<sc-if value="{{noSel}}" hint-placeholder-val="{{false}}"><div class="empty">Nothing needs you. All agents work or wait for tasks.</div></sc-if>
+</div>
+</div>
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>21 running · 3 parked</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span><i class="dot ok"></i>relay</span>
+<span>14:40</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const PVC = { claude: '#D97757', codex: '#1A1A2E', gemini: '#4B5BDB', opencode: '#7C3AED', goose: '#0D9488' };
+const KIND = { permission: ['q', 'Permission'], plan: ['q', 'Plan'], question: ['q', 'Question'], error: ['e', 'Error'], review: ['r', 'Review'], conflict: ['c', 'Conflict'] };
+const HEAD = { permission: 'Permission required', plan: 'Plan approval', question: 'Question', error: 'Stopped on an error', review: 'Ready for review', conflict: 'Two sessions edit the same code' };
+const GROUP = { permission: 'answer', plan: 'answer', question: 'answer', error: 'error', review: 'review', conflict: 'conflict' };
+const IT = [
+  { id: '7f3a', kind: 'permission', t: 'Stripe webhook retries', where: 'billing / payment', ag: 'claude · opus-5.5', mn: 6, cost: '$2.41', line: 'sqlx migrate run --database-url $STAGING_DB', text: 'sqlx migrate run --database-url $STAGING_DB', opts: ['Allow', 'Always allow', 'Deny'], pr: 'add retry with exponential backoff to the stripe webhook handler', f: ['src/payment/webhook.rs', 'src/payment/retry.rs'], tail: [['t', 'Edit  src/payment/retry.rs'], ['p', '+ let delay = BASE_MS * 2u64.pow(attempt).min(30_000);'], ['m', '- thread::sleep(Duration::from_secs(1));'], ['s', '↳ test-writer  4 cases for retry::backoff  ✓'], ['s', '↳ migrator  wrote 0042_webhook_attempts.sql'], ['a', 'The retry table needs a new column. I want to apply the migration to staging.']] },
+  { id: 'c218', kind: 'plan', t: 'Virtualize the session grid', where: 'aivory-code / ui', ag: 'codex · gpt-5.2-codex', mn: 3, cost: '$0.88', line: 'Virtualize the grid in 4 steps. Target: under 4 ms per frame.', text: 'Virtualize the grid in 4 steps.', steps: ['Measure tile rows and keep a row index', 'Lay out only the rows in the viewport, plus one', 'Cache shaped text per session line', 'Bench again. Target: under 4 ms'], opts: ['Approve', 'Edit plan', 'Reject'], pr: 'the session grid lags with 40 tiles. virtualize it', f: ['crates/ui/src/grid.rs', 'crates/ui/src/tile.rs'], tail: [['t', 'Bash  cargo bench -p ui grid_render'], ['o', 'grid_render/40  time: [18.2 ms 18.6 ms 19.1 ms]'], ['a', '40 tiles cost 18 ms per frame. Most of it is text layout of hidden rows.'], ['a', 'The plan is ready.']] },
+  { id: '9b0e', kind: 'question', t: 'OWASP rule pack v2', where: 'aivory-guard / rules', ag: 'gemini · 3-pro', mn: 2, cost: '$0.52', line: 'Keep the legacy regex rules as a fallback, or drop them in v2?', text: 'Keep the legacy regex rules as a fallback, or drop them in v2?', opts: ['Keep as fallback', 'Drop them'], pr: 'port the OWASP top-10 rules to the v2 rule format', f: ['rules/owasp/a03_injection.yaml', 'guard/rules/loader.py'], tail: [['t', 'Write  rules/v2/a03_injection.toml'], ['p', '+ [[match]] pattern = "cursor.execute(f-string)"'], ['s', '↳ rule-tester  38 of 41 fixtures pass'], ['a', 'Three fixtures only match with the legacy regex engine.']] },
+  { id: '41dd', kind: 'error', t: 'Redis failover', where: 'smart-inference / cache', ag: 'opencode · kimi-k2', mn: 1, cost: '$0.31', line: 'dial tcp 127.0.0.1:6380: connect: connection refused', text: 'Test infra is missing: no sentinel on :6380.', opts: ['Start sentinel', 'Retry', 'Open log'], pr: 'make the response cache survive a redis primary failover', f: ['cache/redis_pool.go', 'cache/failover_test.go'], tail: [['t', 'Edit  cache/redis_pool.go'], ['p', '+ opts.MaxRetries = 3'], ['t', 'Bash  go test ./cache -run Failover'], ['e', '--- FAIL: TestFailover (5.02s)'], ['e', '    dial tcp 127.0.0.1:6380: connect: connection refused'], ['a', 'The test needs a sentinel on :6380. It does not run.']] },
+  { id: 'a7e2', kind: 'review', t: 'Ledger compaction', where: 'aivory-code / ledger', ag: 'claude · sonnet-5.5', mn: 12, cost: '$0.74', line: 'Done. 3 files, +142 −38. Tests and Guard pass.', text: 'The session is done: 3 files changed, +142 −38. Review the diff before the merge.', gates: [['tests 31/31', 'ok'], ['Guard clean', 'ok'], ['review open', '']], opts: ['Approve and merge', 'Request changes', 'Open the diff'], pr: 'compact ledger segments older than 7 days', f: ['crates/ledger/src/segment.rs', 'crates/ledger/src/compact.rs'], tail: [['t', 'Edit  crates/ledger/src/compact.rs'], ['p', '+ fn merge(a: &Segment, b: &Segment) -> Segment {'], ['t', 'Bash  cargo test -p ledger'], ['o', 'test result: ok. 31 passed; 0 failed'], ['a', 'Compaction is done. Tombstones older than 7 days drop on merge.']] },
+  { id: 'b5c9', kind: 'conflict', t: 'Both edit crates/ui/src/tile.rs', where: 'aivory-code / ui', ag: 'claude · haiku-5.5 and codex · gpt-5.2-codex', mn: 2, cost: '$0.97', line: 'Tile skeleton states and Virtualize the grid change Tile::render.', text: 'The trial merge fails in 2 hunks of Tile::render.', sides: [{ t: 'Tile skeleton states · claude', lines: [['p', '+ TileState::Attaching => self.skeleton(cx),'], ['o', '  render() line 88']] }, { t: 'Virtualize the session grid · codex', lines: [['p', '+ if !self.visible(row) { return Empty; }'], ['o', '  render() line 86']] }], opts: ['Ping both', 'Pause the skeleton session', 'Queue the merge'], pr: 'add skeleton states for tiles while a session attaches', f: ['crates/ui/src/tile.rs'], tail: [['t', 'Edit  crates/ui/src/tile.rs'], ['p', '+ TileState::Attaching => self.skeleton(cx),'], ['x', '— aivoryd: trial merge with session c218 fails —']] }
+];
+const RES = { Allow: 'allowed', 'Always allow': 'allowed', Deny: 'denied', Approve: 'approved', 'Edit plan': 'edit plan', Reject: 'rejected', 'Keep as fallback': 'answered', 'Drop them': 'answered', 'Start sentinel': 'fixed', Retry: 'retried', 'Open log': 'opened', 'Approve and merge': 'merged', 'Request changes': 'changes', 'Open the diff': 'opened', 'Ping both': 'pinged', 'Pause the skeleton session': 'paused', 'Queue the merge': 'queued' };
+
+class Component extends DCLogic {
+  state = { filter: 'all', sel: '7f3a', done: {} };
+
+  lines(s) {
+    const dir = s.f[0].split('/').slice(0, -1).join('/') || '.';
+    const L = [
+      ['x', '', s.ag + ' · ' + s.where + ' · session ' + s.id],
+      ['u', '› ', 'read .aivory/map.toml and stay inside part "' + s.where.split(' / ')[1] + '"'],
+      ['a', '', 'The part maps to ' + dir + '/. I keep my edits inside it.'],
+      ['t', '● Read', '  README.md'], ['o', '  └ ', '74 lines'],
+      ['t', '● Glob', '  "' + dir + '/**"'], ['o', '  └ ', '23 files'],
+      ['a', '', 'I know the layout of the part. Ready for the task.'],
+      ['u', '› ', s.pr],
+      ['a', '', 'I start with ' + s.f[0] + '.'],
+      ['t', '● Read', '  ' + s.f[0]], ['o', '  └ ', '214 lines']
+    ];
+    if (s.f[1]) L.push(['t', '● Read', '  ' + s.f[1]], ['o', '  └ ', '96 lines']);
+    s.tail.forEach(([k, b]) => {
+      if (k === 't') { const i = b.indexOf(' '); L.push(['t', '● ' + b.slice(0, i), b.slice(i)]); }
+      else if (k === 'o') L.push(['o', '  └ ', b]);
+      else L.push([k, '', b]);
+    });
+    return L;
+  }
+
+  renderVals() {
+    const st = this.state;
+    const open = IT.filter(i => !st.done[i.id]);
+    const shown = open.filter(i => st.filter === 'all' || GROUP[i.kind] === st.filter);
+    const sel = IT.find(i => i.id === st.sel && (!st.done[i.id] ? shown.includes(i) : true)) || shown[0] || null;
+    const idx = sel ? shown.indexOf(sel) : -1;
+    const answer = (i, t) => {
+      const rest = shown.filter(x => x.id !== i.id);
+      this.setState({ done: { ...this.state.done, [i.id]: RES[t] || 'done' }, sel: rest.length ? rest[Math.min(idx, rest.length - 1)].id : '' });
+    };
+    const item = i => ({ t: i.t, where: i.where, ag: i.ag, kc: KIND[i.kind][0], kl: KIND[i.kind][1], age: i.mn + ' min', line: i.line, on: sel && sel.id === i.id ? 'on' : '', pick: () => this.setState({ sel: i.id }) });
+    const done = IT.filter(i => st.done[i.id]);
+    const isDone = sel && !!st.done[sel.id];
+    const selVals = sel ? {
+      id: sel.id, t: sel.t, where: sel.where, ag: sel.ag, agShort: sel.ag.split(' and ')[0], kind: sel.kind, kc: KIND[sel.kind][0], kl: KIND[sel.kind][1], age: sel.mn + ' min', cost: sel.cost,
+      pc: PVC[sel.ag.split(' ')[0]] || '#1A1A2E',
+      lines: this.lines(sel).concat(isDone ? [['u', '› ', st.done[sel.id]], ['a', '', 'OK. I continue.']] : []).map(([k, a, b]) => ({ k, a, b })),
+      askHead: isDone ? 'Done · ' + st.done[sel.id] : HEAD[sel.kind], askText: sel.text,
+      hasSteps: !!sel.steps && !isDone, steps: sel.steps || [],
+      hasGates: !!sel.gates, gates: (sel.gates || []).map(([t, c]) => ({ t: (c === 'ok' ? '✓ ' : '○ ') + t, c })),
+      isConflict: sel.kind === 'conflict', sides: (sel.sides || []).map(c => ({ t: c.t, lines: c.lines.map(([k, b]) => ({ k, b })) })),
+      opts: isDone ? [] : sel.opts.map((t, n) => ({ t, cls: n ? '' : 'pri', pick: () => answer(sel, t) })),
+      act: isDone ? 'Running again' : sel.kind === 'review' ? 'Done · waits for your review' : sel.kind === 'conflict' ? 'Trial merge failed · 2 hunks' : 'Waiting for your answer · ' + sel.mn + ' min',
+      ctx: 'ctx 44% · ' + sel.cost
+    } : {};
+    const counts = { all: open.length, answer: open.filter(i => GROUP[i.kind] === 'answer').length, error: open.filter(i => GROUP[i.kind] === 'error').length, review: open.filter(i => GROUP[i.kind] === 'review').length, conflict: open.filter(i => GROUP[i.kind] === 'conflict').length };
+    return {
+      openCount: open.length, hasOpen: open.length > 0, oldest: open.length ? Math.max(...open.map(i => i.mn)) + ' min' : '—',
+      filters: [['all', 'All'], ['answer', 'Answers'], ['error', 'Errors'], ['review', 'Reviews'], ['conflict', 'Conflicts']].map(([k, label]) => ({ label, n: counts[k], on: st.filter === k ? 'on' : '', pressed: st.filter === k ? 'true' : 'false', pick: () => this.setState({ filter: k }) })),
+      openItems: shown.map(item),
+      hasDone: done.length > 0, doneItems: done.map(i => ({ ...item(i), res: st.done[i.id] })),
+      hasSel: !!sel, noSel: !sel, sel: selVals, posText: idx >= 0 ? (idx + 1) + ' of ' + shown.length : 'done in this session',
+      atFirst: idx <= 0, atLast: idx < 0 || idx >= shown.length - 1,
+      prev: () => idx > 0 && this.setState({ sel: shown[idx - 1].id }), next: () => idx >= 0 && idx < shown.length - 1 && this.setState({ sel: shown[idx + 1].id })
+    };
+  }
+}
+</script>
+</body>
+</html>

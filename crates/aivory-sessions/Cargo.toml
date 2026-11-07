@@ -1,0 +1,18 @@
+[package]
+name = "aivory-sessions"
+description = "Read-only index of native Claude Code, Codex CLI, and Gemini CLI session stores"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-protocol.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

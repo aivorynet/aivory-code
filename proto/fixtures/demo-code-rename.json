@@ -1,0 +1,34 @@
+{
+  "exact": false,
+  "files": [
+    {
+      "edits": [
+        {
+          "col": 8,
+          "endCol": 20,
+          "endLine": 7,
+          "line": 7,
+          "newText": "max_kids"
+        },
+        {
+          "col": 15,
+          "endCol": 27,
+          "endLine": 13,
+          "line": 13,
+          "newText": "max_kids"
+        },
+        {
+          "col": 15,
+          "endCol": 27,
+          "endLine": 14,
+          "line": 14,
+          "newText": "max_kids"
+        }
+      ],
+      "path": "crates/orch/src/budget.rs"
+    }
+  ],
+  "newName": "max_kids",
+  "oldName": "max_children",
+  "source": "index"
+}

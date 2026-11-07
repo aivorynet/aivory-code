@@ -1,0 +1,13 @@
+{"sessionId":"gem-2","projectHash":"h","startTime":"2026-03-01T10:00:00.000Z","lastUpdated":"2026-03-01T10:00:05.000Z","kind":"main"}
+{"id":"a1","timestamp":"2026-03-01T10:00:01.000Z","type":"user","content":"First question"}
+{"id":"a2","timestamp":"2026-03-01T10:00:02.000Z","type":"gemini","content":"Checking.","model":"gemini-test-1","toolCalls":[{"id":"x1","name":"run_shell_command","args":{"command":"ls"},"status":"executing","timestamp":"2026-03-01T10:00:00.000Z"}]}
+{"$set":{"summary":"A summary"}}
+{ broken json
+{"id":"a2","timestamp":"2026-03-01T10:00:03.000Z","type":"gemini","content":"Checking.","model":"gemini-test-1","toolCalls":[{"id":"x1","name":"run_shell_command","args":{"command":"ls"},"status":"success","timestamp":"2026-03-01T10:00:00.000Z","displayName":"run_shell_command","result":[{"functionResponse":{"id":"x1","name":"run_shell_command","response":{"output":"a.txt"}}}]}]}
+{"id":"a3","timestamp":"2026-03-01T10:00:04.000Z","type":"user","content":"Second question"}
+{"id":"a4","timestamp":"2026-03-01T10:00:05.000Z","type":"gemini","content":"Answer to the second question.","model":"gemini-test-1"}
+{"id":"a5","timestamp":"2026-03-01T10:00:06.000Z","type":"user","content":"Third question, rewound"}
+{"id":"a6","timestamp":"2026-03-01T10:00:07.000Z","type":"gemini","content":"Answer that is rewound.","model":"gemini-test-1"}
+{"$rewindTo":"a5"}
+{"id":"a7","timestamp":"2026-03-01T10:00:08.000Z","type":"user","content":"Third question again"}
+{"id":"a8","timestamp":"2026-03-01T10:00:09.000Z","type":"gemini","content":"Final answer.","model":"gemini-test-1"}

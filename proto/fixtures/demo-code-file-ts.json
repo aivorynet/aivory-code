@@ -1,0 +1,633 @@
+{
+  "diagnostics": [],
+  "folding": [
+    {
+      "endLine": 5,
+      "kind": "block",
+      "startLine": 1
+    },
+    {
+      "endLine": 14,
+      "kind": "block",
+      "startLine": 7
+    },
+    {
+      "endLine": 12,
+      "kind": "block",
+      "startLine": 9
+    }
+  ],
+  "highlighted": {
+    "from": 1,
+    "to": 14
+  },
+  "highlights": [
+    {
+      "end": 6,
+      "kind": "keyword",
+      "line": 1,
+      "start": 0
+    },
+    {
+      "end": 16,
+      "kind": "keyword",
+      "line": 1,
+      "start": 7
+    },
+    {
+      "end": 24,
+      "kind": "type",
+      "line": 1,
+      "start": 17
+    },
+    {
+      "end": 26,
+      "kind": "punctuation",
+      "line": 1,
+      "start": 25
+    },
+    {
+      "end": 4,
+      "kind": "variable",
+      "line": 2,
+      "start": 2
+    },
+    {
+      "end": 12,
+      "kind": "type",
+      "line": 2,
+      "start": 6
+    },
+    {
+      "end": 13,
+      "kind": "punctuation",
+      "line": 2,
+      "start": 12
+    },
+    {
+      "end": 6,
+      "kind": "variable",
+      "line": 3,
+      "start": 2
+    },
+    {
+      "end": 14,
+      "kind": "type",
+      "line": 3,
+      "start": 8
+    },
+    {
+      "end": 15,
+      "kind": "punctuation",
+      "line": 3,
+      "start": 14
+    },
+    {
+      "end": 10,
+      "kind": "variable",
+      "line": 4,
+      "start": 2
+    },
+    {
+      "end": 17,
+      "kind": "string",
+      "line": 4,
+      "start": 12
+    },
+    {
+      "end": 19,
+      "kind": "operator",
+      "line": 4,
+      "start": 18
+    },
+    {
+      "end": 26,
+      "kind": "string",
+      "line": 4,
+      "start": 20
+    },
+    {
+      "end": 27,
+      "kind": "punctuation",
+      "line": 4,
+      "start": 26
+    },
+    {
+      "end": 1,
+      "kind": "punctuation",
+      "line": 5,
+      "start": 0
+    },
+    {
+      "end": 6,
+      "kind": "keyword",
+      "line": 7,
+      "start": 0
+    },
+    {
+      "end": 15,
+      "kind": "keyword",
+      "line": 7,
+      "start": 7
+    },
+    {
+      "end": 32,
+      "kind": "function",
+      "line": 7,
+      "start": 16
+    },
+    {
+      "end": 33,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 32
+    },
+    {
+      "end": 41,
+      "kind": "variable",
+      "line": 7,
+      "start": 33
+    },
+    {
+      "end": 50,
+      "kind": "type",
+      "line": 7,
+      "start": 43
+    },
+    {
+      "end": 53,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 50
+    },
+    {
+      "end": 58,
+      "kind": "type",
+      "line": 7,
+      "start": 55
+    },
+    {
+      "end": 59,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 58
+    },
+    {
+      "end": 65,
+      "kind": "type",
+      "line": 7,
+      "start": 59
+    },
+    {
+      "end": 66,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 65
+    },
+    {
+      "end": 73,
+      "kind": "type",
+      "line": 7,
+      "start": 67
+    },
+    {
+      "end": 74,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 73
+    },
+    {
+      "end": 76,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 75
+    },
+    {
+      "end": 7,
+      "kind": "keyword",
+      "line": 8,
+      "start": 2
+    },
+    {
+      "end": 11,
+      "kind": "variable",
+      "line": 8,
+      "start": 8
+    },
+    {
+      "end": 13,
+      "kind": "operator",
+      "line": 8,
+      "start": 12
+    },
+    {
+      "end": 17,
+      "kind": "keyword",
+      "line": 8,
+      "start": 14
+    },
+    {
+      "end": 21,
+      "kind": "type",
+      "line": 8,
+      "start": 18
+    },
+    {
+      "end": 22,
+      "kind": "punctuation",
+      "line": 8,
+      "start": 21
+    },
+    {
+      "end": 28,
+      "kind": "type",
+      "line": 8,
+      "start": 22
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 8,
+      "start": 28
+    },
+    {
+      "end": 36,
+      "kind": "type",
+      "line": 8,
+      "start": 30
+    },
+    {
+      "end": 40,
+      "kind": "punctuation",
+      "line": 8,
+      "start": 36
+    },
+    {
+      "end": 5,
+      "kind": "keyword",
+      "line": 9,
+      "start": 2
+    },
+    {
+      "end": 7,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 6
+    },
+    {
+      "end": 12,
+      "kind": "keyword",
+      "line": 9,
+      "start": 7
+    },
+    {
+      "end": 14,
+      "kind": "variable",
+      "line": 9,
+      "start": 13
+    },
+    {
+      "end": 17,
+      "kind": "keyword",
+      "line": 9,
+      "start": 15
+    },
+    {
+      "end": 26,
+      "kind": "variable",
+      "line": 9,
+      "start": 18
+    },
+    {
+      "end": 27,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 26
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 28
+    },
+    {
+      "end": 9,
+      "kind": "keyword",
+      "line": 10,
+      "start": 4
+    },
+    {
+      "end": 13,
+      "kind": "variable",
+      "line": 10,
+      "start": 10
+    },
+    {
+      "end": 15,
+      "kind": "operator",
+      "line": 10,
+      "start": 14
+    },
+    {
+      "end": 17,
+      "kind": "variable",
+      "line": 10,
+      "start": 16
+    },
+    {
+      "end": 18,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 17
+    },
+    {
+      "end": 22,
+      "kind": "variable",
+      "line": 10,
+      "start": 18
+    },
+    {
+      "end": 23,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 22
+    },
+    {
+      "end": 28,
+      "kind": "function",
+      "line": 10,
+      "start": 23
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 28
+    },
+    {
+      "end": 32,
+      "kind": "string",
+      "line": 10,
+      "start": 29
+    },
+    {
+      "end": 34,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 32
+    },
+    {
+      "end": 39,
+      "kind": "function",
+      "line": 10,
+      "start": 34
+    },
+    {
+      "end": 40,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 39
+    },
+    {
+      "end": 41,
+      "kind": "number",
+      "line": 10,
+      "start": 40
+    },
+    {
+      "end": 42,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 41
+    },
+    {
+      "end": 44,
+      "kind": "operator",
+      "line": 10,
+      "start": 43
+    },
+    {
+      "end": 45,
+      "kind": "number",
+      "line": 10,
+      "start": 44
+    },
+    {
+      "end": 47,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 45
+    },
+    {
+      "end": 51,
+      "kind": "function",
+      "line": 10,
+      "start": 47
+    },
+    {
+      "end": 52,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 51
+    },
+    {
+      "end": 55,
+      "kind": "string",
+      "line": 10,
+      "start": 52
+    },
+    {
+      "end": 57,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 55
+    },
+    {
+      "end": 7,
+      "kind": "variable",
+      "line": 11,
+      "start": 4
+    },
+    {
+      "end": 8,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 7
+    },
+    {
+      "end": 11,
+      "kind": "function",
+      "line": 11,
+      "start": 8
+    },
+    {
+      "end": 12,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 11
+    },
+    {
+      "end": 15,
+      "kind": "variable",
+      "line": 11,
+      "start": 12
+    },
+    {
+      "end": 16,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 15
+    },
+    {
+      "end": 18,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 17
+    },
+    {
+      "end": 21,
+      "kind": "variable",
+      "line": 11,
+      "start": 18
+    },
+    {
+      "end": 22,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 21
+    },
+    {
+      "end": 25,
+      "kind": "function",
+      "line": 11,
+      "start": 22
+    },
+    {
+      "end": 26,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 25
+    },
+    {
+      "end": 29,
+      "kind": "variable",
+      "line": 11,
+      "start": 26
+    },
+    {
+      "end": 30,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 29
+    },
+    {
+      "end": 33,
+      "kind": "operator",
+      "line": 11,
+      "start": 31
+    },
+    {
+      "end": 35,
+      "kind": "number",
+      "line": 11,
+      "start": 34
+    },
+    {
+      "end": 36,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 35
+    },
+    {
+      "end": 38,
+      "kind": "operator",
+      "line": 11,
+      "start": 37
+    },
+    {
+      "end": 40,
+      "kind": "number",
+      "line": 11,
+      "start": 39
+    },
+    {
+      "end": 42,
+      "kind": "punctuation",
+      "line": 11,
+      "start": 40
+    },
+    {
+      "end": 3,
+      "kind": "punctuation",
+      "line": 12,
+      "start": 2
+    },
+    {
+      "end": 8,
+      "kind": "keyword",
+      "line": 13,
+      "start": 2
+    },
+    {
+      "end": 12,
+      "kind": "variable",
+      "line": 13,
+      "start": 9
+    },
+    {
+      "end": 13,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 12
+    },
+    {
+      "end": 1,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 0
+    }
+  ],
+  "language": "typescript",
+  "outline": [
+    {
+      "children": [
+        {
+          "endLine": 2,
+          "kind": "property",
+          "line": 2,
+          "name": "id",
+          "startLine": 2
+        },
+        {
+          "endLine": 3,
+          "kind": "property",
+          "line": 3,
+          "name": "path",
+          "startLine": 3
+        },
+        {
+          "endLine": 4,
+          "kind": "property",
+          "line": 4,
+          "name": "severity",
+          "startLine": 4
+        }
+      ],
+      "endLine": 5,
+      "kind": "interface",
+      "line": 1,
+      "name": "Finding",
+      "startLine": 1
+    },
+    {
+      "endLine": 14,
+      "kind": "function",
+      "line": 7,
+      "name": "countByDirectory",
+      "startLine": 7
+    }
+  ],
+  "path": "web/src/findings.ts",
+  "text": "export interface Finding {\n  id: string;\n  path: string;\n  severity: \"low\" | \"high\";\n}\n\nexport function countByDirectory(findings: Finding[]): Map<string, number> {\n  const out = new Map<string, number>();\n  for (const f of findings) {\n    const dir = f.path.split(\"/\").slice(0, -1).join(\"/\");\n    out.set(dir, (out.get(dir) ?? 0) + 1);\n  }\n  return out;\n}\n",
+  "totalLines": 14
+}

@@ -1,0 +1,955 @@
+{
+  "diagnostics": [],
+  "folding": [
+    {
+      "endLine": 3,
+      "kind": "imports",
+      "startLine": 1
+    },
+    {
+      "endLine": 10,
+      "kind": "block",
+      "startLine": 6
+    },
+    {
+      "endLine": 25,
+      "kind": "block",
+      "startLine": 12
+    },
+    {
+      "endLine": 15,
+      "kind": "block",
+      "startLine": 13
+    },
+    {
+      "endLine": 24,
+      "kind": "block",
+      "startLine": 18
+    },
+    {
+      "endLine": 22,
+      "kind": "block",
+      "startLine": 20
+    },
+    {
+      "endLine": 30,
+      "kind": "block",
+      "startLine": 28
+    }
+  ],
+  "highlighted": {
+    "from": 1,
+    "to": 30
+  },
+  "highlights": [
+    {
+      "end": 3,
+      "kind": "keyword",
+      "line": 1,
+      "start": 0
+    },
+    {
+      "end": 9,
+      "kind": "punctuation",
+      "line": 1,
+      "start": 7
+    },
+    {
+      "end": 22,
+      "kind": "punctuation",
+      "line": 1,
+      "start": 20
+    },
+    {
+      "end": 29,
+      "kind": "type",
+      "line": 1,
+      "start": 22
+    },
+    {
+      "end": 30,
+      "kind": "punctuation",
+      "line": 1,
+      "start": 29
+    },
+    {
+      "end": 3,
+      "kind": "keyword",
+      "line": 3,
+      "start": 0
+    },
+    {
+      "end": 9,
+      "kind": "keyword",
+      "line": 3,
+      "start": 4
+    },
+    {
+      "end": 11,
+      "kind": "punctuation",
+      "line": 3,
+      "start": 9
+    },
+    {
+      "end": 20,
+      "kind": "punctuation",
+      "line": 3,
+      "start": 18
+    },
+    {
+      "end": 28,
+      "kind": "type",
+      "line": 3,
+      "start": 20
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 3,
+      "start": 28
+    },
+    {
+      "end": 2,
+      "kind": "comment",
+      "line": 5,
+      "start": 0
+    },
+    {
+      "end": 3,
+      "kind": "operator",
+      "line": 5,
+      "start": 2
+    },
+    {
+      "end": 55,
+      "kind": "comment",
+      "line": 5,
+      "start": 3
+    },
+    {
+      "end": 3,
+      "kind": "keyword",
+      "line": 6,
+      "start": 0
+    },
+    {
+      "end": 10,
+      "kind": "keyword",
+      "line": 6,
+      "start": 4
+    },
+    {
+      "end": 17,
+      "kind": "type",
+      "line": 6,
+      "start": 11
+    },
+    {
+      "end": 19,
+      "kind": "punctuation",
+      "line": 6,
+      "start": 18
+    },
+    {
+      "end": 7,
+      "kind": "keyword",
+      "line": 7,
+      "start": 4
+    },
+    {
+      "end": 20,
+      "kind": "variable",
+      "line": 7,
+      "start": 8
+    },
+    {
+      "end": 21,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 20
+    },
+    {
+      "end": 24,
+      "kind": "type",
+      "line": 7,
+      "start": 22
+    },
+    {
+      "end": 25,
+      "kind": "punctuation",
+      "line": 7,
+      "start": 24
+    },
+    {
+      "end": 7,
+      "kind": "keyword",
+      "line": 8,
+      "start": 4
+    },
+    {
+      "end": 24,
+      "kind": "variable",
+      "line": 8,
+      "start": 8
+    },
+    {
+      "end": 25,
+      "kind": "punctuation",
+      "line": 8,
+      "start": 24
+    },
+    {
+      "end": 28,
+      "kind": "type",
+      "line": 8,
+      "start": 26
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 8,
+      "start": 28
+    },
+    {
+      "end": 11,
+      "kind": "variable",
+      "line": 9,
+      "start": 4
+    },
+    {
+      "end": 12,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 11
+    },
+    {
+      "end": 20,
+      "kind": "type",
+      "line": 9,
+      "start": 13
+    },
+    {
+      "end": 21,
+      "kind": "operator",
+      "line": 9,
+      "start": 20
+    },
+    {
+      "end": 29,
+      "kind": "type",
+      "line": 9,
+      "start": 21
+    },
+    {
+      "end": 30,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 29
+    },
+    {
+      "end": 33,
+      "kind": "type",
+      "line": 9,
+      "start": 31
+    },
+    {
+      "end": 34,
+      "kind": "operator",
+      "line": 9,
+      "start": 33
+    },
+    {
+      "end": 35,
+      "kind": "punctuation",
+      "line": 9,
+      "start": 34
+    },
+    {
+      "end": 1,
+      "kind": "punctuation",
+      "line": 10,
+      "start": 0
+    },
+    {
+      "end": 4,
+      "kind": "keyword",
+      "line": 12,
+      "start": 0
+    },
+    {
+      "end": 11,
+      "kind": "type",
+      "line": 12,
+      "start": 5
+    },
+    {
+      "end": 13,
+      "kind": "punctuation",
+      "line": 12,
+      "start": 12
+    },
+    {
+      "end": 7,
+      "kind": "keyword",
+      "line": 13,
+      "start": 4
+    },
+    {
+      "end": 10,
+      "kind": "keyword",
+      "line": 13,
+      "start": 8
+    },
+    {
+      "end": 14,
+      "kind": "function",
+      "line": 13,
+      "start": 11
+    },
+    {
+      "end": 15,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 14
+    },
+    {
+      "end": 27,
+      "kind": "variable",
+      "line": 13,
+      "start": 15
+    },
+    {
+      "end": 28,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 27
+    },
+    {
+      "end": 31,
+      "kind": "type",
+      "line": 13,
+      "start": 29
+    },
+    {
+      "end": 32,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 31
+    },
+    {
+      "end": 49,
+      "kind": "variable",
+      "line": 13,
+      "start": 33
+    },
+    {
+      "end": 50,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 49
+    },
+    {
+      "end": 53,
+      "kind": "type",
+      "line": 13,
+      "start": 51
+    },
+    {
+      "end": 54,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 53
+    },
+    {
+      "end": 57,
+      "kind": "operator",
+      "line": 13,
+      "start": 55
+    },
+    {
+      "end": 62,
+      "kind": "type",
+      "line": 13,
+      "start": 58
+    },
+    {
+      "end": 64,
+      "kind": "punctuation",
+      "line": 13,
+      "start": 63
+    },
+    {
+      "end": 12,
+      "kind": "type",
+      "line": 14,
+      "start": 8
+    },
+    {
+      "end": 14,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 13
+    },
+    {
+      "end": 28,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 27
+    },
+    {
+      "end": 46,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 45
+    },
+    {
+      "end": 54,
+      "kind": "variable",
+      "line": 14,
+      "start": 47
+    },
+    {
+      "end": 55,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 54
+    },
+    {
+      "end": 63,
+      "kind": "type",
+      "line": 14,
+      "start": 56
+    },
+    {
+      "end": 65,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 63
+    },
+    {
+      "end": 68,
+      "kind": "function",
+      "line": 14,
+      "start": 65
+    },
+    {
+      "end": 70,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 68
+    },
+    {
+      "end": 72,
+      "kind": "punctuation",
+      "line": 14,
+      "start": 71
+    },
+    {
+      "end": 5,
+      "kind": "punctuation",
+      "line": 15,
+      "start": 4
+    },
+    {
+      "end": 6,
+      "kind": "comment",
+      "line": 17,
+      "start": 4
+    },
+    {
+      "end": 7,
+      "kind": "operator",
+      "line": 17,
+      "start": 6
+    },
+    {
+      "end": 46,
+      "kind": "comment",
+      "line": 17,
+      "start": 7
+    },
+    {
+      "end": 7,
+      "kind": "keyword",
+      "line": 18,
+      "start": 4
+    },
+    {
+      "end": 10,
+      "kind": "keyword",
+      "line": 18,
+      "start": 8
+    },
+    {
+      "end": 16,
+      "kind": "function",
+      "line": 18,
+      "start": 11
+    },
+    {
+      "end": 17,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 16
+    },
+    {
+      "end": 18,
+      "kind": "operator",
+      "line": 18,
+      "start": 17
+    },
+    {
+      "end": 22,
+      "kind": "variable",
+      "line": 18,
+      "start": 18
+    },
+    {
+      "end": 23,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 22
+    },
+    {
+      "end": 26,
+      "kind": "variable",
+      "line": 18,
+      "start": 24
+    },
+    {
+      "end": 27,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 26
+    },
+    {
+      "end": 29,
+      "kind": "operator",
+      "line": 18,
+      "start": 28
+    },
+    {
+      "end": 37,
+      "kind": "type",
+      "line": 18,
+      "start": 29
+    },
+    {
+      "end": 38,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 37
+    },
+    {
+      "end": 41,
+      "kind": "operator",
+      "line": 18,
+      "start": 39
+    },
+    {
+      "end": 48,
+      "kind": "type",
+      "line": 18,
+      "start": 42
+    },
+    {
+      "end": 49,
+      "kind": "operator",
+      "line": 18,
+      "start": 48
+    },
+    {
+      "end": 52,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 49
+    },
+    {
+      "end": 64,
+      "kind": "type",
+      "line": 18,
+      "start": 53
+    },
+    {
+      "end": 65,
+      "kind": "operator",
+      "line": 18,
+      "start": 64
+    },
+    {
+      "end": 67,
+      "kind": "punctuation",
+      "line": 18,
+      "start": 66
+    },
+    {
+      "end": 11,
+      "kind": "keyword",
+      "line": 19,
+      "start": 8
+    },
+    {
+      "end": 15,
+      "kind": "operator",
+      "line": 19,
+      "start": 14
+    },
+    {
+      "end": 20,
+      "kind": "variable",
+      "line": 19,
+      "start": 16
+    },
+    {
+      "end": 21,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 20
+    },
+    {
+      "end": 28,
+      "kind": "variable",
+      "line": 19,
+      "start": 21
+    },
+    {
+      "end": 29,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 28
+    },
+    {
+      "end": 32,
+      "kind": "function",
+      "line": 19,
+      "start": 29
+    },
+    {
+      "end": 33,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 32
+    },
+    {
+      "end": 37,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 35
+    },
+    {
+      "end": 43,
+      "kind": "function",
+      "line": 19,
+      "start": 37
+    },
+    {
+      "end": 46,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 43
+    },
+    {
+      "end": 55,
+      "kind": "function",
+      "line": 19,
+      "start": 46
+    },
+    {
+      "end": 56,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 55
+    },
+    {
+      "end": 57,
+      "kind": "number",
+      "line": 19,
+      "start": 56
+    },
+    {
+      "end": 59,
+      "kind": "punctuation",
+      "line": 19,
+      "start": 57
+    },
+    {
+      "end": 10,
+      "kind": "keyword",
+      "line": 20,
+      "start": 8
+    },
+    {
+      "end": 15,
+      "kind": "operator",
+      "line": 20,
+      "start": 13
+    },
+    {
+      "end": 20,
+      "kind": "variable",
+      "line": 20,
+      "start": 16
+    },
+    {
+      "end": 21,
+      "kind": "punctuation",
+      "line": 20,
+      "start": 20
+    },
+    {
+      "end": 37,
+      "kind": "variable",
+      "line": 20,
+      "start": 21
+    },
+    {
+      "end": 39,
+      "kind": "punctuation",
+      "line": 20,
+      "start": 38
+    },
+    {
+      "end": 18,
+      "kind": "keyword",
+      "line": 21,
+      "start": 12
+    },
+    {
+      "end": 22,
+      "kind": "function",
+      "line": 21,
+      "start": 19
+    },
+    {
+      "end": 23,
+      "kind": "punctuation",
+      "line": 21,
+      "start": 22
+    },
+    {
+      "end": 34,
+      "kind": "type",
+      "line": 21,
+      "start": 23
+    },
+    {
+      "end": 36,
+      "kind": "punctuation",
+      "line": 21,
+      "start": 34
+    },
+    {
+      "end": 44,
+      "kind": "function",
+      "line": 21,
+      "start": 36
+    },
+    {
+      "end": 45,
+      "kind": "punctuation",
+      "line": 21,
+      "start": 44
+    },
+    {
+      "end": 49,
+      "kind": "punctuation",
+      "line": 21,
+      "start": 46
+    },
+    {
+      "end": 9,
+      "kind": "punctuation",
+      "line": 22,
+      "start": 8
+    },
+    {
+      "end": 10,
+      "kind": "function",
+      "line": 23,
+      "start": 8
+    },
+    {
+      "end": 14,
+      "kind": "punctuation",
+      "line": 23,
+      "start": 10
+    },
+    {
+      "end": 5,
+      "kind": "punctuation",
+      "line": 24,
+      "start": 4
+    },
+    {
+      "end": 1,
+      "kind": "punctuation",
+      "line": 25,
+      "start": 0
+    },
+    {
+      "end": 1,
+      "kind": "attribute",
+      "line": 27,
+      "start": 0
+    },
+    {
+      "end": 2,
+      "kind": "punctuation",
+      "line": 27,
+      "start": 1
+    },
+    {
+      "end": 8,
+      "kind": "attribute",
+      "line": 27,
+      "start": 2
+    },
+    {
+      "end": 9,
+      "kind": "punctuation",
+      "line": 27,
+      "start": 8
+    },
+    {
+      "end": 14,
+      "kind": "type",
+      "line": 27,
+      "start": 9
+    },
+    {
+      "end": 16,
+      "kind": "punctuation",
+      "line": 27,
+      "start": 14
+    },
+    {
+      "end": 3,
+      "kind": "keyword",
+      "line": 28,
+      "start": 0
+    },
+    {
+      "end": 8,
+      "kind": "keyword",
+      "line": 28,
+      "start": 4
+    },
+    {
+      "end": 20,
+      "kind": "type",
+      "line": 28,
+      "start": 9
+    },
+    {
+      "end": 22,
+      "kind": "punctuation",
+      "line": 28,
+      "start": 21
+    },
+    {
+      "end": 12,
+      "kind": "type",
+      "line": 29,
+      "start": 4
+    },
+    {
+      "end": 13,
+      "kind": "punctuation",
+      "line": 29,
+      "start": 12
+    },
+    {
+      "end": 15,
+      "kind": "type",
+      "line": 29,
+      "start": 13
+    },
+    {
+      "end": 17,
+      "kind": "punctuation",
+      "line": 29,
+      "start": 15
+    },
+    {
+      "end": 1,
+      "kind": "punctuation",
+      "line": 30,
+      "start": 0
+    }
+  ],
+  "language": "rust",
+  "outline": [
+    {
+      "children": [
+        {
+          "endLine": 7,
+          "kind": "field",
+          "line": 7,
+          "name": "max_children",
+          "startLine": 7
+        },
+        {
+          "endLine": 8,
+          "kind": "field",
+          "line": 8,
+          "name": "max_per_codebase",
+          "startLine": 8
+        },
+        {
+          "endLine": 9,
+          "kind": "field",
+          "line": 9,
+          "name": "running",
+          "startLine": 9
+        }
+      ],
+      "endLine": 10,
+      "kind": "struct",
+      "line": 6,
+      "name": "Budget",
+      "startLine": 6
+    },
+    {
+      "children": [
+        {
+          "endLine": 15,
+          "kind": "method",
+          "line": 13,
+          "name": "new",
+          "startLine": 13
+        },
+        {
+          "endLine": 24,
+          "kind": "method",
+          "line": 18,
+          "name": "check",
+          "startLine": 18
+        }
+      ],
+      "endLine": 25,
+      "kind": "impl",
+      "line": 12,
+      "name": "Budget",
+      "startLine": 12
+    },
+    {
+      "children": [
+        {
+          "endLine": 29,
+          "kind": "variant",
+          "line": 29,
+          "name": "Codebase",
+          "startLine": 29
+        }
+      ],
+      "endLine": 30,
+      "kind": "enum",
+      "line": 28,
+      "name": "BudgetError",
+      "startLine": 28
+    }
+  ],
+  "path": "crates/orch/src/budget.rs",
+  "text": "use std::collections::HashMap;\n\nuse crate::session::Codebase;\n\n/// Limits for the children that one session may start.\npub struct Budget {\n    pub max_children: u8,\n    pub max_per_codebase: u8,\n    running: HashMap<Codebase, u8>,\n}\n\nimpl Budget {\n    pub fn new(max_children: u8, max_per_codebase: u8) -> Self {\n        Self { max_children, max_per_codebase, running: HashMap::new() }\n    }\n\n    /// Fails when `cb` has too many children.\n    pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError> {\n        let n = self.running.get(cb).copied().unwrap_or(0);\n        if n >= self.max_per_codebase {\n            return Err(BudgetError::Codebase(n));\n        }\n        Ok(())\n    }\n}\n\n#[derive(Debug)]\npub enum BudgetError {\n    Codebase(u8),\n}\n",
+  "totalLines": 30
+}

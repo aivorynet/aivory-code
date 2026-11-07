@@ -1,0 +1,47 @@
+{
+  "added": [],
+  "notes": [
+    "stages: syntax, rules, linters (clippy); lsp is not running"
+  ],
+  "removed": [
+    {
+      "col": 8,
+      "endCol": 20,
+      "endLine": 21,
+      "fingerprint": "demo-aivory/deep-nesting-21",
+      "level": "warning",
+      "line": 21,
+      "message": "nesting is deeper than 4 levels",
+      "path": "crates/orch/src/budget.rs",
+      "rule": "aivory/deep-nesting",
+      "tool": "aivory-rules"
+    }
+  ],
+  "rows": [
+    {
+      "col": 8,
+      "endCol": 20,
+      "endLine": 13,
+      "fingerprint": "demo-clippy::new_without_default-13",
+      "level": "note",
+      "line": 13,
+      "message": "`Budget::new` takes arguments; add a builder if more limits come",
+      "path": "crates/orch/src/budget.rs",
+      "rule": "clippy::new_without_default",
+      "tool": "clippy"
+    },
+    {
+      "col": 8,
+      "endCol": 20,
+      "endLine": 19,
+      "fingerprint": "demo-aivory/risky-unwrap-19",
+      "level": "warning",
+      "line": 19,
+      "message": "unwrap_or hides a missing key; check the map first",
+      "path": "crates/orch/src/budget.rs",
+      "rule": "aivory/risky-unwrap",
+      "tool": "aivory-rules"
+    }
+  ],
+  "turn": 3
+}

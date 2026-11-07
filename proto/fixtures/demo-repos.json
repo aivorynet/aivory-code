@@ -1,0 +1,311 @@
+{
+  "codebases": [
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-code",
+      "languages": [
+        "Rust"
+      ],
+      "parts": [
+        {
+          "name": "ui",
+          "paths": [
+            "crates/ui/**",
+            "assets/**"
+          ]
+        },
+        {
+          "name": "orchestrator",
+          "paths": [
+            "crates/orch/**"
+          ]
+        },
+        {
+          "name": "ledger",
+          "paths": [
+            "crates/ledger/**"
+          ]
+        },
+        {
+          "name": "sync",
+          "paths": [
+            "crates/sync/**",
+            ".aivory/map.toml"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-code",
+      "worktrees": 4
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-guard",
+      "languages": [
+        "Python",
+        "TS"
+      ],
+      "parts": [
+        {
+          "name": "scanner",
+          "paths": [
+            "guard/scanner/**"
+          ]
+        },
+        {
+          "name": "api",
+          "paths": [
+            "guard/api/**"
+          ]
+        },
+        {
+          "name": "rules",
+          "paths": [
+            "rules/**",
+            "guard/rules/**"
+          ]
+        },
+        {
+          "name": "dashboard",
+          "paths": [
+            "web/**"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-guard",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "build-01 (ssh)",
+      "id": "billing",
+      "languages": [
+        "Rust",
+        "SQL"
+      ],
+      "parts": [
+        {
+          "name": "payment",
+          "paths": [
+            "src/payment/**"
+          ]
+        },
+        {
+          "name": "invoices",
+          "paths": [
+            "billing/invoices/**"
+          ]
+        },
+        {
+          "name": "database",
+          "paths": [
+            "billing/db/**",
+            "migrations/**"
+          ]
+        }
+      ],
+      "path": "~/work/billing",
+      "worktrees": 2
+    },
+    {
+      "branch": "main",
+      "daemon": "build-01 (ssh)",
+      "id": "smart-inference",
+      "languages": [
+        "Go"
+      ],
+      "parts": [
+        {
+          "name": "router",
+          "paths": [
+            "router/**"
+          ]
+        },
+        {
+          "name": "cache",
+          "paths": [
+            "cache/**"
+          ]
+        },
+        {
+          "name": "metering",
+          "paths": [
+            "metering/**"
+          ]
+        }
+      ],
+      "path": "~/work/smart-inference",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "kronk",
+      "languages": [
+        "Rust"
+      ],
+      "parts": [
+        {
+          "name": "git",
+          "paths": [
+            "git/**"
+          ]
+        },
+        {
+          "name": "runner",
+          "paths": [
+            "runner/**"
+          ]
+        },
+        {
+          "name": "mcp",
+          "paths": [
+            "mcp/**"
+          ]
+        }
+      ],
+      "path": "~/work/kronk",
+      "worktrees": 2
+    },
+    {
+      "branch": "main",
+      "daemon": "runner-eu",
+      "id": "slaide",
+      "languages": [
+        "Python",
+        "TS"
+      ],
+      "parts": [
+        {
+          "name": "editor",
+          "paths": [
+            "editor/**"
+          ]
+        },
+        {
+          "name": "render",
+          "paths": [
+            "render/**"
+          ]
+        },
+        {
+          "name": "export",
+          "paths": [
+            "export/**"
+          ]
+        }
+      ],
+      "path": "~/work/slaide",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-hugo",
+      "languages": [
+        "Hugo"
+      ],
+      "parts": [
+        {
+          "name": "pages",
+          "paths": [
+            "pages/**"
+          ]
+        },
+        {
+          "name": "theme",
+          "paths": [
+            "theme/**"
+          ]
+        },
+        {
+          "name": "i18n",
+          "paths": [
+            "i18n/**"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-hugo",
+      "worktrees": 1
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "mobile",
+      "languages": [
+        "Kotlin"
+      ],
+      "parts": [
+        {
+          "name": "ui",
+          "paths": [
+            "ui/**"
+          ]
+        },
+        {
+          "name": "sync",
+          "paths": [
+            "sync/**"
+          ]
+        },
+        {
+          "name": "push",
+          "paths": [
+            "push/**"
+          ]
+        }
+      ],
+      "path": "~/work/mobile",
+      "worktrees": 1
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "docs",
+      "languages": [
+        "Markdown"
+      ],
+      "parts": [
+        {
+          "name": "guides",
+          "paths": [
+            "guides/**"
+          ]
+        },
+        {
+          "name": "api-ref",
+          "paths": [
+            "api-ref/**"
+          ]
+        }
+      ],
+      "path": "~/work/docs",
+      "worktrees": 0
+    },
+    {
+      "branch": "main",
+      "daemon": "runner-eu",
+      "id": "infra",
+      "languages": [
+        "YAML"
+      ],
+      "parts": [
+        {
+          "name": "k8s",
+          "paths": [
+            "k8s/**"
+          ]
+        },
+        {
+          "name": "ci",
+          "paths": [
+            "ci/**"
+          ]
+        }
+      ],
+      "path": "~/work/infra",
+      "worktrees": 0
+    }
+  ]
+}

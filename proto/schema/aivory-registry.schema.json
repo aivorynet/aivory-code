@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "DisplayClass": {
+      "description": "A display class of a layout set.",
+      "enum": [
+        "desktop",
+        "phone",
+        "fold",
+        "watch"
+      ],
+      "type": "string"
+    },
+    "ItemSource": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "Where the files of an item are: one release asset URL, or a list of raw file URLs."
+    },
+    "ItemType": {
+      "description": "The type of a registry item.",
+      "enum": [
+        "theme",
+        "screen",
+        "parts",
+        "tokens"
+      ],
+      "type": "string"
+    },
+    "RegistryItem": {
+      "additionalProperties": false,
+      "description": "One item of a registry.",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "catalog": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "description": {
+          "default": "",
+          "type": "string"
+        },
+        "displays": {
+          "items": {
+            "$ref": "#/$defs/DisplayClass"
+          },
+          "type": "array"
+        },
+        "license": {
+          "type": "string"
+        },
+        "min_app": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "preview": {
+          "description": "An image URL.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requires": {
+          "default": [],
+          "description": "Other items.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sha256": {
+          "description": "SHA-256 of the archive, in lowercase hex.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ItemSource"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ItemType"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "version",
+        "title",
+        "author",
+        "license",
+        "source",
+        "sha256",
+        "min_app",
+        "catalog",
+        "displays"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`registry.json`.",
+  "properties": {
+    "$schema": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/RegistryItem"
+      },
+      "type": "array"
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "AIVory registry (registry.json)",
+  "type": "object"
+}

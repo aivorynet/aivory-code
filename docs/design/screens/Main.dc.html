@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>War room A · Filmstrip</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;600&amp;family=Fira+Code:wght@400;600&amp;family=Source+Code+Pro:wght@400;600&amp;family=Roboto+Mono:wght@400;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.app{height:100vh;min-height:640px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:12px 32px;min-height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08);position:relative;z-index:4}
+.hd h1{margin:0;font-size:16px;font-weight:600}
+.hd-c{font-size:12px;color:#4A5568;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill.q{background:#FFF1E6;color:#C2410C}
+.pill.e{background:#FDECEC;color:#B91C1C}
+.sp{flex:1}
+.per{display:flex;align-items:center;gap:8px;font-size:12px;color:#4A5568;white-space:nowrap}
+.seg{display:flex;gap:2px;padding:2px;background:#F1F3F6;border-radius:6px}
+.sb{min-width:28px;height:26px;border-radius:4px;color:#4A5568!important;font-family:'JetBrains Mono',monospace!important;font-size:12px}
+.sb:hover{color:#1A1A2E!important}
+.sb.on{background:#FFFFFF;color:#1A1A2E!important;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.apw{position:relative}
+.apb{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid rgba(13,13,14,.14)!important;border-radius:999px;font-size:13px}
+.apb:hover,.apb.open{border-color:#1A1A2E!important}
+.tg{width:26px;height:16px;border-radius:999px;background:#C9CED8;position:relative;display:block;flex:none;transition:background .15s}
+.tg i{position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:999px;background:#FFFFFF;transition:left .15s}
+.tg.on{background:#1A1A2E}
+.tg.on i{left:12px}
+.pop{position:absolute;top:calc(100% + 10px);right:0;width:320px;background:#FFFFFF;border-radius:12px;box-shadow:0 2px 4px rgba(13,13,14,.06),0 16px 40px rgba(13,13,14,.10);border:1px solid rgba(13,13,14,.08);padding:16px;display:flex;flex-direction:column;gap:14px;font-size:13px}
+.pr{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pr .lb{color:#4A5568}
+.stp{display:flex;align-items:center;border:1px solid rgba(13,13,14,.14);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.stp button{width:28px;height:28px;font-size:14px!important;color:#4A5568!important}
+.stp button:hover{color:#1A1A2E!important;background:#F6F7F9}
+.stp span{min-width:56px;text-align:center}
+.srch{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid rgba(13,13,14,.14)!important;border-radius:8px;color:#5A6578!important;font-size:12.5px;min-width:180px}
+.srch kbd{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px}
+.newb{height:32px;padding:0 14px;border-radius:8px;background:#0D0D0E!important;color:#FFFFFF!important;font-size:13px;font-weight:500;white-space:nowrap}
+.newb:hover{background:#2A2A3A!important}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#CDD2DA transparent}
+.band{display:flex;flex-direction:column;gap:16px;padding:20px 32px 8px;min-width:0}
+.band .st-h{order:0;margin-bottom:-6px}
+.band .flows{order:1}
+.band .chart{order:2}
+.flows{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.st-h{flex-wrap:wrap}
+.pulse{margin-left:auto;display:flex;align-items:center;gap:14px}
+.pz-n{display:flex;align-items:center;gap:14px;font-size:12px;color:#5A6578;white-space:nowrap}
+.pz-n span{display:flex;align-items:center;gap:5px}
+.pz-n b{color:#1A1A2E;font-weight:600;font-variant-numeric:tabular-nums}
+.pz-n .lg{width:8px;height:8px;border:0;border-radius:2px;background:#1A1A2E}
+.pz-n .lg.q{background:#F97316}
+.pz-n .lg.i{background:#CBD2DC}
+.pz-t{min-width:38px;justify-content:flex-end}
+.pz-a{font-size:10.5px;color:#5A6578}
+.mir{width:240px;height:34px;display:flex;gap:1px;position:relative;cursor:crosshair;flex:none}
+.mir::after{content:'';position:absolute;left:0;right:0;top:20px;height:1px;background:rgba(13,13,14,.16);pointer-events:none}
+.mb{flex:1;display:flex;flex-direction:column;transition:opacity .12s}
+.mir:hover .mb{opacity:.35}
+.mir:hover .mb.on{opacity:1}
+.mu{height:20px;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:1px}
+.md{height:14px;display:flex;flex-direction:column;gap:1px;padding-top:1px}
+.mu i,.md i{display:block;width:100%}
+.mu i{background:#1A1A2E;border-radius:1px 1px 0 0}
+.md i.q{background:#F97316}
+.md i.i{background:#CBD2DC}
+.card{background:#FFFFFF;border-radius:12px;box-shadow:0 1px 2px rgba(13,13,14,.04),0 8px 24px rgba(13,13,14,.06)}
+.chart{padding:14px 16px 12px;display:flex;flex-direction:column;gap:10px}
+.ch-h{display:flex;align-items:baseline;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.ch-h b{font-weight:600}
+.ch-h .m{color:#5A6578}
+.ch-h .n{color:#5A6578;margin-left:auto}
+.ch-body{height:86px;display:flex;gap:32px;align-items:stretch}
+.ch-p{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.ch-n{display:flex;flex-direction:column;justify-content:center;gap:6px;width:160px;flex:none}
+.ch-n div{display:flex;align-items:baseline;gap:6px}
+.ch-n b{font-size:18px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.ch-n span{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#5A6578;white-space:nowrap}
+.lg{display:inline-block;width:14px;height:0;border-top:2px solid #1A1A2E}
+.lg.q{border-color:#F97316}
+.lg.i{border-top:2px dashed #8A96A8}
+.plot{position:relative;flex:1;min-height:0}
+.plot svg{position:absolute;inset:0;width:100%;height:100%}
+.hits{position:absolute;inset:0;display:flex}
+.hits div{flex:1;cursor:crosshair}
+.xh{position:absolute;top:0;bottom:0;width:1px;background:rgba(13,13,14,.25);pointer-events:none}
+.axis{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6578}
+.strip{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.st-h{display:flex;align-items:center;gap:12px;font-size:13px;min-height:28px}
+.st-h b{font-weight:600}
+.st-h .mono{font-size:11px;color:#5A6578}
+.arw{display:flex;align-items:center;gap:6px;margin-left:auto}
+.arw span{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;margin-right:4px}
+.arw button{width:28px;height:28px;border-radius:999px;border:1px solid rgba(13,13,14,.14)!important;display:grid;place-items:center;color:#1A1A2E!important;background:#FFFFFF!important}
+.arw button:hover{border-color:#1A1A2E!important}
+.arw button:disabled{opacity:.35;cursor:default}
+.film{position:relative;flex:1;min-width:0;overflow:hidden;padding:2px 2px 24px;margin:-2px -2px -24px}
+.track{display:flex;gap:16px;transition:transform .35s cubic-bezier(.2,.6,.2,1)}
+.fade{position:absolute;top:0;right:0;bottom:24px;width:64px;background:linear-gradient(90deg,rgba(246,247,249,0),#F6F7F9);pointer-events:none}
+.sk{min-width:0;padding:14px 16px 12px;display:flex;flex-direction:column;gap:8px}
+.sk-h{display:flex;align-items:baseline;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.sk-h b{font-weight:600}
+.sk-h .n{color:#5A6578;margin-left:auto}
+.sk-h .skn{font-weight:600;color:#1A1A2E!important;text-decoration:none}
+.sk-h .skn:hover{text-decoration:underline}
+.fbox{position:relative;height:100px}
+.fbox svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.lab{position:absolute;transform:translateY(-50%);font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1;white-space:nowrap;color:#1A1A2E;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff}
+.lab.p{font-weight:600;max-width:34%;overflow:hidden;text-overflow:ellipsis}
+.lab.sq{color:#C2410C;font-weight:600}
+.lab.se{color:#B91C1C;font-weight:600}
+.lab.si{color:#5A6578}
+.grid{display:grid;gap:28px 12px;grid-auto-flow:row dense;align-items:start;padding:20px 32px 40px}
+.grp{display:grid;gap:10px;min-width:0;scroll-margin-top:16px}
+.gh{grid-column:1 / -1;display:flex;align-items:center;gap:10px;min-width:0}
+.gh h2{margin:0;font-size:14px;font-weight:600;white-space:nowrap}
+.gh .mono{font-size:11px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.gh .per{margin-left:auto;flex:none}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.i{background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}.dot.p,.dot.d{background:#A0AEC0}.dot.ok{background:#16A34A}
+.pane{position:relative;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid rgba(13,13,14,.08);min-width:0;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.pane:hover{border-color:rgba(13,13,14,.18);box-shadow:0 8px 24px rgba(13,13,14,.06)}
+.pane.st-q{box-shadow:inset 0 2px 0 #F97316}
+.pane.st-e{box-shadow:inset 0 2px 0 #DC2626}
+.ph{height:38px;flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:12px;min-width:0}
+.ph .ag{font-weight:600;white-space:nowrap}
+.ph .bdg{padding:0 5px;border:1px solid rgba(13,13,14,.14);color:#4A5568;font-size:10px;white-space:nowrap;line-height:16px}
+.ph .tt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'IBM Plex Sans',sans-serif;color:#4A5568}
+.ph .tag{font-size:11px;white-space:nowrap}
+.tag.q{color:#C2410C}.tag.e{color:#B91C1C}
+.ph .mt{color:#5A6578;font-size:11px;white-space:nowrap}
+.acts{display:none;gap:2px}
+.pane:hover .acts{display:flex}
+.pane:hover .mt{display:none}
+.ib{width:24px;height:24px;display:grid;place-items:center;border-radius:6px;color:#4A5568!important}
+.ib:hover{background:#F1F3F6;color:#1A1A2E!important}
+.tabs{height:30px;flex:none;display:flex;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;overflow:hidden}
+.tab{display:flex;align-items:center;gap:6px;padding:0 12px;height:30px;color:#5A6578!important;white-space:nowrap}
+.tab:hover{color:#1A1A2E!important}
+.tab.on{color:#1A1A2E!important;box-shadow:inset 0 -2px 0 #1A1A2E}
+.tab .dot{width:6px;height:6px}
+.body{flex:1;min-height:0;display:flex;flex-direction:column-reverse;overflow-y:auto;scrollbar-width:none;padding:8px 12px 10px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px);mask-image:linear-gradient(to bottom,transparent 0,#000 40px)}
+.body::-webkit-scrollbar{display:none}
+.st-i .body{opacity:.6}
+.ln{font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-word;color:#1A1A2E}
+.k-x,.k-o{color:#5A6578}
+.k-u{background:#F3F5F8;margin:6px -6px 3px;padding:2px 6px;border-radius:4px}
+.k-u .pf{color:#5A6578}
+.k-t .pf{font-weight:700;display:inline-block}
+.k-t .pf::first-letter{color:#16A34A}
+.k-p{color:#15803D;background:#F0FAF3;margin:0 -6px;padding:0 6px}
+.k-m{color:#B91C1C;background:#FEF3F3;margin:0 -6px;padding:0 6px}
+.k-s{color:#6D28D9}
+.k-e{color:#B91C1C}
+.ask{flex:none;margin:0 10px 10px;border:1px solid #F1D9B5;background:#FFFBF4;border-radius:8px;overflow:hidden}
+.ask-h{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#FDF1DE;color:#92400E;font-size:12px;font-weight:600}
+.ask-b{padding:10px 12px 4px;font-size:12.5px;line-height:1.5;color:#1A1A2E}
+.ask-permission .ask-b{font-family:'JetBrains Mono',monospace;font-size:12px}
+.ask-s{margin:0;padding:2px 12px 2px 32px;font-size:12px;line-height:1.6;color:#1A1A2E}
+.ask-f{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 12px}
+.ask-error{border-color:#F2C7C7;background:#FFF8F8}
+.ask-error .ask-h{background:#FCE8E8;color:#991B1B}
+.gb{height:28px;padding:0 12px;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px;color:#1A1A2E!important}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.gb.pri:hover{background:#2C63D2!important}
+.fold{flex:none;display:flex;flex-direction:column;gap:6px;max-height:0;opacity:0;overflow:hidden;padding:0 10px;transition:max-height .22s cubic-bezier(.2,.6,.2,1),opacity .18s,padding .22s}
+.pane:hover .fold,.pane:focus-within .fold,.fold.open{max-height:170px;opacity:1;overflow:visible;padding:6px 10px 10px}
+.act{display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#7C3AED;padding:0 2px;white-space:nowrap;overflow:hidden}
+.act span:last-child{color:#5A6578}
+.gz{position:relative;display:flex;align-items:stretch;background:#FFFFFF;border:1px solid #CDD2DA;border-radius:12px;transition:border-color .15s,box-shadow .15s}
+.gz:focus-within{border-color:#3574F0;box-shadow:0 0 0 3px rgba(53,116,240,.14)}
+.gz-l,.gz-r{display:flex;flex-direction:column;justify-content:space-between;padding:4px;flex:none}
+.gz-c{flex:1;min-width:0;display:flex;flex-direction:column;padding:6px 0 4px}
+.gt{width:100%;min-height:38px;resize:none;border:0;outline:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;font-size:13px;line-height:1.45;color:#1A1A2E;padding:2px 2px 0}
+.gt::placeholder{color:#8A93A6}
+.gz-row{display:flex;align-items:center;gap:2px;margin-left:-4px;min-width:0;overflow:hidden}
+.gd{height:22px;padding:0 6px;border-radius:4px;font-size:12px;color:#4A5568!important;white-space:nowrap;display:flex;align-items:center;gap:5px;flex:none}
+.gd:hover,.gd.on{background:#EBECF0;color:#1A1A2E!important}
+.gd .pdot{width:7px;height:7px;border-radius:999px}
+.gi{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:#5A6578!important}
+.gi:hover{background:#EBECF0;color:#1A1A2E!important}
+.gi.rec{background:#FDECEC;color:#DC2626!important}
+.gs{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#3574F0!important;color:#FFFFFF!important}
+.gs:hover{background:#2C63D2!important}
+.menu{position:absolute;bottom:calc(100% + 6px);min-width:150px;background:#FFFFFF;border:1px solid rgba(13,13,14,.12);border-radius:8px;box-shadow:0 2px 4px rgba(13,13,14,.06),0 12px 28px rgba(13,13,14,.12);padding:4px;z-index:6}
+.mi{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;height:28px;padding:0 10px!important;border-radius:5px;font-size:12.5px;text-align:left}
+.mi:hover{background:#F1F3F6}
+.mi.on{font-weight:600}
+.mi.on::after{content:'✓';color:#3574F0}
+.sb.wide{padding:0 8px;font-family:'IBM Plex Sans',sans-serif!important}
+.ahint{font-size:11px;color:#5A6578;white-space:nowrap}
+.dpw{position:relative;z-index:5}
+.dpb{display:flex;align-items:center;gap:7px;height:30px;padding:0 10px;border:1px solid rgba(13,13,14,.14)!important;border-radius:8px;font-size:12.5px;background:#FFFFFF!important;white-space:nowrap}
+.dpb:hover,.dpb.open{border-color:#1A1A2E!important}
+.dpb .aa{font-weight:600;font-size:12px}
+.dpop{width:360px}
+.prc{display:flex;flex-direction:column;gap:8px}
+.prc .lb{color:#4A5568}
+.fchs{display:flex;flex-wrap:wrap;gap:6px}
+.fch{height:28px;padding:0 10px;border:1px solid rgba(13,13,14,.14)!important;border-radius:6px;font-size:12px}
+.fch:hover{border-color:#8A93A6!important}
+.fch.on{border-color:#3574F0!important;box-shadow:0 0 0 2px rgba(53,116,240,.15)}
+.sws{display:flex;gap:8px}
+.swb{width:26px;height:26px;border-radius:6px;border:1px solid rgba(13,13,14,.18)!important}
+.swb.on{box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #3574F0}
+.pvw{padding:10px 12px;border-radius:8px;border:1px solid rgba(13,13,14,.08);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rst{align-self:flex-start;font-size:12px;color:#4B5BDB!important}
+.rst:hover{color:#3A48B8!important}
+.grid{--pbg:#FFFFFF;--ptx:#1A1A2E;--pdim:#5A6578;--pline:rgba(13,13,14,.08);--phov:rgba(13,13,14,.18);--pu:#F3F5F8;--padd:#15803D;--paddbg:#F0FAF3;--pdel:#B91C1C;--pdelbg:#FEF3F3;--psub:#6D28D9;--ptool:#16A34A;--pzbg:#FFFFFF;--pzbd:#CDD2DA;--pgd:#EBECF0;--pacc:#7C3AED;--pask:#FFFBF4;--paskbd:#F1D9B5;--paskh:#FDF1DE;--paskt:#92400E;--perr:#FFF8F8;--perrbd:#F2C7C7;--perrh:#FCE8E8;--perrt:#991B1B;--fs:12px;--tf:'JetBrains Mono',monospace}
+.grid.th-grey{--pbg:#F4F5F7;--pu:#E8EBF0;--pline:rgba(13,13,14,.09)}
+.grid.th-dark,.grid.th-navy{--pbg:#15161B;--ptx:#E4E5EA;--pdim:#9096A5;--pline:rgba(255,255,255,.08);--phov:rgba(255,255,255,.24);--pu:rgba(255,255,255,.07);--padd:#86E3AE;--paddbg:rgba(134,227,174,.08);--pdel:#F7A8A8;--pdelbg:rgba(247,168,168,.08);--psub:#C4B5FD;--ptool:#4ADE80;--pzbg:#1E2027;--pzbd:rgba(255,255,255,.14);--pgd:rgba(255,255,255,.08);--pacc:#C4B5FD;--pask:rgba(251,191,36,.05);--paskbd:rgba(251,191,36,.28);--paskh:rgba(251,191,36,.12);--paskt:#FCD34D;--perr:rgba(248,113,113,.05);--perrbd:rgba(248,113,113,.3);--perrh:rgba(248,113,113,.12);--perrt:#FCA5A5}
+.grid.th-navy{--pbg:#0D1624;--pzbg:#15213A;--pline:rgba(167,170,188,.12)}
+.grid .pane{background:var(--pbg);border-color:var(--pline)}
+.grid .pane:hover{border-color:var(--phov)}
+.grid .ph,.grid .tabs{border-bottom-color:var(--pline)}
+.grid .ph .ag{color:var(--ptx)}
+.grid .ph .tt,.grid .ph .mt{color:var(--pdim)}
+.grid .ph .bdg{border-color:var(--pline);color:var(--pdim)}
+.grid .ib,.grid .gi,.grid .gd{color:var(--pdim)!important}
+.grid .ib:hover,.grid .gi:hover,.grid .gd:hover,.grid .gd.on{background:var(--pgd);color:var(--ptx)!important}
+.grid .gi.rec{color:#EF4444!important;background:rgba(239,68,68,.12)}
+.grid .tab{color:var(--pdim)!important}
+.grid .tab:hover,.grid .tab.on{color:var(--ptx)!important}
+.grid .tab.on{box-shadow:inset 0 -2px 0 var(--ptx)}
+.grid .ln{font-family:var(--tf);font-size:var(--fs);color:var(--ptx)}
+.grid .k-x,.grid .k-o,.grid .k-u .pf{color:var(--pdim)}
+.grid .k-u{background:var(--pu)}
+.grid .k-t .pf::first-letter{color:var(--ptool)}
+.grid .k-p{color:var(--padd);background:var(--paddbg)}
+.grid .k-m{color:var(--pdel);background:var(--pdelbg)}
+.grid .k-s{color:var(--psub)}
+.grid .k-e{color:var(--pdel)}
+.grid .ask{background:var(--pask);border-color:var(--paskbd)}
+.grid .ask-h{background:var(--paskh);color:var(--paskt)}
+.grid .ask-error{background:var(--perr);border-color:var(--perrbd)}
+.grid .ask-error .ask-h{background:var(--perrh);color:var(--perrt)}
+.grid .ask-b,.grid .ask-s{color:var(--ptx)}
+.grid .ask-permission .ask-b{font-family:var(--tf)}
+.grid .gb{background:var(--pzbg)!important;border-color:var(--pzbd)!important;color:var(--ptx)!important}
+.grid .gb:hover{border-color:var(--phov)!important}
+.grid .gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important}
+.grid .gb.pri:hover{background:#2C63D2!important}
+.grid .gz{background:var(--pzbg);border-color:var(--pzbd)}
+.grid .gz:focus-within{border-color:#3574F0}
+.grid .gt{color:var(--ptx)}
+.grid .act{color:var(--pacc)}
+.grid .act span:last-child{color:var(--pdim)}
+.ph{height:auto;flex-direction:column;align-items:stretch;gap:4px;padding:11px 14px 10px;font-family:'IBM Plex Sans',sans-serif}
+.ph1{display:flex;align-items:center;gap:9px;min-width:0;height:22px}
+.ph1 .tt{flex:1;min-width:0;font-size:13.5px;font-weight:600;color:#1A1A2E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph1 .mt{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;white-space:nowrap}
+.ph2{display:flex;align-items:center;gap:10px;min-width:0;height:22px;padding-left:17px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.who{display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:999px;flex:none}
+.where{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph2 .tag{flex:none;padding:1px 8px;border-radius:999px;font-size:10.5px;font-family:'IBM Plex Sans',sans-serif;font-weight:500}
+.ph2 .tag.q{background:#FFF1E6;color:#C2410C}
+.ph2 .tag.e{background:#FDECEC;color:#B91C1C}
+.sbw{position:relative;margin-left:auto;flex:none}
+.sbm{height:22px;padding:0 9px!important;border-radius:999px;border:1px solid rgba(13,13,14,.14)!important;font-family:'JetBrains Mono',monospace!important;font-size:11px;color:#4A5568!important;white-space:nowrap}
+.sbm:hover{border-color:rgba(13,13,14,.32)!important;color:#1A1A2E!important}
+.sbm.on{background:#F3EEFF!important;border-color:#C4B5FD!important;color:#6D28D9!important}
+.sbmenu{top:calc(100% + 6px);bottom:auto;left:auto;right:0;min-width:220px}
+.mil{display:flex;align-items:center;gap:8px}
+.mis{margin-left:auto;font-size:11px;color:#5A6578}
+.grid .ph1 .tt{color:var(--ptx)}
+.grid .ph1 .mt,.grid .ph2{color:var(--pdim)}
+.grid .sbm{border-color:var(--pline)!important;color:var(--pdim)!important}
+.grid.th-dark .ph2 .tag.q,.grid.th-navy .ph2 .tag.q{background:rgba(249,115,22,.16);color:#FDBA74}
+.grid.th-dark .ph2 .tag.e,.grid.th-navy .ph2 .tag.e{background:rgba(248,113,113,.16);color:#FCA5A5}
+.grid.th-dark .sbm.on,.grid.th-navy .sbm.on{background:rgba(196,181,253,.14)!important;border-color:rgba(196,181,253,.4)!important;color:#DDD6FE!important}
+.grid.mini .ph{height:auto;padding:8px 10px;gap:2px}
+.fold.open .gz-row,.fold.open .act{display:none}
+.fold.open .gt{min-height:22px}
+.pane:hover .fold.open .gz-row,.pane:focus-within .fold.open .gz-row,.pane:hover .fold.open .act,.pane:focus-within .fold.open .act{display:flex}
+.pane:hover .fold.open .gt,.pane:focus-within .fold.open .gt{min-height:38px}
+a.ri,a.ib{text-decoration:none}
+.grid.mini .ph2{padding-left:0}
+.grid.mini .where,.grid.micro .ph2{display:none}
+.grid.mini .ln{font-size:calc(var(--fs) - 2px);line-height:1.5}
+.grid.micro .ln{font-size:calc(var(--fs) - 3px)}
+.mini .ln{font-size:10px;line-height:1.5}
+.mini .ph{height:32px;gap:6px}
+.mini .bdg,.mini .tag,.mini .act,.mini .gz-row .opt{display:none}
+.mini .ask-b{font-size:11px}
+.mini .ask-s{display:none}
+.micro .ln{font-size:9px}
+.micro .ask-b,.micro .tabs{display:none}
+.micro .ph .tt{display:none}
+.quiet{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 32px 40px;padding-top:16px;border-top:1px solid rgba(13,13,14,.08)}
+.quiet .lbl{font-size:12px;color:#5A6578;margin-right:4px}
+.qi{display:flex;align-items:center;gap:10px;height:36px;padding:0 6px 0 12px;background:#FFFFFF;border:1px solid rgba(13,13,14,.08);border-radius:8px;font-size:12.5px}
+.qi .mono{font-size:11px;color:#5A6578}
+.qb{height:26px;padding:0 10px;border-radius:6px;background:#F1F3F6!important;font-size:12px}
+.qb:hover{background:#E6E9EE!important}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+@media (max-width:1100px){.flows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:720px){.flows{grid-template-columns:minmax(0,1fr)}.ch-body{flex-direction:column;height:auto}.ch-p{height:86px}.gh{flex-wrap:wrap}}
+@media (max-width:720px){.app{grid-template-columns:minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px}.rail{display:none}.hd,.band,.grid{padding-left:16px;padding-right:16px}.grid{grid-template-columns:minmax(0,1fr)!important}.grp{grid-column:auto!important;grid-template-columns:minmax(0,1fr)!important}.pane{height:520px!important}.srch{min-width:0}.quiet{margin:0 16px 32px}}
+@media (prefers-reduced-motion:reduce){.app *{transition:none!important}}
+</style>
+</helmet>
+<div class="app">
+<div class="rbw" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri on" href="Main.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri" href="Inbox.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<span class="bd">{{c.attn}}</span></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri" href="Repos.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri" href="Settings.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+<header class="hd">
+<h1>War room</h1>
+<span class="pill q"><i class="dot q"></i>{{c.q}} need you</span>
+<span class="pill e"><i class="dot e"></i>{{c.e}} error</span>
+<span class="sp"></span>
+<div class="apw">
+<button class="apb {{apBtnCls}}" aria-expanded="{{apExpanded}}" onClick="{{toggleAp}}"><span class="tg {{apOnCls}}"><i></i></span>Autopilot</button>
+<sc-if value="{{apOpen}}" hint-placeholder-val="{{false}}">
+<div class="pop">
+<div class="pr"><b>Autopilot</b><button class="tg {{apOnCls}}" aria-label="Autopilot on or off" aria-pressed="{{apPressed}}" onClick="{{flipAp}}"><i></i></button></div>
+<sc-for list="{{rules}}" as="r" hint-placeholder-count="3"><div class="pr"><span class="lb">{{r.label}}</span><div class="stp"><button aria-label="Decrease" onClick="{{r.dec}}">−</button><span>{{r.v}}</span><button aria-label="Increase" onClick="{{r.inc}}">+</button></div></div></sc-for>
+<div class="pr"><span class="lb">Start queued tasks · {{queued}} queued</span><button class="tg {{sqOnCls}}" aria-label="Start queued tasks" aria-pressed="{{sqPressed}}" onClick="{{flipSq}}"><i></i></button></div>
+</div>
+</sc-if>
+</div>
+<button class="srch"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg>Search<kbd>⌘K</kbd></button>
+<button class="newb">New session</button>
+</header>
+
+<div class="scroll">
+<section class="band">
+<div class="st-h">
+<b>Codebases</b>
+<div class="pulse" aria-label="Active and idle agents, last 60 minutes">
+<div class="pz-n"><span class="pz-t mono">{{ro.time}}</span><span><i class="lg"></i><b>{{ro.w}}</b>active</span><span><i class="lg q"></i><b>{{ro.q}}</b>wait for you</span><span><i class="lg i"></i><b>{{ro.i}}</b>idle</span></div>
+<div class="mir" onMouseLeave="{{clearHb}}"><sc-for list="{{mbars}}" as="b" hint-placeholder-count="60"><div class="mb {{b.on}}" onMouseEnter="{{b.hover}}"><div class="mu"><i style="height: {{b.w}}%"></i></div><div class="md"><i class="q" style="height: {{b.q}}%"></i><i class="i" style="height: {{b.i}}%"></i></div></div></sc-for></div>
+<span class="pz-a mono">60 min</span>
+</div>
+</div>
+<div class="flows">
+<sc-for list="{{sankeys}}" as="s" hint-placeholder-count="8">
+<div class="card sk">
+<div class="sk-h"><a class="skn" href="#g-{{s.name}}">{{s.name}}</a></div>
+<div class="fbox">
+<svg viewBox="{{s.vb}}" preserveAspectRatio="none" aria-hidden="true">
+<sc-for list="{{s.links}}" as="l"><path d="{{l.d}}" fill="none" stroke="{{l.c}}" stroke-opacity="{{l.o}}" stroke-width="{{l.w}}" vector-effect="non-scaling-stroke"></path></sc-for>
+<sc-for list="{{s.nodes}}" as="n"><rect x="{{n.x}}" y="{{n.y}}" width="{{n.w}}" height="{{n.h}}" rx="2" fill="{{n.c}}"></rect></sc-for>
+</svg>
+<sc-for list="{{s.labels}}" as="l"><div class="lab {{l.cls}}" style="top: {{l.y}}px; {{l.pos}}">{{l.t}}</div></sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<main class="grid {{mini}} {{bgCls}}" style="grid-template-columns: repeat({{cols}}, minmax(0, 1fr)); --fs: {{fs}}px; --tf: {{ffCss}}">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<section class="grp" id="g-{{g.id}}" style="grid-column: span {{g.span}}; grid-template-columns: repeat({{g.span}}, minmax(0, 1fr))">
+<div class="gh"><span class="dot {{g.dot}}"></span><h2>{{g.label}}</h2><span class="mono">{{g.sub}}</span><sc-if value="{{g.first}}" hint-placeholder-val="{{false}}"><div class="per"><span>Panes per row</span><div class="seg" role="group" aria-label="Panes per row"><sc-for list="{{perRow}}" as="n" hint-placeholder-count="8"><button class="sb {{n.on}} {{n.wide}}" aria-pressed="{{n.pressed}}" onClick="{{n.pick}}">{{n.v}}</button></sc-for></div><div class="dpw"><button class="dpb {{viewCls}}" aria-expanded="{{viewExpanded}}" onClick="{{toggleView}}"><span class="aa">Aa</span>Display</button>
+<sc-if value="{{viewOpen}}" hint-placeholder-val="{{false}}">
+<div class="pop dpop">
+<div class="pr"><span class="lb">Font size</span><div class="stp"><button aria-label="Smaller text" onClick="{{fsDec}}">−</button><span>{{fs}} px</span><button aria-label="Larger text" onClick="{{fsInc}}">+</button></div></div>
+<div class="prc"><span class="lb">Font</span><div class="fchs"><sc-for list="{{fonts}}" as="f" hint-placeholder-count="5"><button class="fch {{f.on}}" aria-pressed="{{f.pressed}}" style="font-family: {{f.css}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for></div></div>
+<div class="pr"><span class="lb">Background</span><div class="sws"><sc-for list="{{bgs}}" as="b" hint-placeholder-count="4"><button class="swb {{b.on}}" aria-label="{{b.label}} background" aria-pressed="{{b.pressed}}" style="background: {{b.c}}" onClick="{{b.pick}}"></button></sc-for></div></div>
+<div class="pvw" style="background: {{bgC}}; color: {{bgT}}; font-family: {{ffCss}}; font-size: {{fs}}px">● Bash  cargo test -p orch budget</div>
+<button class="rst" onClick="{{resetView}}">Reset to default</button>
+</div>
+</sc-if>
+</div>
+</div></sc-if></div>
+<sc-for list="{{g.panes}}" as="p" hint-placeholder-count="3">
+<article class="pane st-{{p.st}}" style="height: {{paneH}}px">
+<div class="ph">
+<div class="ph1"><span class="dot {{p.st}}"></span><span class="tt">{{p.title}}</span><span class="mt">{{p.meta}}</span>
+<span class="acts">
+<button class="ib" aria-label="Pause session"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 3v10M11 3v10"></path></svg></button>
+<button class="ib" aria-label="Stop session"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9"></rect></svg></button>
+<a class="ib" href="Session.dc.html" aria-label="Open the session deep dive"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3h4v4M13 3L7.5 8.5M12 10v3H3V4h3"></path></svg></a>
+</span>
+</div>
+<div class="ph2"><span class="who"><i class="pdot" style="background: {{p.pc}}"></i>{{p.agent}} · {{p.model}}</span><span class="where">· {{p.where}}</span>
+<sc-if value="{{p.hasTabs}}" hint-placeholder-val="{{false}}"><div class="sbw"><button class="sbm {{p.subOn}}" aria-haspopup="menu" aria-expanded="{{p.subExpanded}}" onClick="{{p.subToggle}}">{{p.subLabel}} ▾</button>
+<sc-if value="{{p.subOpen}}" hint-placeholder-val="{{false}}"><div class="menu sbmenu" role="menu"><sc-for list="{{p.tabs}}" as="t"><button class="mi {{t.on}}" role="menuitemradio" aria-checked="{{t.sel}}" onClick="{{t.pick}}"><span class="mil"><i class="dot {{t.k}}"></i>{{t.label}}</span><span class="mis">{{t.stl}}</span></button></sc-for></div></sc-if>
+</div></sc-if>
+</div>
+</div>
+<div class="body"><div><sc-for list="{{p.lines}}" as="l"><div class="ln k-{{l.k}}"><span class="pf">{{l.a}}</span>{{l.b}}</div></sc-for></div></div>
+<sc-if value="{{p.hasAsk}}" hint-placeholder-val="{{false}}">
+<div class="ask ask-{{p.ask.k}}">
+<div class="ask-h">{{p.ask.label}}</div>
+<div class="ask-b">{{p.ask.text}}</div>
+<sc-if value="{{p.ask.hasSteps}}" hint-placeholder-val="{{false}}"><ol class="ask-s"><sc-for list="{{p.ask.steps}}" as="x"><li>{{x}}</li></sc-for></ol></sc-if>
+<div class="ask-f"><sc-for list="{{p.ask.opts}}" as="o"><button class="gb {{o.cls}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for></div>
+</div>
+</sc-if>
+<div class="fold {{p.foldCls}}">
+<div class="act"><span>{{p.act}}</span><span>{{p.ctx}}</span></div>
+<div class="gz">
+<div class="gz-l">
+<button class="gi" aria-label="Capture a screen area for context"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 13.5l7-7M8.5 5.5l2 2"></path><path d="M12 1.5v3M10.5 3h3M13.5 7v2M12.5 8h2M5.5 2v2M4.5 3h2"></path></svg></button>
+<button class="gi" aria-label="Attach a file"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M13 7.5l-5.2 5.2a3 3 0 0 1-4.3-4.3l5.6-5.6a2 2 0 0 1 2.9 2.9L6.4 11.3a1 1 0 0 1-1.4-1.4l4.9-4.9"></path></svg></button>
+</div>
+<div class="gz-c">
+<textarea class="gt" rows="2" aria-label="Message {{p.agent}}" placeholder="{{p.ph}}"></textarea>
+<div class="gz-row">
+<button class="gd {{p.cm.onMode}}" aria-label="Permission mode" onClick="{{p.cm.openMode}}">{{p.cm.mode}} ▾</button>
+<button class="gd {{p.cm.onProv}}" aria-label="Provider" onClick="{{p.cm.openProv}}"><i class="pdot" style="background: {{p.cm.pc}}"></i>{{p.cm.prov}} ▾</button>
+<button class="gd {{p.cm.onModel}}" aria-label="Model" onClick="{{p.cm.openModel}}">{{p.cm.model}} ▾</button>
+<button class="gd opt {{p.cm.onEff}}" aria-label="Effort" onClick="{{p.cm.openEff}}">{{p.cm.effort}} ▾</button>
+</div>
+</div>
+<div class="gz-r">
+<button class="gi {{p.recCls}}" aria-label="Voice input" aria-pressed="{{p.recPressed}}" onClick="{{p.recPick}}"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"></rect><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"></path></svg></button>
+<button class="gs" aria-label="Send"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg></button>
+</div>
+<sc-if value="{{p.cm.menuOpen}}" hint-placeholder-val="{{false}}">
+<div class="menu" style="left: {{p.cm.mx}}px"><sc-for list="{{p.cm.items}}" as="m"><button class="mi {{m.on}}" onClick="{{m.pick}}">{{m.t}}</button></sc-for></div>
+</sc-if>
+</div>
+</div>
+</article>
+</sc-for>
+</section>
+</sc-for>
+</main>
+
+<section class="quiet" aria-label="Parked and done sessions">
+<span class="lbl">Quiet</span>
+<sc-for list="{{quiet}}" as="s" hint-placeholder-count="2"><div class="qi"><span class="dot {{s.st}}"></span><span>{{s.t}}</span><span class="mono">{{s.path}} · {{s.when}}</span><button class="qb" onClick="{{s.resume}}">Resume</button></div></sc-for>
+</section>
+</div>
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>{{c.live}} running · {{c.parked}} parked</span>
+<span>claude 5 h window 62%</span>
+<span>codex 31%</span>
+<span>gemini 18%</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span><i class="dot ok"></i>relay</span>
+<span>14:40</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"perRow":{"editor":"enum","options":["auto","1","2","3","4","8","9","16"],"default":"auto"},"$preview":{"width":1440,"height":900}}'>
+const CB = [
+  ['aivory-code', ['ui', 'orchestrator', 'ledger', 'sync']],
+  ['aivory-guard', ['scanner', 'api', 'rules', 'dashboard']],
+  ['billing', ['payment', 'invoices', 'database']],
+  ['smart-inference', ['router', 'cache', 'metering']],
+  ['kronk', ['git', 'runner', 'mcp']],
+  ['slaide', ['editor', 'render', 'export']],
+  ['aivory-hugo', ['pages', 'theme', 'i18n']],
+  ['mobile', ['ui', 'sync', 'push']],
+  ['docs', ['guides', 'api-ref']],
+  ['infra', ['k8s', 'ci']]
+];
+const PV = { claude: ['claude', '#D97757'], codex: ['codex', '#1A1A2E'], gemini: ['gemini', '#4B5BDB'], opencode: ['opencode', '#7C3AED'], goose: ['goose', '#0D9488'] };
+const PM = { claude: ['opus-5.5', 'sonnet-5.5', 'haiku-5.5'], codex: ['gpt-5.2-codex', 'gpt-5.2'], gemini: ['3-pro', '3-flash'], opencode: ['kimi-k2', 'qwen3-coder'], goose: ['goose-1.9'] };
+const MODES = ['Plan', 'Edit', 'Auto'];
+const EFF = ['low', 'medium', 'high', 'max'];
+const ST = { q: { l: 'needs you', o: 0 }, e: { l: 'error', o: 1 }, w: { l: 'working', o: 2 }, i: { l: 'idle', o: 3 }, p: { l: 'parked', o: 4 }, d: { l: 'done', o: 5 } };
+const ASK = { permission: 'Permission required', plan: 'Plan approval', question: 'Question', error: 'Stopped on an error' };
+const TAGL = { permission: 'needs permission', plan: 'plan to approve', question: 'question', error: 'error' };
+const COLS = [1, 2, 3, 4, 8, 9, 16];
+const ph = n => n <= 1 ? 640 : n === 2 ? 580 : n === 3 ? 520 : n === 4 ? 480 : n <= 7 ? 420 : n <= 9 ? 300 : 200;
+const FONTS = ['JetBrains Mono', 'IBM Plex Mono', 'Fira Code', 'Source Code Pro', 'Roboto Mono'];
+const BGS = [['light', 'White', '#FFFFFF', '#1A1A2E'], ['grey', 'Grey', '#F4F5F7', '#1A1A2E'], ['dark', 'Dark', '#15161B', '#E4E5EA'], ['navy', 'Navy', '#0D1624', '#E4E7F0']];
+const VIEW = { fs: 12, ff: 'JetBrains Mono', bg: 'light' };
+const SER = {
+  w: [12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 18, 19, 19, 18, 17, 17, 16, 16, 17, 18, 19, 19, 18, 18, 17, 17, 16, 15, 15, 14],
+  q: [1, 1, 2, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 2, 3, 4, 4, 3, 2, 2, 1, 1, 2, 3, 3, 4, 4, 3, 4, 4],
+  i: [8, 7, 7, 6, 6, 6, 5, 4, 4, 4, 5, 4, 3, 4, 4, 3, 4, 5, 5, 4, 4, 4, 4, 3, 4, 3, 4, 4, 3, 3]
+};
+const FLOW = { W: 281, H: 100, lw: 62, rw: 76, nw: 4, pad: 8, maxU: 8 };
+const LINK = { w: ['#1A1A2E', 0.09], i: ['#8A96A8', 0.18], q: ['#F97316', 0.5], e: ['#DC2626', 0.5] };
+const STC = { w: '#1A1A2E', q: '#F97316', e: '#DC2626', i: '#A0AEC0' };
+const CARD = 396;
+const S = [
+  { id: '7f3a', cb: 'billing', pt: 'payment', ag: 'claude', m: 'opus-5.5', t: 'Stripe webhook retries', st: 'q', mn: 6, c: 2.41, sub: 2, pr: 'add retry with exponential backoff to the stripe webhook handler', f: ['src/payment/webhook.rs', 'src/payment/retry.rs'], tail: [['t', 'Edit  src/payment/retry.rs'], ['p', '+ let delay = BASE_MS * 2u64.pow(attempt).min(30_000);'], ['m', '- thread::sleep(Duration::from_secs(1));'], ['s', '↳ test-writer  4 cases for retry::backoff  ✓'], ['s', '↳ migrator  wrote 0042_webhook_attempts.sql'], ['a', 'The retry table needs a new column. I want to apply the migration to staging.']], ask: ['permission', 'sqlx migrate run --database-url $STAGING_DB', ['Allow', 'Always allow', 'Deny']] },
+  { id: 'c218', cb: 'aivory-code', pt: 'ui', ag: 'codex', m: 'gpt-5.2-codex', t: 'Virtualize the session grid', st: 'q', mn: 3, c: 0.88, sub: 0, pr: 'the session grid lags with 40 tiles. virtualize it', f: ['crates/ui/src/grid.rs', 'crates/ui/src/tile.rs'], tail: [['t', 'Bash  cargo bench -p ui grid_render'], ['o', 'grid_render/40  time: [18.2 ms 18.6 ms 19.1 ms]'], ['a', '40 tiles cost 18 ms per frame. Most of it is text layout of hidden rows.'], ['a', 'The plan is ready.']], ask: ['plan', 'Virtualize the grid in 4 steps.', ['Approve', 'Edit plan', 'Reject'], ['Measure tile rows and keep a row index', 'Lay out only the rows in the viewport, plus one', 'Cache shaped text per session line', 'Bench again. Target: under 4 ms']] },
+  { id: '9b0e', cb: 'aivory-guard', pt: 'rules', ag: 'gemini', m: '3-pro', t: 'OWASP rule pack v2', st: 'q', mn: 2, c: 0.52, sub: 1, pr: 'port the OWASP top-10 rules to the v2 rule format', f: ['rules/owasp/a03_injection.yaml', 'guard/rules/loader.py'], tail: [['t', 'Write  rules/v2/a03_injection.toml'], ['p', '+ [[match]] pattern = "cursor.execute(f-string)"'], ['s', '↳ rule-tester  38 of 41 fixtures pass'], ['a', 'Three fixtures only match with the legacy regex engine.']], ask: ['question', 'Keep the legacy regex rules as a fallback, or drop them in v2?', ['Keep as fallback', 'Drop them']] },
+  { id: 'a01c', cb: 'aivory-code', pt: 'orchestrator', ag: 'claude', m: 'opus-5.5', t: 'Subagent fan-out limits', st: 'w', mn: 23, c: 3.12, sub: 3, pr: 'cap subagent fan-out per session and per codebase', f: ['crates/orch/src/spawn.rs', 'crates/orch/src/budget.rs'], tail: [['t', 'Edit  crates/orch/src/budget.rs'], ['p', '+ pub max_children: u8,      // default 4'], ['p', '+ pub max_per_codebase: u8, // default 12'], ['s', '↳ explorer  mapped 14 spawn call sites'], ['s', '↳ test-writer  writing budget::exceeds'], ['s', '↳ reviewer  waits for the diff'], ['t', 'Bash  cargo test -p orch budget'], ['o', 'test result: ok. 22 passed; 0 failed'], ['a', 'Now I wire the budget into the spawn path.']] },
+  { id: 'a7e2', cb: 'aivory-code', pt: 'ledger', ag: 'claude', m: 'sonnet-5.5', t: 'Ledger compaction', st: 'w', mn: 9, c: 0.74, sub: 0, pr: 'compact ledger segments older than 7 days', f: ['crates/ledger/src/segment.rs', 'crates/ledger/src/compact.rs'], tail: [['t', 'Edit  crates/ledger/src/compact.rs'], ['p', '+ fn merge(a: &Segment, b: &Segment) -> Segment {'], ['p', '+     let mut out = Segment::with_capacity(a.len() + b.len());'], ['p', '+     out.extend(a.newest_per_key(b));'], ['a', 'Merge keeps the newest entry per key. Next: tombstones.']] },
+  { id: 'd3f0', cb: 'aivory-code', pt: 'sync', ag: 'goose', m: 'goose-1.9', t: 'CRDT merge for map.toml', st: 'i', mn: 12, c: 0.40, sub: 0, pr: 'merge concurrent edits of .aivory/map.toml from two agents', f: ['crates/sync/src/map_merge.rs', '.aivory/map.toml'], tail: [['t', 'Edit  crates/sync/src/map_merge.rs'], ['p', '+ parts.sort_by(|a, b| a.path.cmp(&b.path));'], ['t', 'Bash  cargo test -p sync map_merge'], ['o', 'test result: ok. 9 passed; 0 failed'], ['a', 'Done. The merge does not depend on the order now.'], ['x', '— idle · waits for a next task —']] },
+  { id: '5e81', cb: 'aivory-guard', pt: 'scanner', ag: 'claude', m: 'opus-5.5', t: 'Incremental scan cache', st: 'w', mn: 31, c: 4.05, sub: 2, pr: 'only rescan files whose hash changed since the last scan', f: ['guard/scanner/walker.py', 'guard/scanner/cache.py'], tail: [['t', 'Edit  guard/scanner/cache.py'], ['p', '+ if self.index.get(path) == digest:'], ['p', '+     return CachedResult(path)'], ['s', '↳ bench  full scan 41.2s → incremental 3.8s'], ['s', '↳ test-writer  cache invalidation on rename'], ['a', 'Rename handling needs the inode. I add it to the index.']] },
+  { id: '6c40', cb: 'aivory-guard', pt: 'rules', ag: 'claude', m: 'sonnet-5.5', t: 'Secrets rule tuning', st: 'w', mn: 15, c: 0.95, sub: 1, pr: 'cut the false positives in the secrets rules', f: ['rules/secrets.toml', 'guard/rules/entropy.py'], tail: [['t', 'Bash  aivory-guard eval rules/secrets --corpus fp-2026'], ['o', 'false positives 212 → 37'], ['s', '↳ corpus-builder  added 18 negative samples'], ['a', 'An entropy threshold of 4.2 removes most of them.']] },
+  { id: '6f19', cb: 'aivory-guard', pt: 'dashboard', ag: 'gemini', m: '3-flash', t: 'Findings heatmap', st: 'i', mn: 4, c: 0.22, sub: 0, pr: 'show a heatmap of findings per directory', f: ['web/src/Heatmap.tsx', 'web/src/api.ts'], tail: [['t', 'Write  web/src/Heatmap.tsx'], ['p', '+ const cell = scale(count) // 0..4'], ['a', 'The heatmap renders. The task is complete.'], ['x', '— idle —']] },
+  { id: '8a22', cb: 'billing', pt: 'invoices', ag: 'gemini', m: '3-pro', t: 'Invoice PDF layout', st: 'w', mn: 11, c: 0.58, sub: 0, pr: 'match the new invoice PDF layout from the design file', f: ['billing/invoices/pdf.ts', 'billing/invoices/template.hbs'], tail: [['t', 'Edit  billing/invoices/template.hbs'], ['p', '+ <td class="num">fmt(total)</td>'], ['t', 'Bash  npm run render:sample'], ['o', 'wrote out/invoice-sample.pdf (2 pages)'], ['a', 'Page 2 breaks inside the table. I add a keep-together rule.']] },
+  { id: '8d07', cb: 'billing', pt: 'database', ag: 'claude', m: 'sonnet-5.5', t: 'Invoice lookup index', st: 'w', mn: 5, c: 0.33, sub: 0, pr: 'speed up the invoice lookup by customer and month', f: ['billing/db/schema.sql', 'billing/db/queries.sql'], tail: [['t', 'Bash  psql -c "EXPLAIN ANALYZE select ..."'], ['o', 'Seq Scan on invoices  (actual time=412.8 ms)'], ['p', '+ CREATE INDEX invoices_cust_month ON invoices (customer_id, month);'], ['t', 'Bash  psql -c "EXPLAIN ANALYZE select ..."'], ['o', 'Index Scan using invoices_cust_month  (actual time=0.9 ms)']] },
+  { id: '41dd', cb: 'smart-inference', pt: 'cache', ag: 'opencode', m: 'kimi-k2', t: 'Redis failover', st: 'e', mn: 1, c: 0.31, sub: 0, pr: 'make the response cache survive a redis primary failover', f: ['cache/redis_pool.go', 'cache/failover_test.go'], tail: [['t', 'Edit  cache/redis_pool.go'], ['p', '+ opts.MaxRetries = 3'], ['t', 'Bash  go test ./cache -run Failover'], ['e', '--- FAIL: TestFailover (5.02s)'], ['e', '    dial tcp 127.0.0.1:6380: connect: connection refused'], ['a', 'The test needs a sentinel on :6380. It does not run.']], ask: ['error', 'Test infra is missing: no sentinel on :6380.', ['Start sentinel', 'Retry', 'Open log']] },
+  { id: '90c4', cb: 'smart-inference', pt: 'router', ag: 'claude', m: 'opus-5.5', t: 'Model routing table', st: 'w', mn: 18, c: 2.20, sub: 1, pr: 'route by task class with a fallback chain per provider', f: ['router/table.go', 'router/classify.go'], tail: [['t', 'Edit  router/table.go'], ['p', '+ {Class: "refactor", Chain: []string{"opus", "gpt-5.2", "gemini-3"}},'], ['s', '↳ eval-runner  312 prompts, 94.1% routed as expected'], ['a', 'Most misroutes are short questions. I add a length feature.']] },
+  { id: '93e8', cb: 'smart-inference', pt: 'metering', ag: 'codex', m: 'gpt-5.2-codex', t: 'Token metering', st: 'w', mn: 6, c: 0.47, sub: 0, pr: 'meter tokens per org and push them to billing every minute', f: ['metering/counter.go', 'metering/push.go'], tail: [['t', 'Edit  metering/push.go'], ['p', '+ ticker := time.NewTicker(time.Minute)'], ['t', 'Bash  go test ./metering'], ['o', 'ok  metering  0.84s']] },
+  { id: 'k1b7', cb: 'kronk', pt: 'mcp', ag: 'claude', m: 'sonnet-5.5', t: 'MCP tool timeouts', st: 'w', mn: 8, c: 0.51, sub: 0, pr: 'long git ops over MCP time out. make the timeouts per tool', f: ['kronk/mcp/server.rs', 'kronk/mcp/tools.rs'], tail: [['t', 'Edit  kronk/mcp/tools.rs'], ['p', '+ "git.clone" => Duration::from_secs(120),'], ['p', '+ _ => Duration::from_secs(30),'], ['a', 'Clone gets 120 s. All other tools keep 30 s.']] },
+  { id: 'k4c2', cb: 'kronk', pt: 'runner', ag: 'claude', m: 'opus-5.5', t: 'Runner sandbox seccomp', st: 'w', mn: 26, c: 2.88, sub: 1, pr: 'add a seccomp profile to the runner sandbox', f: ['kronk/runner/sandbox.rs', 'kronk/runner/seccomp.json'], tail: [['t', 'Write  kronk/runner/seccomp.json'], ['p', '+ { "names": ["ptrace", "mount"], "action": "SCMP_ACT_ERRNO" }'], ['s', '↳ fuzzer  2,000 syscalls, 0 escapes'], ['t', 'Bash  cargo test -p runner sandbox'], ['o', 'test result: ok. 17 passed; 0 failed']] },
+  { id: 's3d1', cb: 'slaide', pt: 'render', ag: 'claude', m: 'opus-5.5', t: 'PPTX chart export', st: 'w', mn: 14, c: 1.66, sub: 2, pr: 'export charts as native pptx charts, not as images', f: ['slaide/export/pptx/chart.py', 'slaide/export/pptx/xml.py'], tail: [['t', 'Edit  slaide/export/pptx/chart.py'], ['p', '+ ser = c_ser(idx=i, tx=name, val=num_ref(sheet, col))'], ['s', '↳ fixture-maker  bar, line and pie decks'], ['s', '↳ validator  opens the decks in LibreOffice'], ['a', 'Bar and line export as native charts. Pie is next.']] },
+  { id: 's7a0', cb: 'slaide', pt: 'editor', ag: 'opencode', m: 'kimi-k2', t: 'Undo stack', st: 'i', mn: 18, c: 0.29, sub: 0, pr: 'group text edits into one undo step per word', f: ['web/editor/history.ts'], tail: [['t', 'Edit  web/editor/history.ts'], ['p', '+ if (isWordBoundary(prev, next)) this.commit()'], ['a', 'Undo groups by word now. The task is complete.'], ['x', '— idle —']] },
+  { id: 's9e2', cb: 'slaide', pt: 'export', ag: 'codex', m: 'gpt-5.2', t: 'Embed fonts in PDF export', st: 'w', mn: 7, c: 0.34, sub: 0, pr: 'embed the deck fonts in the pdf export', f: ['slaide/export/pdf/fonts.py', 'slaide/export/pdf/writer.py'], tail: [['t', 'Edit  slaide/export/pdf/fonts.py'], ['p', '+ subset = font.subset(used_glyphs(deck))'], ['t', 'Bash  pytest tests/export -k fonts'], ['o', '5 passed in 2.10s']] },
+  { id: 'h8f3', cb: 'aivory-hugo', pt: 'i18n', ag: 'gemini', m: '3-flash', t: 'German translations', st: 'w', mn: 13, c: 0.37, sub: 1, pr: 'translate the new docs pages to german', f: ['i18n/de.toml', 'content/de/docs/war-room.md'], tail: [['t', 'Write  content/de/docs/war-room.md'], ['p', '+ title = "Kommandozentrale"'], ['s', '↳ glossary-check  4 terms differ from the glossary'], ['a', 'I align the 4 terms with the glossary.']] },
+  { id: 'm6b4', cb: 'mobile', pt: 'sync', ag: 'claude', m: 'sonnet-5.5', t: 'Offline answer queue', st: 'w', mn: 9, c: 0.62, sub: 0, pr: 'queue answers offline and send them on reconnect', f: ['app/sync/Queue.kt', 'app/sync/Net.kt'], tail: [['t', 'Edit  app/sync/Queue.kt'], ['p', '+ suspend fun flush() = pending.forEach { send(it) }'], ['t', 'Bash  ./gradlew testDebug --tests "*Queue*"'], ['o', 'BUILD SUCCESSFUL in 38s']] },
+  { id: 'o2c4', cb: 'docs', pt: 'guides', ag: 'gemini', m: '3-flash', t: 'War room guide', st: 'p', mn: 30, c: 0.21, sub: 0, pr: 'write the getting started guide for the war room', f: ['guides/start.md', 'guides/war-room.md'], tail: [['t', 'Write  guides/war-room.md'], ['p', '+ ## Answer an agent'], ['p', '+ Hover a pane. The input folds up from the bottom.'], ['a', 'Next: one screenshot for each step.']] },
+  { id: 'i0a8', cb: 'infra', pt: 'ci', ag: 'claude', m: 'haiku-5.5', t: 'Cache cargo builds in CI', st: 'd', mn: 40, c: 0.18, sub: 0, pr: 'cache cargo builds in ci', f: ['.github/workflows/ci.yml'], tail: [] },
+  { id: 'i3f2', cb: 'infra', pt: 'k8s', ag: 'codex', m: 'gpt-5.2-codex', t: 'Node pool resize', st: 'p', mn: 55, c: 0.35, sub: 0, pr: 'resize the node pool', f: ['k8s/pool.yaml'], tail: [] }
+];
+const SUBS = {
+  '7f3a': [['test-writer', 'd', 'write 4 cases for retry::backoff', 'cargo test -p payment retry', 'test result: ok. 4 passed; 0 failed'], ['migrator', 'd', 'write a migration for webhook attempts', 'sqlx migrate add webhook_attempts', 'wrote migrations/0042_webhook_attempts.sql']],
+  '9b0e': [['rule-tester', 'w', 'run all 41 fixtures against the v2 rules', 'aivory-guard test rules/v2 --fixtures owasp', '38 of 41 fixtures pass']],
+  'a01c': [['explorer', 'd', 'map every spawn call site', 'rg -n "spawn_child" crates/', '14 call sites in 6 files'], ['test-writer', 'w', 'write tests for budget::exceeds', 'cargo test -p orch budget::exceeds', 'running 5 tests'], ['reviewer', 'i', 'review the budget diff when it is ready', 'git diff --stat', 'waits for the main agent']],
+  '5e81': [['bench', 'd', 'compare a full scan with an incremental scan', 'aivory-guard bench scan --repo fixtures/large', 'full 41.2s · incremental 3.8s'], ['test-writer', 'w', 'cover cache invalidation on rename', 'pytest tests/scanner -k rename', '2 passed, 1 failed']],
+  '6c40': [['corpus-builder', 'w', 'collect negative samples for the secrets rules', 'aivory-guard corpus add --negative', 'added 18 samples']],
+  '90c4': [['eval-runner', 'w', 'run the 312 routing prompts', 'go run ./cmd/eval --set routing-312', '94.1% routed as expected']],
+  'k4c2': [['fuzzer', 'w', 'fuzz the sandbox with 2,000 syscalls', 'cargo run -p runner --bin fuzz -- --n 2000', '0 escapes so far']],
+  's3d1': [['fixture-maker', 'd', 'make bar, line and pie test decks', 'python -m slaide.fixtures charts', 'wrote 3 decks'], ['validator', 'w', 'open each deck in LibreOffice', 'soffice --headless --convert-to pdf out/*.pptx', 'bar.pptx ok · line.pptx ok']],
+  'h8f3': [['glossary-check', 'w', 'compare the new terms with the glossary', 'aivory i18n check --lang de', '4 terms differ']]
+};
+const r1 = x => Math.round(x * 10) / 10;
+const agentsOf = list => list.reduce((t, s) => t + 1 + (s.sub || 0), 0);
+
+class Component extends DCLogic {
+  state = { cols: this.props.perRow && this.props.perRow !== 'auto' ? Number(this.props.perRow) : 'auto', vw: typeof window === 'undefined' ? 1440 : window.innerWidth, viewOpen: false, ...VIEW, hb: -1, apOpen: false, ap: true, park: 15, maxRun: 14, maxPer: 4, sq: true, film: 0, ans: {}, tab: {}, cmp: {}, menu: '', rec: '' };
+
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onResize();
+  }
+
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); }
+
+  setIn(key, id, val) { this.setState({ [key]: { ...this.state[key], [id]: val } }); }
+
+  live(s) {
+    const a = this.state.ans[s.id];
+    if (!a) return s;
+    const reply = a === 'Resume' ? 'I resume where I stopped.' : 'OK. I continue with: ' + a.toLowerCase() + '.';
+    return { ...s, st: 'w', mn: 0, ask: null, tail: s.tail.concat([['u', a], ['a', reply]]) };
+  }
+
+  lines(s) {
+    const h = (s.t.length * 31 + s.pr.length * 7) % 97;
+    const dir = s.f[0].split('/').slice(0, -1).join('/') || '.';
+    const L = [
+      ['x', '', s.ag + ' ' + s.m + ' · ' + s.cb + ' · session ' + s.id],
+      ['u', '› ', 'read .aivory/map.toml and stay inside part "' + s.pt + '"'],
+      ['a', '', 'Part "' + s.pt + '" maps to ' + dir + '/. I keep my edits inside it.'],
+      ['t', '● Read', '  README.md'], ['o', '  └ ', (60 + h % 40) + ' lines'],
+      ['t', '● Glob', '  "' + dir + '/**"'], ['o', '  └ ', (8 + h % 30) + ' files'],
+      ['a', '', 'I know the layout of the part. Ready for the task.'],
+      ['u', '› ', s.pr],
+      ['a', '', 'I start with the code in part "' + s.pt + '".'],
+      ['t', '● Read', '  ' + s.f[0]],
+      ['o', '  └ ', (120 + (h * 37) % 280) + ' lines']
+    ];
+    if (s.f[1]) L.push(['t', '● Grep', '  "' + s.pt + '" ' + dir], ['o', '  └ ', (3 + h % 9) + ' matches in ' + (2 + h % 4) + ' files'], ['t', '● Read', '  ' + s.f[1]], ['o', '  └ ', (60 + (h * 13) % 200) + ' lines']);
+    s.tail.forEach(([k, b]) => {
+      if (k === 't') { const i = b.indexOf(' '); L.push(['t', '● ' + b.slice(0, i), b.slice(i)]); }
+      else if (k === 'u') L.push(['u', '› ', b]);
+      else if (k === 'o') L.push(['o', '  └ ', b]);
+      else L.push([k, '', b]);
+    });
+    return L.map(([k, a, b]) => ({ k, a, b }));
+  }
+
+  sublines(s, sa) {
+    const [name, st, task, cmd, out] = sa;
+    const dir = s.f[0].split('/').slice(0, -1).join('/') || '.';
+    const L = [
+      ['x', '', 'subagent ' + name + ' · spawned by session ' + s.id],
+      ['u', '› ', task],
+      ['a', '', 'I work inside part "' + s.pt + '" and report back to the main agent.'],
+      ['t', '● Read', '  ' + (s.f[1] || s.f[0])],
+      ['o', '  └ ', (40 + name.length * 17) + ' lines'],
+      ['t', '● Grep', '  "' + s.pt + '" ' + dir],
+      ['o', '  └ ', (2 + name.length % 7) + ' matches'],
+      ['a', '', 'The context is clear. I run the check.'],
+      ['t', '● Bash', '  ' + cmd],
+      ['o', '  └ ', out]
+    ];
+    if (st === 'd') L.push(['a', '', 'Done. I return the result to the main agent.'], ['x', '', '— returned to main —']);
+    if (st === 'i') L.push(['x', '', '— waits for the main agent —']);
+    return L.map(([k, a, b]) => ({ k, a, b }));
+  }
+
+  sankey(cb, list) {
+    const F = FLOW, v = s => 1 + (s.sub || 0);
+    const parts = CB.find(c => c[0] === cb)[1];
+    const cols = [[], [], []], key = [s => s.ag, s => s.pt, s => s.st];
+    list.forEach(s => key.forEach((f, c) => {
+      const k = f(s);
+      let n = cols[c].find(x => x.k === k);
+      if (!n) cols[c].push(n = { k, v: 0 });
+      n.v += v(s);
+    }));
+    cols[1].sort((a, b) => parts.indexOf(a.k) - parts.indexOf(b.k));
+    cols[2].sort((a, b) => ST[a.k].o - ST[b.k].o);
+    const tot = agentsOf(list);
+    const k = Math.min(F.maxU, ...cols.map(c => (F.H - F.pad * (c.length - 1)) / tot));
+    const xs = [F.lw, F.lw + (F.W - F.rw - F.nw - F.lw) * 0.42, F.W - F.rw - F.nw];
+    cols.forEach((c, ci) => {
+      let y = (F.H - tot * k - F.pad * (c.length - 1)) / 2;
+      c.forEach((n, i) => { n.i = i; n.x = xs[ci]; n.y = y; n.h = n.v * k; n.oy = y; n.iy = y; y += n.h + F.pad; });
+    });
+    const find = (c, kk) => cols[c].find(n => n.k === kk);
+    const stages = [{}, {}];
+    list.forEach(s => {
+      const a = [s.ag, s.pt, s.st].join('|'), b = [s.pt, s.st].join('|');
+      stages[0][a] = (stages[0][a] || 0) + v(s);
+      stages[1][b] = (stages[1][b] || 0) + v(s);
+    });
+    const links = [];
+    const so = (a, b) => ST[a.st].o - ST[b.st].o;
+    stages.forEach((m, si) => {
+      const L = Object.keys(m).map(kk => {
+        const p = kk.split('|'), st = p[p.length - 1];
+        return { src: find(si, p[0]), dst: find(si + 1, si ? st : p[1]), st, h: m[kk] * k };
+      });
+      L.slice().sort((a, b) => a.dst.i - b.dst.i || so(a, b)).forEach(l => { l.y0 = l.src.oy + l.h / 2; l.src.oy += l.h; });
+      L.slice().sort((a, b) => a.src.i - b.src.i || so(a, b)).forEach(l => { l.y1 = l.dst.iy + l.h / 2; l.dst.iy += l.h; });
+      L.forEach(l => {
+        const xa = r1(l.src.x + F.nw), xb = r1(l.dst.x), xm = r1((xa + xb) / 2), y0 = r1(l.y0), y1 = r1(l.y1);
+        links.push({ o2: ST[l.st].o, d: 'M' + xa + ',' + y0 + 'C' + xm + ',' + y0 + ' ' + xm + ',' + y1 + ' ' + xb + ',' + y1, w: r1(Math.max(1, l.h - 1.5)), c: LINK[l.st][0], o: LINK[l.st][1] });
+      });
+    });
+    links.sort((a, b) => b.o2 - a.o2);
+    const nodes = [], labels = [], pct = x => r1(x / F.W * 100);
+    cols.forEach((c, ci) => c.forEach(n => {
+      nodes.push({ x: r1(n.x), y: r1(n.y), w: F.nw, h: r1(Math.max(2, n.h)), c: ci === 2 ? STC[n.k] : '#1A1A2E' });
+      const y = r1(n.y + n.h / 2);
+      if (ci === 0) labels.push({ y, pos: 'right: ' + r1(100 - pct(n.x) + 2) + '%', cls: '', t: n.k + (n.v > 1 ? ' ×' + n.v : '') });
+      else if (ci === 1) labels.push({ y, pos: 'left: ' + r1(pct(n.x + F.nw) + 1.5) + '%', cls: 'p', t: n.k });
+      else labels.push({ y, pos: 'left: ' + r1(pct(n.x + F.nw) + 2) + '%', cls: 's' + n.k, t: ST[n.k].l + ' ' + n.v });
+    }));
+    return { vb: '0 0 ' + F.W + ' ' + F.H, links, nodes, labels };
+  }
+
+  composer(s) {
+    const cs = this.state.cmp[s.id] || {}, open = this.state.menu;
+    const pk = cs.pv || s.ag, md = cs.model || (pk === s.ag ? s.m : PM[pk][0]), mode = cs.mode || 'Edit', eff = cs.effort || 'high';
+    const set = patch => this.setState({ cmp: { ...this.state.cmp, [s.id]: { ...cs, ...patch } }, menu: '' });
+    const toggle = key => () => this.setState({ menu: open === s.id + ':' + key ? '' : s.id + ':' + key });
+    const key = open.startsWith(s.id + ':') ? open.slice(s.id.length + 1) : '';
+    const lists = {
+      mode: MODES.map(x => ({ t: x, on: x === mode ? 'on' : '', pick: () => set({ mode: x }) })),
+      prov: Object.keys(PM).map(x => ({ t: x, on: x === pk ? 'on' : '', pick: () => set({ pv: x, model: x === s.ag ? s.m : PM[x][0] }) })),
+      model: PM[pk].map(x => ({ t: x, on: x === md ? 'on' : '', pick: () => set({ model: x }) })),
+      eff: EFF.map(x => ({ t: x + ' effort', on: x === eff ? 'on' : '', pick: () => set({ effort: x }) }))
+    };
+    const mx = { mode: 34, prov: 84, model: 160, eff: 250 };
+    return {
+      mode, prov: pk, pc: PV[pk][1], model: md, effort: eff,
+      openMode: toggle('mode'), openProv: toggle('prov'), openModel: toggle('model'), openEff: toggle('eff'),
+      onMode: key === 'mode' ? 'on' : '', onProv: key === 'prov' ? 'on' : '', onModel: key === 'model' ? 'on' : '', onEff: key === 'eff' ? 'on' : '',
+      menuOpen: !!lists[key], items: lists[key] || [], mx: mx[key] || 0
+    };
+  }
+
+  pane(s, inNeeds) {
+    const subs = SUBS[s.id] || [];
+    const ti = Math.min(this.state.tab[s.id] || 0, subs.length);
+    const tabs = subs.length ? [['main', s.st]].concat(subs.map(x => [x[0], x[1]])).map(([label, k], i) => ({ label, k, stl: ST[k].l, on: ti === i ? 'on' : '', sel: ti === i ? 'true' : 'false', pick: () => this.setState({ tab: { ...this.state.tab, [s.id]: i }, menu: '' }) })) : [];
+    const subKey = s.id + ':subs', subOpen = this.state.menu === subKey;
+    const ask = s.ask
+      ? { k: s.ask[0], label: ASK[s.ask[0]], text: s.ask[1], hasSteps: !!s.ask[3], steps: s.ask[3] || [], opts: s.ask[2].map((t, i) => ({ t, cls: i ? '' : 'pri', pick: () => this.setIn('ans', s.id, t) })) }
+      : { k: '', label: '', text: '', hasSteps: false, steps: [], opts: [] };
+    const lastTool = (s.tail.filter(x => x[0] === 't').pop() || ['t', 'Think'])[1];
+    const h = (s.t.length * 13) % 50;
+    const act = s.st === 'q' ? 'Waiting for your answer · ' + s.mn + ' min' : s.st === 'e' ? 'Stopped ' + s.mn + ' min ago' : s.st === 'i' ? 'Idle · waits for a task' : 'Running ' + lastTool.split('  ')[0] + ' · ' + lastTool.split('  ')[1];
+    const rec = this.state.rec === s.id;
+    return {
+      st: s.st, agent: s.ag, model: s.m, pc: PV[s.ag][1], title: s.t, where: inNeeds ? s.cb + ' / ' + s.pt : s.pt,
+      hasTag: !!s.ask, tag: s.ask ? TAGL[s.ask[0]] : '', meta: s.st === 'i' ? 'idle ' + s.mn + ' min' : s.st === 'q' ? 'waits ' + s.mn + ' min' : s.mn + ' min',
+      subLabel: ti ? '↳ ' + subs[ti - 1][0] : subs.length + (subs.length > 1 ? ' subagents' : ' subagent'), subOn: ti ? 'on' : '', subOpen, subExpanded: subOpen ? 'true' : 'false', subToggle: () => this.setState({ menu: subOpen ? '' : subKey }),
+      hasTabs: subs.length > 0, tabs, lines: ti ? this.sublines(s, subs[ti - 1]) : this.lines(s),
+      hasAsk: !!s.ask, ask, foldCls: s.ask ? 'open' : '',
+      act, ctx: 'ctx ' + (30 + h) + '% · $' + s.c.toFixed(2),
+      ph: rec ? 'Listening… speak now' : s.ask ? 'Or type your own answer…' : 'Type a message…',
+      recCls: rec ? 'rec' : '', recPressed: rec ? 'true' : 'false', recPick: () => this.setState({ rec: rec ? '' : s.id }),
+      cm: this.composer(s)
+    };
+  }
+
+  renderVals() {
+    const st = this.state;
+    const gridW = st.vw - (st.vw > 720 ? 76 : 0) - 64;
+    const autoCols = Math.max(1, Math.min(16, Math.floor((gridW + 12) / (st.fs * 34 + 12))));
+    const cols = st.cols === 'auto' ? autoCols : st.cols;
+    const bg = BGS.find(b => b[0] === st.bg) || BGS[0];
+    const all = S.map(s => this.live(s));
+    const live = all.filter(s => 'qewi'.includes(s.st));
+    const quiet = all.filter(s => 'pd'.includes(s.st));
+    const cnt = x => live.filter(s => x.includes(s.st)).length;
+    const cbs = CB.filter(([id]) => live.some(s => s.cb === id));
+    const c = { w: cnt('w'), q: cnt('q'), e: cnt('e'), i: cnt('i'), attn: cnt('qe'), live: live.length, agents: agentsOf(live), parked: quiet.length, cbs: CB.length };
+
+    const needs = live.filter(s => s.st === 'q').sort((a, b) => b.mn - a.mn);
+    const groups = [];
+    if (needs.length) groups.push({ id: 'needs', label: 'Needs you', dot: 'q', sub: 'oldest waits ' + needs[0].mn + ' min', span: cols, panes: needs.map(s => this.pane(s, true)) });
+    cbs.forEach(([id, parts]) => {
+      const ps = live.filter(s => s.cb === id && s.st !== 'q');
+      if (!ps.length) return;
+      const allCb = live.filter(s => s.cb === id);
+      const used = parts.filter(p => allCb.some(s => s.pt === p));
+      groups.push({ id, label: id, dot: ps.some(s => s.st === 'e') ? 'e' : 'w', sub: allCb.length + (allCb.length > 1 ? ' sessions' : ' session'), span: Math.min(ps.length, cols), panes: ps.map(s => this.pane(s, false)) });
+    });
+
+    const sankeys = cbs.map(([id]) => { const list = live.filter(s => s.cb === id); return { name: id, n: list.length + ' sessions', ...this.sankey(id, list) }; });
+    const maxFilm = Math.max(0, sankeys.length - 2);
+    const film = Math.min(st.film, maxFilm);
+
+    const n = 60, lerp = (a, j) => { const t = j / (n - 1) * (a.length - 1), k = Math.floor(t), f = t - k; return Math.round(a[k] + ((a[k + 1] ?? a[k]) - a[k]) * f); };
+    const ser = { w: [...Array(n)].map((_, j) => lerp(SER.w, j)), q: [...Array(n)].map((_, j) => lerp(SER.q, j)), i: [...Array(n)].map((_, j) => lerp(SER.i, j)) };
+    const tl = j => { const m = 14 * 60 + 40 - (n - 1 - j); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+    const hb = st.hb;
+    const ro = hb < 0 ? { time: '', w: c.w, q: c.q + c.e, i: c.i } : { time: tl(hb), w: ser.w[hb], q: ser.q[hb], i: ser.i[hb] };
+    const mbars = ser.w.map((w, j) => ({ w: r1(w / 20 * 100), q: r1(ser.q[j] / 12 * 100), i: r1(ser.i[j] / 12 * 100), on: hb === j ? 'on' : '', hover: () => this.setState({ hb: j }) }));
+
+    const step = (k, d, lo, hi) => () => this.setState({ [k]: Math.max(lo, Math.min(hi, this.state[k] + d)) });
+    return {
+      c, cols, paneH: ph(cols), mini: cols >= 16 ? 'mini micro' : cols >= 8 ? 'mini' : '',
+      perRow: ['auto'].concat(COLS).map(v => { const on = st.cols === v; return { v: v === 'auto' ? (st.cols === 'auto' ? 'Auto · ' + autoCols : 'Auto') : String(v), wide: v === 'auto' ? 'wide' : '', on: on ? 'on' : '', pressed: on ? 'true' : 'false', pick: () => this.setState({ cols: v }) }; }),
+      autoHint: st.cols === 'auto' ? autoCols + ' per row at this width' : '',
+      viewOpen: st.viewOpen, viewCls: st.viewOpen ? 'open' : '', viewExpanded: st.viewOpen ? 'true' : 'false', toggleView: () => this.setState({ viewOpen: !this.state.viewOpen }),
+      fs: st.fs, fsDec: () => this.setState({ fs: Math.max(9, this.state.fs - 1) }), fsInc: () => this.setState({ fs: Math.min(18, this.state.fs + 1) }),
+      fonts: FONTS.map(f => ({ label: f, css: "'" + f + "', monospace", on: f === st.ff ? 'on' : '', pressed: f === st.ff ? 'true' : 'false', pick: () => this.setState({ ff: f }) })),
+      bgs: BGS.map(([k, label, c]) => ({ label, c, on: k === st.bg ? 'on' : '', pressed: k === st.bg ? 'true' : 'false', pick: () => this.setState({ bg: k }) })),
+      ffCss: "'" + st.ff + "', monospace", bgCls: 'th-' + bg[0], bgC: bg[2], bgT: bg[3],
+      resetView: () => this.setState({ ...VIEW }),
+      apOpen: st.apOpen, apBtnCls: st.apOpen ? 'open' : '', apExpanded: st.apOpen ? 'true' : 'false', apOnCls: st.ap ? 'on' : '', apPressed: st.ap ? 'true' : 'false',
+      toggleAp: () => this.setState({ apOpen: !this.state.apOpen }), flipAp: () => this.setState({ ap: !this.state.ap }),
+      rules: [
+        { label: 'Park idle after', v: st.park + ' min', dec: step('park', -5, 5, 120), inc: step('park', 5, 5, 120) },
+        { label: 'Max running', v: String(st.maxRun), dec: step('maxRun', -1, 1, 64), inc: step('maxRun', 1, 1, 64) },
+        { label: 'Max per codebase', v: String(st.maxPer), dec: step('maxPer', -1, 1, 16), inc: step('maxPer', 1, 1, 16) }
+      ],
+      queued: 6, sqOnCls: st.sq ? 'on' : '', sqPressed: st.sq ? 'true' : 'false', flipSq: () => this.setState({ sq: !this.state.sq }),
+      ro, mbars, clearHb: () => this.setState({ hb: -1 }),
+      sankeys, flowCount: sankeys.length, filmX: film * CARD, filmPos: (film + 1) + '–' + Math.min(film + 2, sankeys.length) + ' of ' + sankeys.length,
+      atStart: film === 0, atEnd: film >= maxFilm, hasMore: film < maxFilm,
+      prev: () => this.setState({ film: Math.max(0, film - 1) }), next: () => this.setState({ film: Math.min(maxFilm, film + 1) }),
+      groups: groups.map((g, i) => ({ ...g, first: i === 0 })),
+      quiet: quiet.map(s => ({ st: s.st, t: s.t, path: s.cb + ' / ' + s.pt, when: ST[s.st].l + ' ' + s.mn + ' min ago', resume: () => this.setIn('ans', s.id, 'Resume') }))
+    };
+  }
+}
+</script>
+</body>
+</html>

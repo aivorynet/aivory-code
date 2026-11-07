@@ -1,0 +1,276 @@
+{
+  "activity": [
+    {
+      "added": 6,
+      "at": 1792593480000,
+      "cost": 0.37,
+      "provider": "codex",
+      "removed": 14,
+      "session": "c218",
+      "what": "Edit in ui: refactor"
+    },
+    {
+      "added": 7,
+      "at": 1792593240000,
+      "cost": 0.38,
+      "provider": "codex",
+      "removed": 15,
+      "session": "c218",
+      "what": "Turn 2 in ui: fix"
+    },
+    {
+      "added": 45,
+      "at": 1792593000000,
+      "cost": 0.76,
+      "provider": "claude",
+      "removed": 17,
+      "session": "a01c",
+      "what": "Edit in orchestrator: new module"
+    },
+    {
+      "added": 46,
+      "at": 1792592760000,
+      "cost": 0.77,
+      "provider": "claude",
+      "removed": 0,
+      "session": "a01c",
+      "what": "Turn 2 in orchestrator: refactor"
+    },
+    {
+      "added": 55,
+      "at": 1792592520000,
+      "cost": 0.86,
+      "provider": "claude",
+      "removed": 9,
+      "session": "a7e2",
+      "what": "Edit in ledger: new module"
+    },
+    {
+      "added": 56,
+      "at": 1792592280000,
+      "cost": 0.87,
+      "provider": "claude",
+      "removed": 10,
+      "session": "a7e2",
+      "what": "Turn 3 in ledger: refactor"
+    },
+    {
+      "added": 53,
+      "at": 1792592040000,
+      "cost": 0.84,
+      "provider": "goose",
+      "removed": 7,
+      "session": "d3f0",
+      "what": "Edit in sync: docs"
+    },
+    {
+      "added": 54,
+      "at": 1792591800000,
+      "cost": 0.85,
+      "provider": "goose",
+      "removed": 8,
+      "session": "d3f0",
+      "what": "Turn 4 in sync: tests pass"
+    }
+  ],
+  "codebase": {
+    "branch": "main",
+    "daemon": "desktop",
+    "id": "aivory-code",
+    "languages": [
+      "Rust"
+    ],
+    "parts": [
+      {
+        "name": "ui",
+        "paths": [
+          "crates/ui/**",
+          "assets/**"
+        ]
+      },
+      {
+        "name": "orchestrator",
+        "paths": [
+          "crates/orch/**"
+        ]
+      },
+      {
+        "name": "ledger",
+        "paths": [
+          "crates/ledger/**"
+        ]
+      },
+      {
+        "name": "sync",
+        "paths": [
+          "crates/sync/**",
+          ".aivory/map.toml"
+        ]
+      }
+    ],
+    "path": "~/work/aivory-code",
+    "worktrees": 4
+  },
+  "files": [
+    {
+      "depth": 0,
+      "dir": true,
+      "name": "crates/ui/",
+      "part": "ui",
+      "path": "crates/ui/"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "mod.rs",
+      "path": "crates/ui/mod.rs"
+    },
+    {
+      "claimState": "needsYou",
+      "claimedBy": "c218",
+      "depth": 1,
+      "dir": false,
+      "name": "ui.rs",
+      "path": "crates/ui/ui.rs"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "tests.rs",
+      "path": "crates/ui/tests.rs"
+    },
+    {
+      "depth": 0,
+      "dir": true,
+      "name": "crates/orch/",
+      "part": "orchestrator",
+      "path": "crates/orch/"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "mod.rs",
+      "path": "crates/orch/mod.rs"
+    },
+    {
+      "claimState": "working",
+      "claimedBy": "a01c",
+      "depth": 1,
+      "dir": false,
+      "name": "orchestrator.rs",
+      "path": "crates/orch/orchestrator.rs"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "tests.rs",
+      "path": "crates/orch/tests.rs"
+    },
+    {
+      "depth": 0,
+      "dir": true,
+      "name": "crates/ledger/",
+      "part": "ledger",
+      "path": "crates/ledger/"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "mod.rs",
+      "path": "crates/ledger/mod.rs"
+    },
+    {
+      "claimState": "working",
+      "claimedBy": "a7e2",
+      "depth": 1,
+      "dir": false,
+      "name": "ledger.rs",
+      "path": "crates/ledger/ledger.rs"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "tests.rs",
+      "path": "crates/ledger/tests.rs"
+    },
+    {
+      "depth": 0,
+      "dir": true,
+      "name": "crates/sync/",
+      "part": "sync",
+      "path": "crates/sync/"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "mod.rs",
+      "path": "crates/sync/mod.rs"
+    },
+    {
+      "claimState": "idle",
+      "claimedBy": "d3f0",
+      "depth": 1,
+      "dir": false,
+      "name": "sync.rs",
+      "path": "crates/sync/sync.rs"
+    },
+    {
+      "depth": 1,
+      "dir": false,
+      "name": "tests.rs",
+      "path": "crates/sync/tests.rs"
+    }
+  ],
+  "parts": [
+    {
+      "claims": 1,
+      "lastChange": 1792593240000,
+      "lines": 5928,
+      "name": "ui",
+      "paths": [
+        "crates/ui/**",
+        "assets/**"
+      ],
+      "sessions": [
+        "c218"
+      ]
+    },
+    {
+      "claims": 2,
+      "lastChange": 1792592640000,
+      "lines": 1258,
+      "name": "orchestrator",
+      "paths": [
+        "crates/orch/**"
+      ],
+      "sessions": [
+        "a01c"
+      ]
+    },
+    {
+      "claims": 1,
+      "lastChange": 1792592940000,
+      "lines": 2913,
+      "name": "ledger",
+      "paths": [
+        "crates/ledger/**"
+      ],
+      "sessions": [
+        "a7e2"
+      ]
+    },
+    {
+      "claims": 2,
+      "lastChange": 1792593060000,
+      "lines": 5179,
+      "name": "sync",
+      "paths": [
+        "crates/sync/**",
+        ".aivory/map.toml"
+      ],
+      "sessions": [
+        "d3f0"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+target/
+.playwright-mcp/
+.claude/
+.env
+.env.*
+*.iml
+.idea/
+.vscode/
+.DS_Store
+dist/
+apps/mobile/build/
+apps/mobile/.dart_tool/
+apps/mobile/ios/Pods/
+apps/mobile/test/failures/

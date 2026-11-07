@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile · Session stream</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.str > *{flex-shrink:0}
+.phn *{box-sizing:border-box}
+:where(.phn) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phn{width:390px;height:844px;position:relative;overflow:hidden;background:#FFFFFF;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:#1A1A2E;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{flex:none;height:3px;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.bar{flex:none;display:flex;align-items:center;gap:6px;padding:14px 10px 8px 6px}
+.bk{width:44px;height:44px;display:grid;place-items:center;border-radius:999px;color:#1A1A2E!important;text-decoration:none}
+.bk:hover{background:#F1F3F6}
+.ttl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ttl b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl span{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more{width:44px;height:44px;display:grid;place-items:center;border-radius:999px}
+.more:hover,.more.on{background:#F1F3F6!important}
+.acts{flex:none;display:flex;gap:8px;padding:0 16px 10px;overflow-x:auto;scrollbar-width:none}
+.acts::-webkit-scrollbar{display:none}
+.ac{flex:none;height:36px;padding:0 14px!important;border-radius:999px;border:1px solid rgba(13,13,14,.12)!important;font-size:13px;white-space:nowrap}
+.ac.sub{background:#F3EEFF!important;border-color:#DDD6FE!important;color:#6D28D9!important;font-family:'JetBrains Mono',monospace!important;font-size:12px}
+.menu{position:absolute;top:150px;left:16px;right:16px;background:#FFFFFF;border:1px solid rgba(13,13,14,.1);border-radius:14px;box-shadow:0 16px 40px rgba(13,13,14,.16);padding:6px;z-index:5}
+.mi{display:flex;align-items:center;gap:10px;width:100%;height:48px;padding:0 12px!important;border-radius:10px;font-size:14px;text-align:left}
+.mi:hover{background:#F6F7F9!important}
+.mi.on{font-weight:600}
+.mi .s{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578}
+.work{flex:none;display:flex;align-items:center;gap:8px;margin:0 16px;padding:9px 12px;border-radius:10px;background:#F5F3FF;color:#6D28D9;font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.work i{width:6px;height:6px;border-radius:999px;background:#7C3AED;flex:none}
+.work span{overflow:hidden;text-overflow:ellipsis}
+.str{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:12px 16px 12px;display:flex;flex-direction:column-reverse}
+.stri{display:flex;flex-direction:column;gap:10px}
+.stri > *{flex-shrink:0}
+.str::-webkit-scrollbar{display:none}
+.u{align-self:stretch;background:#F3F5F8;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.45}
+.u .who{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6578;margin-bottom:3px}
+.a{font-size:14px;line-height:1.5}
+.tool{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:8px 12px!important;border:1px solid rgba(13,13,14,.08)!important;border-radius:10px;font-family:'JetBrains Mono',monospace!important;font-size:12px;text-align:left}
+.tool .tn{font-weight:700}
+.tool .tp{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4A5568}
+.tool .ok{color:#16A34A}
+.tool .dd{font-size:11px;color:#15803D;white-space:nowrap}
+.tool .dd em{font-style:normal;color:#B91C1C}
+.tool .cv{color:#8A93A6}
+.diff{border:1px solid rgba(13,13,14,.08);border-radius:10px;overflow:hidden;margin-top:-6px}
+.dl{font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;padding:0 10px;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.dl.p{background:#F0FAF3;color:#15803D}.dl.m{background:#FEF3F3;color:#B91C1C}.dl.c{color:#5A6578}
+.sb{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6D28D9}
+.qa{flex:none;display:flex;gap:8px;padding:8px 16px 0;overflow-x:auto;scrollbar-width:none}
+.qa::-webkit-scrollbar{display:none}
+.qa button{flex:none;height:34px;padding:0 12px!important;border-radius:999px;background:#F1F3F6!important;font-size:13px;color:#4A5568!important;white-space:nowrap}
+.cmp{flex:none;margin:8px 12px 26px;border:1px solid #CDD2DA;border-radius:18px;background:#FFFFFF;padding:6px 6px 6px 8px;display:flex;flex-direction:column;gap:4px}
+.cmp:focus-within{border-color:#3574F0;box-shadow:0 0 0 3px rgba(53,116,240,.14)}
+.cr{display:flex;align-items:flex-end;gap:4px}
+.gt{flex:1;min-width:0;min-height:44px;max-height:120px;resize:none;border:0;outline:none;background:transparent;font-family:'IBM Plex Sans',sans-serif;font-size:15px;line-height:1.4;color:#1A1A2E;padding:11px 4px}
+.gt::placeholder{color:#8A93A6}
+.mic{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:#4A5568!important;flex:none}
+.mic.rec{background:#FDECEC!important;color:#DC2626!important}
+.snd{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;background:#3574F0!important;color:#FFFFFF!important;flex:none}
+.cb{display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none}
+.cb::-webkit-scrollbar{display:none}
+.gi{width:36px;height:36px;border-radius:999px;display:grid;place-items:center;color:#5A6578!important;flex:none}
+.gd{flex:none;height:32px;padding:0 10px!important;border-radius:999px;font-size:12.5px;color:#4A5568!important;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.gd:hover{background:#F1F3F6!important}
+.pdot{width:7px;height:7px;border-radius:999px;display:inline-block}
+.listen{display:flex;align-items:center;gap:3px;height:20px;padding:0 6px}
+.listen i{width:3px;border-radius:2px;background:#DC2626;display:block}
+</style>
+</helmet>
+<div class="phn">
+<div class="rbw" aria-hidden="true"></div>
+<div class="bar">
+<a class="bk" href="Sessions.dc.html" aria-label="Back to sessions"><svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 3L5 8l5 5"></path></svg></a>
+<div class="ttl"><b>Subagent fan-out limits</b><span>aivory-code / orchestrator · claude opus-5.5 · 23 min · $3.12</span></div>
+<button class="more" aria-label="More actions"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></button>
+</div>
+<div class="acts">
+<button class="ac sub" aria-haspopup="menu" aria-expanded="{{subExpanded}}" onClick="{{toggleSub}}">{{subLabel}} ▾</button>
+<button class="ac">Park</button><button class="ac">Fork</button><button class="ac">Handoff</button><button class="ac">Stop</button>
+</div>
+<sc-if value="{{subOpen}}" hint-placeholder-val="{{false}}">
+<div class="menu" role="menu"><sc-for list="{{agents}}" as="a"><button class="mi {{a.on}}" role="menuitemradio" aria-checked="{{a.sel}}" onClick="{{a.pick}}"><span>{{a.n}}</span><span class="s">{{a.s}}</span></button></sc-for></div>
+</sc-if>
+<div class="work"><i></i><span>{{work}}</span></div>
+
+<div class="str"><div class="stri">
+<sc-for list="{{items}}" as="m">
+<sc-if value="{{m.isU}}" hint-placeholder-val="{{false}}"><div class="u"><span class="who">you</span>{{m.t}}</div></sc-if>
+<sc-if value="{{m.isA}}" hint-placeholder-val="{{false}}"><div class="a">{{m.t}}</div></sc-if>
+<sc-if value="{{m.isS}}" hint-placeholder-val="{{false}}"><div class="sb">{{m.t}}</div></sc-if>
+<sc-if value="{{m.isT}}" hint-placeholder-val="{{false}}"><button class="tool" onClick="{{m.toggle}}" aria-expanded="{{m.exp}}"><span class="ok">●</span><span class="tn">{{m.tn}}</span><span class="tp">{{m.tp}}</span><span class="dd">{{m.add}}<em>{{m.rm}}</em></span><span class="cv">{{m.chev}}</span></button></sc-if>
+<sc-if value="{{m.showDiff}}" hint-placeholder-val="{{false}}"><div class="diff"><sc-for list="{{m.diff}}" as="d"><div class="dl {{d.c}}">{{d.t}}</div></sc-for></div></sc-if>
+</sc-for>
+</div></div>
+
+<div class="qa"><button>Continue</button><button>Run tests</button><button>Explain the last turn</button><button>Ask the reviewer</button></div>
+<div class="cmp">
+<div class="cr">
+<textarea class="gt" rows="1" aria-label="Message the session" placeholder="{{ph}}"></textarea>
+<sc-if value="{{rec}}" hint-placeholder-val="{{false}}"><span class="listen" aria-hidden="true"><i style="height: 6px"></i><i style="height: 14px"></i><i style="height: 9px"></i><i style="height: 18px"></i><i style="height: 11px"></i></span></sc-if>
+<button class="mic {{recCls}}" aria-label="Hold to speak" aria-pressed="{{recPressed}}" onClick="{{recPick}}"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"></rect><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"></path></svg></button>
+<button class="snd" aria-label="Send"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"></path></svg></button>
+</div>
+<div class="cb">
+<button class="gi" aria-label="Attach a photo or file"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M13 7.5l-5.2 5.2a3 3 0 0 1-4.3-4.3l5.6-5.6a2 2 0 0 1 2.9 2.9L6.4 11.3a1 1 0 0 1-1.4-1.4l4.9-4.9"></path></svg></button>
+<button class="gi" aria-label="Take a screenshot of the desktop"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 13.5l7-7M8.5 5.5l2 2"></path><path d="M12 1.5v3M10.5 3h3M13.5 7v2M12.5 8h2M5.5 2v2M4.5 3h2"></path></svg></button>
+<button class="gd" onClick="{{nextMode}}">{{mode}} ▾</button>
+<button class="gd" onClick="{{nextModel}}"><i class="pdot" style="background: #D97757"></i>{{model}} ▾</button>
+<button class="gd" onClick="{{nextEff}}">{{eff}} ▾</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const MAIN = [
+  ['u', 'cap subagent fan-out per session and per codebase'],
+  ['a', 'I start with the spawn code in part "orchestrator". The explorer maps every call site.'],
+  ['s', '↳ explorer  14 call sites in 6 files  ✓'],
+  ['t', 'Edit', 'crates/orch/src/budget.rs', '+38 ', '−4', [['p', '+ pub struct Budget {'], ['p', '+     pub max_children: u8,      // 4'], ['p', '+     pub max_per_codebase: u8, // 12'], ['p', '+ }']]],
+  ['t', 'Bash', 'cargo test -p orch budget', '22 passed', '', [['c', 'test result: ok. 22 passed; 0 failed']]],
+  ['u', 'now wire the budget into the spawn path'],
+  ['t', 'Edit', 'crates/orch/src/spawn.rs', '+21 ', '−6', [['m', '-     let child = Session::spawn(cfg)?;'], ['p', '+     self.budget.check(&cfg.codebase)?;'], ['p', '+     let child = Session::spawn(cfg)?;']]],
+  ['s', '↳ test-writer  runs 5 new cases'],
+  ['a', 'spawn_child checks the budget first now. I wait for the tests, then I ask the reviewer.']
+];
+const SUBS = {
+  'test-writer': [['u', 'write tests for budget::exceeds'], ['a', 'Five cases: zero, at limit, over limit, nested, per codebase.'], ['t', 'Write', 'tests/budget_exceeds.rs', '+96 ', '', [['p', '+ #[test]'], ['p', '+ fn rejects_the_13th_session_in_a_codebase() {']]], ['t', 'Bash', 'cargo test -p orch budget::exceeds', 'running', '', [['c', 'running 5 tests …']]]],
+  'reviewer': [['u', 'review the budget diff when it is ready'], ['a', 'I wait for the main agent to finish the spawn change.']],
+  'explorer': [['u', 'map every spawn call site'], ['t', 'Bash', 'rg -n "spawn_child" crates/', '14 hits', '', [['c', '14 matches in 6 files']]], ['a', 'Call sites by crate: orch 8, sessions 4, agents 2. Done.']]
+};
+const AG = [['main', 'running'], ['test-writer', 'running'], ['reviewer', 'waits'], ['explorer', 'done']];
+const MODES = ['Edit', 'Plan', 'Auto'], MODELS = ['opus-5.5', 'sonnet-5.5', 'haiku-5.5'], EFF = ['high effort', 'max effort', 'low effort', 'medium effort'];
+const nx = (l, v) => l[(l.indexOf(v) + 1) % l.length];
+
+class Component extends DCLogic {
+  state = { agent: 'main', subOpen: false, open: { 3: true }, rec: false, mode: 'Edit', model: 'opus-5.5', eff: 'high effort' };
+
+  renderVals() {
+    const st = this.state;
+    const src = st.agent === 'main' ? MAIN : SUBS[st.agent];
+    return {
+      subLabel: st.agent === 'main' ? '3 subagents' : '↳ ' + st.agent, subOpen: st.subOpen, subExpanded: st.subOpen ? 'true' : 'false', toggleSub: () => this.setState({ subOpen: !this.state.subOpen }),
+      agents: AG.map(([n, s]) => ({ n, s, on: n === st.agent ? 'on' : '', sel: n === st.agent ? 'true' : 'false', pick: () => this.setState({ agent: n, subOpen: false, open: {} }) })),
+      work: st.agent === 'reviewer' ? 'Waits for the main agent' : 'Running Bash · cargo test -p orch budget::exceeds',
+      items: src.map((m, i) => {
+        const isT = m[0] === 't', exp = !!st.open[i];
+        return {
+          isU: m[0] === 'u', isA: m[0] === 'a', isS: m[0] === 's', isT, t: isT ? '' : m[1],
+          tn: isT ? m[1] : '', tp: isT ? m[2] : '', add: isT ? m[3] : '', rm: isT ? m[4] : '', chev: exp ? '▾' : '›', exp: exp ? 'true' : 'false',
+          showDiff: isT && exp, diff: isT ? m[5].map(([c, t]) => ({ c, t })) : [],
+          toggle: () => this.setState({ open: { ...this.state.open, [i]: !this.state.open[i] } })
+        };
+      }),
+      rec: st.rec, recCls: st.rec ? 'rec' : '', recPressed: st.rec ? 'true' : 'false', recPick: () => this.setState({ rec: !this.state.rec }),
+      ph: st.rec ? 'Listening… speak now' : st.agent === 'main' ? 'Message the session…' : 'Message ' + st.agent + '…',
+      mode: st.mode, model: st.model, eff: st.eff,
+      nextMode: () => this.setState({ mode: nx(MODES, this.state.mode) }), nextModel: () => this.setState({ model: nx(MODELS, this.state.model) }), nextEff: () => this.setState({ eff: nx(EFF, this.state.eff) })
+    };
+  }
+}
+</script>
+</body>
+</html>

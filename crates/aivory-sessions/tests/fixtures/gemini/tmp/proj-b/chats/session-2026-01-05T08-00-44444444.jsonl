@@ -1,0 +1,7 @@
+{"sessionId":"44444444-4444-4444-8444-444444444444","projectHash":"0000000000000000000000000000000000000000000000000000000000000000","startTime":"2026-01-05T08:00:00.000Z","lastUpdated":"2026-01-05T08:00:00.000Z","kind":"main"}
+{"id":"c0","timestamp":"2026-01-05T08:00:00.100Z","type":"user","content":[{"text":"<session_context>\nSynthetic context block\n</session_context>"}]}
+{"id":"c1","timestamp":"2026-01-05T08:00:01.000Z","type":"user","content":[{"text":"Synthetic gemini jsonl prompt"}]}
+{"$set":{"lastUpdated":"2026-01-05T08:00:01.000Z"}}
+{"id":"c2","timestamp":"2026-01-05T08:00:02.000Z","type":"gemini","content":"OK","model":"gemini-test-2"}
+{"id":"c2","timestamp":"2026-01-05T08:00:02.000Z","type":"gemini","content":"OK","model":"gemini-test-2","tokens":{"input":1,"output":1,"cached":0,"thoughts":0,"tool":0,"total":2}}
+{"$set":{"summary":"Synthetic gemini summary","lastUpdated":"2026-01-05T08:00:03.000Z"}}

@@ -1,0 +1,16 @@
+[package]
+name = "aivory-protocol"
+description = "AIVory Code client contract: war-room data types, JSON-RPC surface, layout helpers, demo data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

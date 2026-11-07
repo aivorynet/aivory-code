@@ -1,0 +1,7 @@
+{"timestamp":"2026-01-02T03:04:05.100Z","type":"session_meta","payload":{"id":"22222222-2222-4222-8222-222222222222","timestamp":"2026-01-02T03:04:05.000Z","cwd":"C:\\synthetic\\codex-app","originator":"codex_exec","cli_version":"0.0.1-test","source":"exec","model_provider":"openai","base_instructions":{"text":"synthetic instructions"},"git":{"commit_hash":"0000000","branch":"develop","repository_url":"https://example.invalid/synthetic.git"}}}
+{"timestamp":"2026-01-02T03:04:05.200Z","type":"turn_context","payload":{"cwd":"C:\\synthetic\\codex-app","model":"gpt-test","effort":"medium"}}
+{"timestamp":"2026-01-02T03:04:05.300Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}
+{"timestamp":"2026-01-02T03:04:05.400Z","type":"event_msg","payload":{"type":"user_message","message":"Synthetic codex prompt","images":[],"local_images":[],"text_elements":[]}}
+{"timestamp":"2026-01-02T03:04:06.000Z","type":"event_msg","payload":{"type":"agent_message","message":"OK"}}
+{"timestamp":"2026-01-02T03:04:06.100Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{}}}
+{"timestamp":"2026-01-02T03:04:06.200Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"t1"}}

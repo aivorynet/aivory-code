@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile · Diff review</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.phn *{box-sizing:border-box}
+:where(.phn) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phn{width:390px;height:844px;position:relative;overflow:hidden;background:#FFFFFF;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:#1A1A2E;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{flex:none;height:3px;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.bar{flex:none;display:flex;align-items:center;gap:6px;padding:14px 12px 6px 6px}
+.bk{width:44px;height:44px;display:grid;place-items:center;border-radius:999px;color:#1A1A2E!important;text-decoration:none}
+.ttl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ttl b{font-size:16px;font-weight:600}
+.ttl span{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.gates{flex:none;display:flex;gap:6px;padding:4px 16px 10px;overflow-x:auto;scrollbar-width:none}
+.gates::-webkit-scrollbar{display:none}
+.gate{flex:none;height:30px;padding:0 11px;border-radius:999px;display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11.5px;border:1px solid rgba(13,13,14,.1)}
+.gate.ok{color:#15803D;background:#F3FBF5;border-color:#BFE5CB}.gate.no{color:#5A6578}
+.fp{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px 10px 16px;background:#F6F7F9;border-top:1px solid rgba(13,13,14,.06);border-bottom:1px solid rgba(13,13,14,.06)}
+.fp .fn{flex:1;min-width:0;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp .ct{font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap}
+.fp .ct i{font-style:normal;color:#15803D}.fp .ct em{font-style:normal;color:#B91C1C}
+.nav{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:#FFFFFF!important;border:1px solid rgba(13,13,14,.1)!important}
+.nav:disabled{opacity:.35}
+.pg{flex:none;display:flex;justify-content:center;gap:6px;padding:8px 0 2px}
+.pg i{width:6px;height:6px;border-radius:999px;background:#D5DAE3}
+.pg i.on{background:#1A1A2E;width:18px}
+.code{flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:6px 0 16px}
+.code::-webkit-scrollbar{display:none}
+.dl{display:grid;grid-template-columns:34px minmax(0,1fr);width:100%;min-height:26px;text-align:left;font-family:'JetBrains Mono',monospace!important;font-size:12px;line-height:1.7}
+.dl .no{color:#A0A7B5;text-align:right;padding-right:8px;user-select:none}
+.dl .tx{white-space:pre;overflow:hidden;text-overflow:ellipsis;padding-right:12px}
+.dl.a{background:#F0FAF3}.dl.a .tx{color:#15803D}
+.dl.r{background:#FEF3F3}.dl.r .tx{color:#B91C1C}
+.dl.h{background:#F3F5F8;color:#5A6578}
+.dl.sel{box-shadow:inset 3px 0 0 #3574F0}
+.blame{margin:4px 12px 8px 34px;padding:10px 12px;border-radius:12px;background:#EEF3FE;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.45}
+.blame .k{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#2C4FA8}
+.blame .m{font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568}
+.blame .ba{display:flex;gap:8px;margin-top:2px}
+.bb{height:36px;padding:0 12px!important;border-radius:10px;background:#FFFFFF!important;border:1px solid rgba(13,13,14,.1)!important;font-size:13px}
+.cmt{margin:4px 12px 8px 34px;padding:10px 12px;border-radius:12px;background:#FFF8EB;border:1px solid #F3D7A6;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:4px}
+.cmt .m{font-family:'JetBrains Mono',monospace;font-size:11px;color:#92400E}
+.hint{flex:none;text-align:center;font-size:12px;color:#5A6578;padding:6px 0}
+.foot{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px 28px;border-top:1px solid rgba(13,13,14,.08)}
+.btn{height:52px;border-radius:14px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:15px;font-weight:500}
+.btn.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:600}
+.toast{position:absolute;left:16px;right:16px;bottom:104px;padding:14px 16px;border-radius:14px;background:#1A1A2E;color:#FFFFFF;font-size:14px;z-index:4}
+</style>
+</helmet>
+<div class="phn">
+<div class="rbw" aria-hidden="true"></div>
+<div class="bar">
+<a class="bk" href="Focus.dc.html" aria-label="Back to focus"><svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 3L5 8l5 5"></path></svg></a>
+<div class="ttl"><b>Review · Ledger compaction</b><span>aivory-code / ledger · claude sonnet-5.5 · 3 files · +142 −38</span></div>
+</div>
+<div class="gates"><span class="gate ok">✓ tests 31/31</span><span class="gate ok">✓ Guard clean</span><span class="gate ok">✓ build</span><span class="gate no">○ review · you</span></div>
+<div class="fp">
+<button class="nav" aria-label="Previous file" onClick="{{prev}}" disabled="{{atFirst}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 3L5 8l5 5"></path></svg></button>
+<span class="fn">{{file.n}}</span><span class="ct"><i>+{{file.a}}</i> <em>−{{file.r}}</em></span>
+<button class="nav" aria-label="Next file" onClick="{{next}}" disabled="{{atLast}}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3l5 5-5 5"></path></svg></button>
+</div>
+<div class="pg" aria-hidden="true"><sc-for list="{{dots}}" as="d"><i class="{{d}}"></i></sc-for></div>
+<div class="code">
+<sc-for list="{{lines}}" as="l">
+<button class="dl {{l.t}} {{l.sel}}" onClick="{{l.pick}}"><span class="no">{{l.n}}</span><span class="tx">{{l.s}}</span></button>
+<sc-if value="{{l.showBlame}}" hint-placeholder-val="{{false}}"><div class="blame"><span class="k">Blame by prompt · turn {{l.turn}}</span><span>“{{l.prompt}}”</span><span class="m">claude sonnet-5.5 · session a7e2 · 14:{{l.min}} · $0.{{l.cost}}</span><span class="ba"><button class="bb" onClick="{{l.comment}}">Comment to the session</button><button class="bb" onClick="{{l.close}}">Close</button></span></div></sc-if>
+<sc-if value="{{l.hasComment}}" hint-placeholder-val="{{false}}"><div class="cmt"><span class="m">your comment · sent as a ping to session a7e2</span>Use a stable sort here, so that equal keys keep their order.</div></sc-if>
+</sc-for>
+</div>
+<div class="hint">Tap a line for blame by prompt · long-press to comment</div>
+<div class="foot"><button class="btn" onClick="{{changes}}">Request changes</button><button class="btn pri" onClick="{{approve}}">Approve and merge</button></div>
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}"><div class="toast">{{toast}}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const FILES = [
+  { n: 'crates/ledger/src/compact.rs', a: 88, r: 12, lines: [['h', '', '@@ -40,10 +40,52 @@'], ['', '40', 'impl Ledger {'], ['a', '41', '    pub fn compact(&mut self, older_than: Days) -> Stats {'], ['a', '42', '        let old = self.segments_older_than(older_than);'], ['a', '43', '        let merged = old.chunks(2).map(|p| merge(&p[0], p.get(1)));'], ['a', '44', '        self.replace(old, merged.collect())'], ['a', '45', '    }'], ['', '46', ''], ['a', '47', 'fn merge(a: &Segment, b: Option<&Segment>) -> Segment {'], ['a', '48', '    let mut out = Segment::with_capacity(a.len() + b.map_or(0, |b| b.len()));'], ['a', '49', '    out.extend(a.newest_per_key(b));'], ['a', '50', '    out.entries.sort_unstable_by_key(|e| e.key);'], ['a', '51', '    out.drop_tombstones_older_than(Days(7));'], ['r', '', '    // TODO: compaction'], ['', '52', '    out'], ['', '53', '}']] },
+  { n: 'crates/ledger/src/segment.rs', a: 34, r: 22, lines: [['h', '', '@@ -12,8 +12,20 @@'], ['', '12', 'pub struct Segment {'], ['', '13', '    pub entries: Vec<Entry>,'], ['a', '14', '    pub sealed_at: Timestamp,'], ['', '15', '}'], ['r', '', 'impl Segment { fn len(&self) -> usize { 0 } }'], ['a', '16', 'impl Segment {'], ['a', '17', '    pub fn len(&self) -> usize { self.entries.len() }'], ['a', '18', '}']] },
+  { n: 'crates/ledger/tests/compact.rs', a: 20, r: 4, lines: [['h', '', '@@ -1,4 +1,20 @@'], ['a', '1', '#[test]'], ['a', '2', 'fn drops_old_tombstones() {'], ['a', '3', '    let mut l = Ledger::fixture(30);'], ['a', '4', '    assert_eq!(l.compact(Days(7)).dropped, 12);'], ['a', '5', '}']] }
+];
+
+class Component extends DCLogic {
+  state = { f: 0, sel: 12, comments: {}, toast: '' };
+
+  renderVals() {
+    const st = this.state, file = FILES[st.f];
+    return {
+      file: { n: file.n, a: file.a, r: file.r },
+      dots: FILES.map((_, i) => i === st.f ? 'on' : ''),
+      atFirst: st.f === 0, atLast: st.f === FILES.length - 1,
+      prev: () => this.setState({ f: Math.max(0, this.state.f - 1), sel: -1 }), next: () => this.setState({ f: Math.min(FILES.length - 1, this.state.f + 1), sel: -1 }),
+      lines: file.lines.map(([t, n, s], i) => {
+        const key = st.f + ':' + i;
+        return {
+          t, n, s, sel: st.sel === i ? 'sel' : '', showBlame: st.sel === i && t !== 'h',
+          turn: 2 + i % 3, min: String(10 + i).padStart(2, '0'), cost: String(10 + i * 3).padStart(2, '0'),
+          prompt: i % 2 ? 'compact ledger segments older than 7 days' : 'keep the newest entry per key and drop old tombstones',
+          hasComment: !!st.comments[key],
+          pick: () => this.setState({ sel: this.state.sel === i ? -1 : i }),
+          close: () => this.setState({ sel: -1 }),
+          comment: () => this.setState({ comments: { ...this.state.comments, [key]: true }, sel: -1 })
+        };
+      }),
+      hasToast: !!st.toast, toast: st.toast,
+      approve: () => this.setState({ toast: 'Approved. aivoryd merges after the last gate.' }),
+      changes: () => this.setState({ toast: 'Sent to the session. It answers in the stream.' })
+    };
+  }
+}
+</script>
+</body>
+</html>

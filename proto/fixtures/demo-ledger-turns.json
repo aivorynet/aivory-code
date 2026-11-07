@@ -1,0 +1,83 @@
+{
+  "session": "a01c",
+  "turns": [
+    {
+      "endedAt": 1792591800000,
+      "files": [],
+      "model": "opus-5.5",
+      "n": 0,
+      "prompt": "",
+      "provider": "claude",
+      "snapshot": true,
+      "startedAt": 1792591500000
+    },
+    {
+      "cost": 0.71,
+      "diagnosticsAdded": 0,
+      "diagnosticsRemoved": 0,
+      "endedAt": 1792592520000,
+      "files": [
+        {
+          "added": 16,
+          "path": "crates/orch/src/budget.rs",
+          "removed": 1
+        }
+      ],
+      "model": "opus-5.5",
+      "n": 1,
+      "prompt": "cap subagent fan-out per session and per codebase",
+      "provider": "claude",
+      "snapshot": true,
+      "startedAt": 1792592220000,
+      "tokensIn": 40000,
+      "tokensOut": 3000
+    },
+    {
+      "cost": 0.88,
+      "diagnosticsAdded": 1,
+      "diagnosticsRemoved": 0,
+      "endedAt": 1792592940000,
+      "files": [
+        {
+          "added": 9,
+          "path": "crates/orch/src/budget.rs",
+          "removed": 0
+        },
+        {
+          "added": 1,
+          "path": "crates/orch/src/spawn.rs",
+          "removed": 0
+        }
+      ],
+      "model": "opus-5.5",
+      "n": 2,
+      "prompt": "check the limit before a child starts",
+      "provider": "claude",
+      "snapshot": true,
+      "startedAt": 1792592640000,
+      "tokensIn": 80000,
+      "tokensOut": 6000
+    },
+    {
+      "cost": 0.42,
+      "diagnosticsAdded": 0,
+      "diagnosticsRemoved": 1,
+      "endedAt": 1792593360000,
+      "files": [
+        {
+          "added": 5,
+          "path": "crates/orch/src/budget.rs",
+          "removed": 0
+        }
+      ],
+      "model": "opus-5.5",
+      "n": 3,
+      "prompt": "return a typed error when the limit is hit",
+      "provider": "claude",
+      "snapshot": true,
+      "startedAt": 1792593060000,
+      "tokensIn": 120000,
+      "tokensOut": 9000
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "comment": "Sealed push payload v1. All binary values are base64url without padding. HKDF salt = epk || device_public, info = 'aivory-push-v1', no AAD.",
+  "device_public": "e06Qm75__kTEZaIgA31gjuNYl9Me-XLwf3SJLLD3PxM",
+  "device_secret": "ERERERERERERERERERERERERERERERERERERERERERE",
+  "envelope": {
+    "ct": "y3tIi9cSeFUqRZnt4NM4VVtPRC_6dsEQkR0oLb9oEi46QGbjIus-jROPkRu79QBS5BRmLayCjLAVYCXk3-QDYdeyQxXZ3-M16liu9r2VhV41l2LFmTFMZwF6RsyuDEawSoFgaQ",
+    "epk": "D6poTtKIZ7l_Smot7l34zpdOdrcBjj8iocTPJnhXDyA",
+    "nonce": "MzMzMzMzMzMzMzMz",
+    "v": 1
+  },
+  "ephemeral_secret": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI",
+  "info": "aivory-push-v1",
+  "nonce": "MzMzMzMzMzMzMzMz",
+  "plaintext": "{\"session\":\"sess-0001\",\"kind\":\"approval\",\"text\":\"Allow cargo test?\",\"ts\":1760000000}"
+}

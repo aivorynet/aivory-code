@@ -1,0 +1,13 @@
+{"type":"thread.started","thread_id":"thread-codex-1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"synthetic"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"echo hi","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"echo hi","aggregated_output":"hi\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"false","aggregated_output":"","exit_code":1,"status":"failed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"file_change","changes":[{"path":"a.txt","kind":"add"}],"status":"completed"}}
+{"type":"item.started","item":{"id":"item_4","type":"mcp_tool_call","server":"srv","tool":"lookup","arguments":{"q":1},"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_4","type":"mcp_tool_call","server":"srv","tool":"lookup","arguments":{"q":1},"result":{"content":[{"type":"text","text":"found"}]},"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"OK"}}
+{"type":"item.completed","item":{"id":"item_6","type":"future_item_type","x":1}}
+{"type":"future.event","y":2}
+{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":4,"output_tokens":2,"reasoning_output_tokens":1}}

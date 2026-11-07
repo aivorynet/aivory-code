@@ -1,0 +1,31 @@
+[package]
+name = "aivory-index"
+description = "AIVory Code symbol index: stub store, segments, session deltas, queries"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-syntax = { workspace = true }
+# MIT or Apache-2.0 (CC0 for the C part); content hash for files outside git.
+blake3 = "1"
+# MIT or Unlicense. The name index of a segment.
+fst = "0.4"
+# MIT or Unlicense. The repo walk with .gitignore rules.
+ignore = "0.4"
+# MIT. Compresses stubs on disk.
+lz4_flex = "0.14"
+# MIT or Apache-2.0. Compact binary format of the stubs and the segment tables.
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile = "3"

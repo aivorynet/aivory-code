@@ -1,0 +1,8 @@
+{
+ "agentType": "Plan",
+ "description": "Plan the change",
+ "toolUseId": "tu-c",
+ "spawnDepth": 1,
+ "model": "opus",
+ "finished": false
+}

@@ -1,0 +1,7 @@
+{
+ "agentType": "Explore",
+ "description": "Check docs",
+ "toolUseId": "tu-d",
+ "spawnDepth": 1,
+ "model": "haiku"
+}

@@ -1,0 +1,39 @@
+# release-plz configuration (docs/design/15-release.md).
+# One version for the whole workspace: [workspace.package] version in Cargo.toml.
+# One tag vX.Y.Z and one CHANGELOG.md at the root.
+# Nothing goes to crates.io. The GitLab release comes from .gitlab-ci.yml.
+# Not tested yet: the release-plz docs do not describe a shared workspace tag. Test it on a scratch
+# repo first (dry-run step 2 in the design document).
+
+[workspace]
+# Deprecated key, but it keeps cliff.toml as the only changelog template. Replace it by a
+# [changelog] table here if a later release-plz version removes the key.
+changelog_config = "cliff.toml"
+publish = false
+git_only = true
+git_release_enable = false
+git_tag_enable = false
+changelog_update = false
+semver_check = false
+dependencies_update = false
+allow_dirty = false
+# Release only when the release merge request is merged.
+release_always = false
+pr_name = "chore(release): {{ version }}"
+pr_labels = ["release"]
+
+# The daemon crate carries the shared tag and the shared changelog.
+[[package]]
+name = "aivoryd"
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+changelog_update = true
+changelog_path = "./CHANGELOG.md"
+changelog_include = [
+    "aivory-agents",
+    "aivory-desktop",
+    "aivory-engine",
+    "aivory-map",
+    "aivory-protocol",
+    "aivory-sessions",
+]

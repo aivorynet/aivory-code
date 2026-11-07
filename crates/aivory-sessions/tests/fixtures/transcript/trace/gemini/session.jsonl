@@ -1,0 +1,7 @@
+{"sessionId":"gem-t","startTime":"2026-03-01T10:00:00.000Z","kind":"main"}
+{"id":"m1","timestamp":"2026-03-01T10:00:02.000Z","type":"user","content":"Fix the parser"}
+{"id":"m2","timestamp":"2026-03-01T10:00:06.000Z","type":"gemini","content":"I read the file.","model":"gemini-test-1","tokens":{"input":1000,"output":30,"cached":600,"thoughts":10,"tool":5,"total":1045},"toolCalls":[{"id":"t1","name":"read_file","args":{"file_path":"src/a.rs"},"status":"success","timestamp":"2026-03-01T10:00:08.000Z","result":[{"functionResponse":{"id":"t1","name":"read_file","response":{"output":"line1"}}}]},{"id":"t2","name":"run_shell_command","args":{"command":"cargo test"},"status":"error","timestamp":"2026-03-01T10:00:12.000Z","result":[{"functionResponse":{"id":"t2","name":"run_shell_command","response":{"error":"exit code 101"}}}]}]}
+{ broken json
+{"id":"m3","timestamp":"2026-03-01T10:00:15.000Z","type":"gemini","content":"Fixed.","model":"gemini-test-1","tokens":{"input":2000,"output":20,"cached":0,"thoughts":0,"tool":0,"total":2020}}
+{"id":"m4","timestamp":"2026-03-01T10:00:20.000Z","type":"user","content":"Run it again"}
+{"id":"m5","timestamp":"2026-03-01T10:00:24.000Z","type":"gemini","content":"Running.","model":"gemini-test-1","tokens":{"input":2500,"output":10,"cached":0,"thoughts":0,"tool":0,"total":2510},"toolCalls":[{"id":"t3","name":"run_shell_command","args":{"command":"sleep 100"},"status":"executing","timestamp":"2026-03-01T10:00:24.000Z"}]}

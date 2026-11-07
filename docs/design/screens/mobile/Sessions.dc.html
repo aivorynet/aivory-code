@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile · Sessions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.scroll > *{flex-shrink:0}
+.phn *{box-sizing:border-box}
+:where(.phn) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phn{width:390px;height:844px;position:relative;overflow:hidden;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:#1A1A2E;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{flex:none;height:3px;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.top{flex:none;display:flex;align-items:flex-end;gap:12px;padding:28px 20px 12px}
+.top h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.sub{font-size:13px;color:#5A6578;margin-top:6px}
+.ib{margin-left:auto;width:44px;height:44px;border-radius:999px;background:#FFFFFF!important;display:grid;place-items:center;box-shadow:0 1px 2px rgba(13,13,14,.06)}
+.pulse{flex:none;margin:0 16px 12px;padding:12px 14px;background:#FFFFFF;border-radius:14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(13,13,14,.04)}
+.pz{display:flex;gap:14px;font-size:12.5px;color:#5A6578}
+.pz b{color:#1A1A2E;font-weight:600;margin-right:4px}
+.pz span{display:flex;align-items:center;gap:5px}
+.sq{width:8px;height:8px;border-radius:2px;display:inline-block}
+.mir{display:flex;gap:1px;height:30px;position:relative}
+.mir::after{content:'';position:absolute;left:0;right:0;top:18px;height:1px;background:rgba(13,13,14,.16)}
+.mb{flex:1;display:flex;flex-direction:column}
+.mu{height:18px;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:1px}
+.md{height:12px;display:flex;flex-direction:column;gap:1px;padding-top:1px}
+.mu i,.md i{display:block}
+.mu i{background:#1A1A2E;border-radius:1px 1px 0 0}
+.md i.q{background:#F97316}.md i.i{background:#CBD2DC}
+.seg{flex:none;display:flex;gap:2px;padding:3px;margin:0 16px 10px;background:#ECEEF2;border-radius:10px}
+.sb{flex:1;height:36px;border-radius:8px;font-size:13px;color:#4A5568!important}
+.sb.on{background:#FFFFFF!important;color:#1A1A2E!important;font-weight:600;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:0 16px 96px;display:flex;flex-direction:column;gap:6px}
+.scroll::-webkit-scrollbar{display:none}
+.gh{display:flex;align-items:center;gap:8px;padding:12px 4px 4px;font-size:12px;font-weight:600;color:#4A5568;text-transform:uppercase;letter-spacing:.06em}
+.gh .n{font-family:'JetBrains Mono',monospace;font-weight:500;color:#5A6578;letter-spacing:0}
+.grp{background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(13,13,14,.04)}
+.row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:12px 14px;border-top:1px solid rgba(13,13,14,.06);text-decoration:none;color:#1A1A2E!important;min-height:64px}
+.row:first-child{border-top:0}
+.row .t{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tm{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;white-space:nowrap}
+.row .tm.q{color:#C2410C}.row .tm.e{color:#B91C1C}
+.row .wh{grid-column:2 / 4;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
+.row .l{grid-column:2 / 4;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#4A5568;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.i{background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}.dot.ok{background:#16A34A}
+.sub2{display:inline-flex;align-items:center;gap:4px;padding:0 7px;height:18px;border-radius:999px;background:#F3EEFF;color:#6D28D9;font-size:10.5px;font-family:'JetBrains Mono',monospace;vertical-align:2px;margin-left:6px}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:80px;padding:8px 6px 22px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.tb{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;color:#5A6578!important;text-decoration:none;min-height:48px}
+.tb.on{color:#1A1A2E!important;font-weight:600}
+.tb .bd{position:absolute;top:2px;left:calc(50% + 4px);min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#FFFFFF;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+</style>
+</helmet>
+<div class="phn">
+<div class="rbw" aria-hidden="true"></div>
+<div class="top">
+<div><h1>Sessions</h1><div class="sub">21 live · 8 codebases · 35 agents</div></div>
+<button class="ib" aria-label="Search sessions"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg></button>
+</div>
+
+<div class="pulse" aria-label="Active and idle agents, last 60 minutes">
+<div class="pz"><span><i class="sq" style="background: #1A1A2E"></i><b>14</b>active</span><span><i class="sq" style="background: #F97316"></i><b>4</b>wait for you</span><span><i class="sq" style="background: #CBD2DC"></i><b>3</b>idle</span></div>
+<div class="mir"><sc-for list="{{bars}}" as="b" hint-placeholder-count="40"><div class="mb"><div class="mu"><i style="height: {{b.w}}%"></i></div><div class="md"><i class="q" style="height: {{b.q}}%"></i><i class="i" style="height: {{b.i}}%"></i></div></div></sc-for></div>
+</div>
+
+<div class="seg" role="group" aria-label="Filter"><sc-for list="{{filters}}" as="f" hint-placeholder-count="4"><button class="sb {{f.on}}" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for></div>
+
+<div class="scroll">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div class="gh"><i class="dot {{g.st}}"></i>{{g.label}}<span class="n">{{g.n}}</span></div>
+<div class="grp">
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="4">
+<a class="row" href="Stream.dc.html"><i class="dot {{r.st}}"></i><span class="t">{{r.t}}<sc-if value="{{r.hasSub}}" hint-placeholder-val="{{false}}"><span class="sub2">↳{{r.sub}}</span></sc-if></span><span class="tm {{r.st}}">{{r.tm}}</span><span class="wh">{{r.where}} · {{r.ag}}</span><span class="l">{{r.last}}</span></a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+
+<nav class="tabbar" aria-label="Tabs">
+<a class="tb" href="Focus.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.5"></circle><circle cx="8" cy="8" r="2"></circle></svg>Focus<span class="bd">5</span></a>
+<a class="tb on" href="Sessions.dc.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>Sessions</a>
+<button class="tb"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</button>
+<a class="tb" href="Diff.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"></path></svg>Code</a>
+<a class="tb" href="Me.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8"></circle><path d="M2.5 14c.8-2.6 3-4 5.5-4s4.7 1.4 5.5 4"></path></svg>Me</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const S = [
+  ['q', 'Stripe webhook retries', 'billing / payment', 'claude', 2, 'waits 6 min', 'Run sqlx migrate run on staging?'],
+  ['q', 'Virtualize the session grid', 'aivory-code / ui', 'codex', 0, 'waits 3 min', 'Approve the 4-step plan?'],
+  ['q', 'OWASP rule pack v2', 'aivory-guard / rules', 'gemini', 1, 'waits 2 min', 'Keep the legacy regex rules?'],
+  ['e', 'Redis failover', 'smart-inference / cache', 'opencode', 0, 'stopped 1 min', 'dial tcp 127.0.0.1:6380: refused'],
+  ['w', 'Subagent fan-out limits', 'aivory-code / orchestrator', 'claude', 3, '23 min', '● Bash cargo test -p orch budget'],
+  ['w', 'Incremental scan cache', 'aivory-guard / scanner', 'claude', 2, '31 min', 'Rename handling needs the inode.'],
+  ['w', 'Runner sandbox seccomp', 'kronk / runner', 'claude', 1, '26 min', '↳ fuzzer 2,000 syscalls, 0 escapes'],
+  ['w', 'Model routing table', 'smart-inference / router', 'claude', 1, '18 min', '94.1% routed as expected'],
+  ['w', 'PPTX chart export', 'slaide / render', 'claude', 2, '14 min', 'Bar and line export natively.'],
+  ['w', 'German translations', 'aivory-hugo / i18n', 'gemini', 1, '13 min', 'I align the 4 terms.'],
+  ['w', 'Invoice PDF layout', 'billing / invoices', 'gemini', 0, '11 min', 'Page 2 breaks inside the table.'],
+  ['w', 'Ledger compaction', 'aivory-code / ledger', 'claude', 0, '9 min', 'Next: tombstones.'],
+  ['w', 'Offline answer queue', 'mobile / sync', 'claude', 0, '9 min', 'BUILD SUCCESSFUL in 38s'],
+  ['w', 'MCP tool timeouts', 'kronk / mcp', 'claude', 0, '8 min', 'Clone gets 120 s.'],
+  ['w', 'Embed fonts in PDF export', 'slaide / export', 'codex', 0, '7 min', '5 passed in 2.10s'],
+  ['w', 'Token metering', 'smart-inference / metering', 'codex', 0, '6 min', 'ok metering 0.84s'],
+  ['w', 'Invoice lookup index', 'billing / database', 'claude', 0, '5 min', 'Index Scan 0.9 ms'],
+  ['w', 'Secrets rule tuning', 'aivory-guard / rules', 'claude', 1, '15 min', 'false positives 212 → 37'],
+  ['i', 'Undo stack', 'slaide / editor', 'opencode', 0, 'idle 18 min', 'The task is complete.'],
+  ['i', 'CRDT merge for map.toml', 'aivory-code / sync', 'goose', 0, 'idle 12 min', 'Waits for a next task.'],
+  ['i', 'Findings heatmap', 'aivory-guard / dashboard', 'gemini', 0, 'idle 4 min', 'The task is complete.']
+];
+const GROUPS = [['q', 'Needs you'], ['e', 'Error'], ['w', 'Working'], ['i', 'Idle']];
+const SERW = [12, 13, 14, 15, 16, 17, 17, 18, 19, 19, 18, 17, 16, 16, 17, 18, 19, 19, 18, 18, 17, 17, 16, 17, 16, 16, 15, 15, 14, 14, 15, 15, 14, 14, 15, 15, 14, 14, 14, 14];
+const SERQ = [1, 1, 2, 2, 1, 2, 3, 3, 2, 1, 1, 2, 3, 4, 4, 3, 2, 2, 1, 1, 2, 3, 3, 4, 4, 3, 3, 4, 4, 4, 3, 3, 4, 4, 4, 3, 4, 4, 4, 4];
+const SERI = [8, 7, 6, 6, 5, 4, 4, 4, 5, 4, 3, 4, 4, 3, 4, 5, 5, 4, 4, 4, 4, 3, 4, 3, 4, 4, 3, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+
+class Component extends DCLogic {
+  state = { f: 'all' };
+
+  renderVals() {
+    const st = this.state;
+    const keep = g => st.f === 'all' || (st.f === 'needs' && (g === 'q' || g === 'e')) || (st.f === 'working' && g === 'w') || (st.f === 'idle' && g === 'i');
+    return {
+      bars: SERW.map((w, i) => ({ w: Math.round(w / 20 * 100), q: Math.round(SERQ[i] / 12 * 100), i: Math.round(SERI[i] / 12 * 100) })),
+      filters: [['all', 'All'], ['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle']].map(([k, label]) => ({ label, on: st.f === k ? 'on' : '', pressed: st.f === k ? 'true' : 'false', pick: () => this.setState({ f: k }) })),
+      groups: GROUPS.filter(([k]) => keep(k)).map(([k, label]) => { const rows = S.filter(s => s[0] === k); return { st: k, label, n: rows.length, rows: rows.map(([s, t, where, ag, sub, tm, last]) => ({ st: s, t, where, ag, sub, hasSub: sub > 0, tm, last })) }; }).filter(g => g.n)
+    };
+  }
+}
+</script>
+</body>
+</html>

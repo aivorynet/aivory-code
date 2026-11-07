@@ -1,0 +1,94 @@
+{
+  "hits": [
+    {
+      "a": "7f3a",
+      "at": 1792593420000,
+      "b": "k9d4",
+      "codebase": "billing",
+      "conflictFiles": [
+        "src/payment/charge.rs"
+      ],
+      "keys": [
+        "path:src/payment/charge.rs",
+        "test:payment::charge::tests::pays_once"
+      ],
+      "score": 1.0,
+      "tier": 1,
+      "trial": true
+    },
+    {
+      "a": "7f3a",
+      "at": 1792593300000,
+      "b": "8a22",
+      "codebase": "billing",
+      "keys": [
+        "sym:rust:billing::Invoice::total"
+      ],
+      "score": 0.699999988079071,
+      "tier": 3,
+      "trial": true
+    },
+    {
+      "a": "8a22",
+      "at": 1792593060000,
+      "b": "m2e5",
+      "codebase": "billing",
+      "keys": [
+        "sym:rust:billing::Money::round"
+      ],
+      "score": 0.4000000059604645,
+      "tier": 2,
+      "trial": true
+    },
+    {
+      "a": "8d07",
+      "at": 1792592760000,
+      "b": "m2e5",
+      "codebase": "billing",
+      "keys": [
+        "mod:billing/db",
+        "path:billing/db/schema.rs"
+      ],
+      "score": 0.10000000149011612,
+      "tier": 1,
+      "trial": true
+    }
+  ],
+  "sessions": [
+    {
+      "id": "7f3a",
+      "owner": "you",
+      "part": "payment",
+      "provider": "claude",
+      "state": "needsYou"
+    },
+    {
+      "id": "k9d4",
+      "owner": "Jonas",
+      "part": "payment",
+      "provider": "opencode",
+      "state": "working"
+    },
+    {
+      "id": "8a22",
+      "owner": "you",
+      "part": "invoices",
+      "provider": "gemini",
+      "state": "working"
+    },
+    {
+      "id": "8d07",
+      "owner": "you",
+      "part": "database",
+      "provider": "claude",
+      "state": "working"
+    },
+    {
+      "id": "m2e5",
+      "owner": "Mara",
+      "part": "invoices",
+      "provider": "codex",
+      "state": "working"
+    }
+  ]
+}

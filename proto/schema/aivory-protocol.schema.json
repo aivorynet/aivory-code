@@ -1,0 +1,6899 @@
+{
+  "$defs": {
+    "Account": {
+      "properties": {
+        "hub": {
+          "type": "string"
+        },
+        "hubState": {
+          "$ref": "#/$defs/LinkState"
+        },
+        "license": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "string"
+        },
+        "renews": {
+          "description": "`YYYY-MM-DD`.",
+          "type": "string"
+        },
+        "seats": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "team": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "team",
+        "seats",
+        "license",
+        "renews",
+        "hub",
+        "relay",
+        "hubState"
+      ],
+      "type": "object"
+    },
+    "Ack": {
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "AcpAdded": {
+      "description": "Result of `providers/addAcp`.",
+      "properties": {
+        "found": {
+          "description": "`<command> --version` ran, or the file of the command exists.",
+          "type": "boolean"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderInfo",
+          "description": "The new card, with the badge `acp`."
+        },
+        "version": {
+          "description": "The first line of the `--version` output, when the command printed one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "provider",
+        "found"
+      ],
+      "type": "object"
+    },
+    "AcpAgent": {
+      "description": "An ACP agent that the user added in Settings. Stored with the settings (`Settings::acp`).",
+      "properties": {
+        "args": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Extra environment variables of the agent process.",
+          "type": "object"
+        },
+        "id": {
+          "description": "The provider id: `acp-` and the name in lower case.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "command"
+      ],
+      "type": "object"
+    },
+    "ActivityRow": {
+      "description": "A row of the activity tab.",
+      "properties": {
+        "added": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "removed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "session": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "provider",
+        "session",
+        "what",
+        "added",
+        "removed",
+        "cost"
+      ],
+      "type": "object"
+    },
+    "ActivitySample": {
+      "description": "One minute of the pulse chart.",
+      "properties": {
+        "active": {
+          "description": "Agents that work (upper half, ink).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "at": {
+          "description": "Start of the minute.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "idle": {
+          "description": "Idle agents (lower half, grey).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "waiting": {
+          "description": "Agents that wait for the user, errors included (lower half, orange).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "at",
+        "active",
+        "waiting",
+        "idle"
+      ],
+      "type": "object"
+    },
+    "AddAcpParams": {
+      "description": "Parameters of `providers/addAcp`.",
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "A program name on the PATH, or the path of a file.",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ],
+      "type": "object"
+    },
+    "AddPartParams": {
+      "description": "Parameters of `map/addPart`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "paths": {
+          "description": "Globs relative to the repository root, for example `crates/pay/**`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "codebase",
+        "name",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "AgentMem": {
+      "description": "One agent process.",
+      "properties": {
+        "mb": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "description": "The program: `claude`, `codex`, `gemini` or `node`.",
+          "type": "string"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pid",
+        "name",
+        "mb"
+      ],
+      "type": "object"
+    },
+    "AgentRef": {
+      "description": "A provider and a model, for example `claude · opus-5.5`.",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "type": "object"
+    },
+    "AnswerParams": {
+      "description": "Answer an ask: pick an option, or type an own answer, or both.",
+      "properties": {
+        "ask": {
+          "description": "The [`crate::Ask::id`] the answer is for.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "option": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "Ask": {
+      "description": "A question to the user. The first option is the primary button.",
+      "properties": {
+        "id": {
+          "description": "Changes with every new ask, so a late answer cannot hit the next ask.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AskKind"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "description": "Why the agent asks (phone Approval screen).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "risky": {
+          "description": "A risky permission needs a biometric confirmation on the phone.",
+          "type": "boolean"
+        },
+        "steps": {
+          "description": "The steps of a plan.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "The command for a permission (show it in mono), else the question.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "options"
+      ],
+      "type": "object"
+    },
+    "AskKind": {
+      "description": "What a session in [`SessionState::NeedsYou`] or [`SessionState::Error`] waits for.",
+      "enum": [
+        "permission",
+        "plan",
+        "question",
+        "error"
+      ],
+      "type": "string"
+    },
+    "Autopilot": {
+      "description": "The autopilot rules (war-room popover and Settings).",
+      "properties": {
+        "maxPerCodebase": {
+          "description": "1-16.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maxRunning": {
+          "description": "1-64.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "order": {
+          "$ref": "#/$defs/QueueOrder"
+        },
+        "parkAfterMin": {
+          "description": "5-120, step 5.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "startQueued": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on",
+        "parkAfterMin",
+        "maxRunning",
+        "maxPerCodebase",
+        "startQueued",
+        "order"
+      ],
+      "type": "object"
+    },
+    "AutopilotPatch": {
+      "description": "Change some autopilot rules. Missing fields keep their value.",
+      "properties": {
+        "maxPerCodebase": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "maxRunning": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "on": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueueOrder"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parkAfterMin": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "startQueued": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Blame": {
+      "description": "Which prompt wrote a line (phone Diff screen, \"blame by prompt\").",
+      "properties": {
+        "at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "model": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "session": {
+          "type": "string"
+        },
+        "turn": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turn",
+        "prompt",
+        "model",
+        "session",
+        "at",
+        "cost"
+      ],
+      "type": "object"
+    },
+    "BlameHunk": {
+      "description": "A run of lines with the same commit and the same turn. A hunk of one line is one line.",
+      "properties": {
+        "commit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommitRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`None`: the lines are not committed yet."
+        },
+        "count": {
+          "description": "The number of lines.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "line": {
+          "description": "The first line.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlameTurn"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`None`: no turn of the ledger wrote these lines (a human, or an unknown tool)."
+        }
+      },
+      "required": [
+        "line",
+        "count"
+      ],
+      "type": "object"
+    },
+    "BlameParams": {
+      "description": "Parameters of `ledger/blame`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "session": {
+          "description": "The session that owns the uncommitted lines. Without it, only committed lines have a\nturn.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "path"
+      ],
+      "type": "object"
+    },
+    "BlameTurn": {
+      "description": "The turn that wrote a line.",
+      "properties": {
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "n": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "prompt": {
+          "description": "At most [`PROMPT_CHARS`] characters.",
+          "type": "string"
+        },
+        "session": {
+          "type": "string"
+        },
+        "time": {
+          "description": "The end of the turn.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session",
+        "n",
+        "prompt",
+        "time"
+      ],
+      "type": "object"
+    },
+    "BlockOverrideParams": {
+      "description": "Parameters of `block/override`.",
+      "properties": {
+        "keys": {
+          "description": "The blocked keys to free. Empty frees every block of the session.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "BlockOverrideResult": {
+      "description": "Result of `block/override`.",
+      "properties": {
+        "resolved": {
+          "description": "The number of blocks that the call closed.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "resolved"
+      ],
+      "type": "object"
+    },
+    "Board": {
+      "description": "The computed board of the war room. Every display shows these gates; none computes them.\n\nGate rule, for live sessions only (`Working`, `NeedsYou`, `Error`, `Idle`):\n`NeedsYou` goes to `needs_you`, `Working` to `working`, `Error` to `blocked`, `Idle` to\n`idle`. Parked and done sessions are in no gate. In a gate the sessions with an open ask\ncome first, then the longest wait (the oldest `since`), then the id.",
+      "properties": {
+        "asks": {
+          "description": "The sessions with an open ask, longest wait first.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "blocked": {
+          "$ref": "#/$defs/BoardGate"
+        },
+        "idle": {
+          "$ref": "#/$defs/BoardGate"
+        },
+        "needsYou": {
+          "$ref": "#/$defs/BoardGate"
+        },
+        "working": {
+          "$ref": "#/$defs/BoardGate"
+        }
+      },
+      "required": [
+        "needsYou",
+        "working",
+        "blocked",
+        "idle",
+        "asks"
+      ],
+      "type": "object"
+    },
+    "BoardGate": {
+      "description": "One gate of the board: the count and the session ids.",
+      "properties": {
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "ids"
+      ],
+      "type": "object"
+    },
+    "Budget": {
+      "description": "The monthly budget (phone Me).",
+      "properties": {
+        "limit": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "month": {
+          "description": "`YYYY-MM`.",
+          "type": "string"
+        },
+        "spent": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "warnPct": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "month",
+        "spent",
+        "limit",
+        "warnPct"
+      ],
+      "type": "object"
+    },
+    "Channels": {
+      "properties": {
+        "desktop": {
+          "type": "boolean"
+        },
+        "email": {
+          "type": "boolean"
+        },
+        "phone": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "desktop",
+        "phone",
+        "email"
+      ],
+      "type": "object"
+    },
+    "Claim": {
+      "description": "A lease of a session on a routing key.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "leaseS": {
+          "description": "Seconds until the lease ends. A heartbeat of the daemon renews it.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file of the key (a path key, or the file of a symbol key when the daemon knows it).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClaimRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The lines of the symbol, when the key is a symbol key."
+        },
+        "session": {
+          "description": "The session id as the war room shows it.",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ClaimState"
+        }
+      },
+      "required": [
+        "session",
+        "codebase",
+        "key",
+        "state",
+        "leaseS"
+      ],
+      "type": "object"
+    },
+    "ClaimList": {
+      "description": "Result of `claims/list`: the live claims, ordered by key and session.",
+      "properties": {
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "claims"
+      ],
+      "type": "object"
+    },
+    "ClaimRange": {
+      "description": "The lines of a changed declaration, from 1, both ends included.",
+      "properties": {
+        "from": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "to": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "ClaimState": {
+      "description": "The state of a claim. It only moves up: intent, editing, landed.",
+      "oneOf": [
+        {
+          "const": "intent",
+          "description": "The plan of the session will touch the key.",
+          "type": "string"
+        },
+        {
+          "const": "editing",
+          "description": "The session changed the key.",
+          "type": "string"
+        },
+        {
+          "const": "landed",
+          "description": "The change is on the target branch. It shows no heat.",
+          "type": "string"
+        }
+      ]
+    },
+    "ClaimsListParams": {
+      "description": "Parameters of `claims/list`.",
+      "properties": {
+        "codebase": {
+          "description": "Only the claims of the sessions of this codebase.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session": {
+          "description": "Only the claims of this session.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "CodeFile": {
+      "description": "Result of `code/file`.",
+      "properties": {
+        "diagnostics": {
+          "description": "The findings in this file: the stored findings of the last turn that changed it in\nthis session, or the syntax errors of the text.",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "folding": {
+          "items": {
+            "$ref": "#/$defs/Fold"
+          },
+          "type": "array"
+        },
+        "highlighted": {
+          "$ref": "#/$defs/LineRange",
+          "description": "The lines that `highlights` covers."
+        },
+        "highlights": {
+          "items": {
+            "$ref": "#/$defs/Highlight"
+          },
+          "type": "array"
+        },
+        "language": {
+          "description": "The language name (`rust`, `typescript`, ...), or empty for a file without a grammar.",
+          "type": "string"
+        },
+        "outline": {
+          "items": {
+            "$ref": "#/$defs/OutlineNode"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "description": "The whole text, cut at 1 MiB (then `truncated` is true).",
+          "type": "string"
+        },
+        "totalLines": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "language",
+        "text",
+        "totalLines",
+        "highlighted",
+        "highlights",
+        "outline",
+        "folding",
+        "diagnostics"
+      ],
+      "type": "object"
+    },
+    "CodeFileParams": {
+      "description": "Parameters of `code/file`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "lines": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The lines to highlight (the viewport). Default: lines 1 to 200."
+        },
+        "path": {
+          "type": "string"
+        },
+        "rev": {
+          "description": "A git revision (`HEAD`, a branch, a commit), or `turn:<n>` with `session`: the snapshot\nat the end of turn `n`. Default: the working tree.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "path"
+      ],
+      "type": "object"
+    },
+    "CodePosParams": {
+      "description": "Parameters of `code/definition`, `code/references`, and `code/hover`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "line": {
+          "description": "The cursor.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page": {
+          "description": "Default 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Default 20, at most 200.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "path",
+        "line",
+        "col"
+      ],
+      "type": "object"
+    },
+    "CodeSource": {
+      "description": "The engine that answered.",
+      "oneOf": [
+        {
+          "const": "index",
+          "description": "The symbol index (declarations and name references; no type resolution).",
+          "type": "string"
+        },
+        {
+          "const": "lsp",
+          "description": "A language server.",
+          "type": "string"
+        },
+        {
+          "const": "syntax",
+          "description": "The syntax tree of the file alone.",
+          "type": "string"
+        }
+      ]
+    },
+    "Codebase": {
+      "description": "One repository with its parts from `.aivory/map.toml`. The id is the short name.",
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "daemon": {
+          "description": "The daemon that runs the sessions of this codebase.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "languages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "parts": {
+          "description": "In map order. The Sankey orders its part column by this list.",
+          "items": {
+            "$ref": "#/$defs/Part"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "worktrees": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "branch",
+        "worktrees",
+        "daemon",
+        "languages",
+        "parts"
+      ],
+      "type": "object"
+    },
+    "CodebaseRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "CommitRef": {
+      "description": "The commit of a line.",
+      "properties": {
+        "id": {
+          "description": "The first 12 characters of the commit id.",
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "time": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "summary",
+        "time"
+      ],
+      "type": "object"
+    },
+    "ComposerPrefs": {
+      "description": "The dropdowns of a composer. A provider change is a handoff to a new session.",
+      "properties": {
+        "effort": {
+          "$ref": "#/$defs/Effort"
+        },
+        "mode": {
+          "$ref": "#/$defs/Mode"
+        },
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "provider",
+        "model",
+        "effort"
+      ],
+      "type": "object"
+    },
+    "ConflictSide": {
+      "description": "One side of a conflict.",
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/Line"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "ConsoleBackground": {
+      "description": "Console background of the session panes.",
+      "oneOf": [
+        {
+          "const": "white",
+          "title": "FFFFFF",
+          "type": "string"
+        },
+        {
+          "const": "grey",
+          "title": "F4F5F7",
+          "type": "string"
+        },
+        {
+          "const": "dark",
+          "title": "15161B, text #E4E5EA",
+          "type": "string"
+        },
+        {
+          "const": "navy",
+          "title": "0D1624, text #E4E7F0",
+          "type": "string"
+        }
+      ]
+    },
+    "Created": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "Daemon": {
+      "properties": {
+        "detail": {
+          "description": "`aivoryd 0.9.2 · Windows 11`, `ssh pp@build-01`, `cloud runner · eu-central`.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DaemonKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "sessions": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "detail",
+        "sessions",
+        "running"
+      ],
+      "type": "object"
+    },
+    "DaemonInfo": {
+      "properties": {
+        "contract": {
+          "description": "[`crate::PROTOCOL_VERSION`] of the daemon.",
+          "type": "string"
+        },
+        "cwd": {
+          "default": "",
+          "description": "The working folder of the daemon process: where \"Open shell\" starts when no codebase is\nselected. Empty from an older daemon.",
+          "type": "string"
+        },
+        "demo": {
+          "description": "The daemon serves the demo data (`aivoryd serve --demo`).",
+          "type": "boolean"
+        },
+        "host": {
+          "default": "",
+          "description": "The name of the machine. Empty from an older daemon.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "protocol": {
+          "description": "The transport, `jsonrpc-2.0/ndjson`.",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "protocol",
+        "contract",
+        "pid",
+        "demo"
+      ],
+      "type": "object"
+    },
+    "DaemonKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "ssh",
+            "cloud"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "local",
+          "description": "This machine.",
+          "type": "string"
+        }
+      ]
+    },
+    "DaemonRef": {
+      "description": "Parameters of `daemon/restart`.",
+      "properties": {
+        "daemon": {
+          "description": "A daemon id of `settings/get`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "daemon"
+      ],
+      "type": "object"
+    },
+    "DaemonScaleParams": {
+      "description": "Parameters of `daemon/scale`.",
+      "properties": {
+        "daemon": {
+          "type": "string"
+        },
+        "maxRunning": {
+          "description": "1-64. The daemon writes it to the autopilot value `maxRunning`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "daemon",
+        "maxRunning"
+      ],
+      "type": "object"
+    },
+    "DagEdge": {
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "DagNode": {
+      "description": "A card of the DAG tab. [`crate::layout::dag`] places the cards.",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "durationMs": {
+          "description": "Known for done and running nodes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "span": {
+          "description": "The span that a click selects.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState",
+          "description": "Done, working (`running`), needs you (`waiting`) or parked (`planned`)."
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "agent",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Delta": {
+      "description": "One change of the war-room view.",
+      "oneOf": [
+        {
+          "description": "Add a session or replace it (same id).",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/Pane"
+            },
+            "type": {
+              "const": "session",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "const": "sessionRemoved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "New transcript lines. Main lines go to the pane tail; subagent lines only count.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "lines": {
+              "items": {
+                "$ref": "#/$defs/Line"
+              },
+              "type": "array"
+            },
+            "subagent": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "total": {
+              "description": "The new transcript length.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "lines",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "lines",
+            "total"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A new pulse sample, or a new value for the current minute (same `at`).",
+          "properties": {
+            "sample": {
+              "$ref": "#/$defs/ActivitySample"
+            },
+            "type": {
+              "const": "activity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "sample"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "autopilot": {
+              "$ref": "#/$defs/Autopilot"
+            },
+            "type": {
+              "const": "autopilot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "autopilot"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "inboxOpen": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "queued": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "counts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "queued",
+            "inboxOpen"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "usage",
+              "type": "string"
+            },
+            "usage": {
+              "items": {
+                "$ref": "#/$defs/UsageWindow"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "usage"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "hub": {
+              "$ref": "#/$defs/LinkState"
+            },
+            "relay": {
+              "$ref": "#/$defs/LinkState"
+            },
+            "type": {
+              "const": "links",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "hub",
+            "relay"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Add a codebase or replace it (same id).",
+          "properties": {
+            "codebase": {
+              "$ref": "#/$defs/Codebase"
+            },
+            "type": {
+              "const": "codebase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "codebase"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A codebase that no longer shows (`repos/remove` of a pinned codebase).",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "const": "codebaseRemoved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Daemon time, so that the clocks of the clients stay right.",
+          "properties": {
+            "now": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": {
+              "const": "tick",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "now"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The new board. The daemon sends it after every change of a session. A client that does\nnot know this delta keeps its old board.",
+          "properties": {
+            "board": {
+              "$ref": "#/$defs/Board"
+            },
+            "type": {
+              "const": "board",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "board"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DeltaNote": {
+      "description": "Parameters of the `warroom/delta` notification.",
+      "properties": {
+        "delta": {
+          "$ref": "#/$defs/Delta"
+        },
+        "seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq",
+        "delta"
+      ],
+      "type": "object"
+    },
+    "Device": {
+      "description": "A paired phone or desktop.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lastSeen": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "os": {
+          "type": "string"
+        },
+        "paired": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "os",
+        "paired",
+        "lastSeen",
+        "online"
+      ],
+      "type": "object"
+    },
+    "DevicePushParams": {
+      "description": "Parameters of `devices/push`: where the daemon sends the end-to-end encrypted push of a\npaired device.",
+      "properties": {
+        "id": {
+          "description": "The device id (`device_id` of the pairing). The daemon binds the call to the caller, so a\nclient may leave it out.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platform": {
+          "$ref": "#/$defs/PushPlatform"
+        },
+        "pushKey": {
+          "description": "The X25519 public key of the device for sealed pushes, base64url without padding.",
+          "type": "string"
+        },
+        "token": {
+          "description": "The APNs hex token or the FCM registration token.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "platform",
+        "pushKey"
+      ],
+      "type": "object"
+    },
+    "DeviceRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "DiagnosticsParams": {
+      "description": "Parameters of `code/diagnostics`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "path": {
+          "description": "Only this file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session": {
+          "description": "With a session: the stored findings of that session. Without it: the daemon runs the\nfast stages (syntax and rules) now on the files that changed in the checkout.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "turn": {
+          "description": "The turn. Default: the last turn that has stored findings. Needs `session`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase"
+      ],
+      "type": "object"
+    },
+    "DiagnosticsResult": {
+      "description": "Result of `code/diagnostics`.",
+      "properties": {
+        "added": {
+          "description": "In `rows`, not in the state before the turn. `added` and `removed` compare the stages\nthat ran on both sides (syntax and rules; linters and language servers run only after\nthe turn).",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "description": "The stages that ran and the notes of the run (skipped tools, truncated stages).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "description": "In the state before the turn, not in `rows`.",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "rows": {
+          "description": "The findings after the turn, in the files that the turn changed.",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "turn": {
+          "description": "The turn of the findings. `None` for a run without a session.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rows",
+        "added",
+        "removed"
+      ],
+      "type": "object"
+    },
+    "DiffFile": {
+      "properties": {
+        "added": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/DiffLine"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "removed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "added",
+        "removed",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "DiffLine": {
+      "properties": {
+        "blame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Blame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/DiffLineKind"
+        },
+        "new": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "old": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "type": "object"
+    },
+    "DiffLineKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "context",
+            "added",
+            "removed"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "hunk",
+          "description": "`@@ -1,12 +1,46 @@`",
+          "type": "string"
+        }
+      ]
+    },
+    "DispatchParams": {
+      "description": "Start work from one line, or queue it (`session/dispatch`).\n\nRule: the daemon takes `codebase` (default: the first codebase), `part` (default: the first\npart) and `agent` (the provider, default `claude`). When the autopilot has a free slot for\nthe codebase ([`crate::WarRoom::has_free_slot`]) the daemon starts a session now and the\nresult holds `session`. Else it queues a task, whatever the autopilot `startQueued` value is,\nand the result holds `task`. [`DispatchParams::from_line`] reads the line\n`@codebase words --agent provider`.",
+      "properties": {
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "codebase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The effort of the session (default: the provider setting)."
+        },
+        "model": {
+          "description": "The model of the session (default: the provider setting).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "part": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "Dispatched": {
+      "description": "The result of `session/dispatch`: `session` when it started, `task` when it queued.",
+      "properties": {
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Display": {
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/ConsoleBackground"
+        },
+        "customTheme": {
+          "default": null,
+          "description": "The id of an installed theme package (ADR 0024). `None` uses `look`. Setting\n`display.look` clears it. The field serializes as `null`, so `set_key` finds it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "font": {
+          "description": "Console font family.",
+          "type": "string"
+        },
+        "fontSize": {
+          "description": "Console font size, 9-18 px.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "look": {
+          "$ref": "#/$defs/Look",
+          "default": "minimal"
+        },
+        "perRow": {
+          "description": "Panes per row: 1, 2, 3, 4, 8, 9 or 16. `None` is Auto (fits the window width).",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "theme": {
+          "$ref": "#/$defs/Theme"
+        },
+        "uiScale": {
+          "default": 115,
+          "description": "Interface text size in percent of the base sizes, 80-150.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "theme",
+        "font",
+        "fontSize",
+        "background"
+      ],
+      "type": "object"
+    },
+    "DisplayClass": {
+      "description": "A display class of a layout set.",
+      "enum": [
+        "desktop",
+        "phone",
+        "fold",
+        "watch"
+      ],
+      "type": "string"
+    },
+    "Effort": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "type": "string"
+    },
+    "Empty": {
+      "description": "Parameters of a method without parameters. `null` and `{}` are both valid.",
+      "type": "object"
+    },
+    "FileBlame": {
+      "description": "Result of `ledger/blame`.",
+      "properties": {
+        "hunks": {
+          "items": {
+            "$ref": "#/$defs/BlameHunk"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "hunks"
+      ],
+      "type": "object"
+    },
+    "FileEdits": {
+      "description": "The edits of one file.",
+      "properties": {
+        "edits": {
+          "items": {
+            "$ref": "#/$defs/TextEdit"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "edits"
+      ],
+      "type": "object"
+    },
+    "FileNode": {
+      "description": "A row of the file tree.",
+      "properties": {
+        "claimState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The state of that session (an orange pill for needs you)."
+        },
+        "claimedBy": {
+          "description": "The session that claims the file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "depth": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dir": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "part": {
+          "description": "The part tag of a part root.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "Relative to the repository root. Directories end with `/`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "name",
+        "dir",
+        "depth"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "description": "One diagnostic: a row of a SARIF log, without the parts that no client needs.",
+      "properties": {
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "endCol": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "endLine": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fingerprint": {
+          "description": "The stable id of the finding (`aivoryFingerprint/v1`). It stays the same when the\nfinding moves in its declaration.",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/FindingLevel"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rule": {
+          "description": "For example `aivory/syntax-error`, `aivory/long-function`, or a linter rule.",
+          "type": "string"
+        },
+        "tool": {
+          "description": "The tool that found it: `aivory-syntax`, `aivory-rules`, `clippy`, or a language server.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "level",
+        "message",
+        "path",
+        "line",
+        "col"
+      ],
+      "type": "object"
+    },
+    "FindingLevel": {
+      "description": "The level of a finding.",
+      "enum": [
+        "none",
+        "note",
+        "warning",
+        "error"
+      ],
+      "type": "string"
+    },
+    "Fold": {
+      "description": "A range that an editor can fold.",
+      "properties": {
+        "endLine": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/FoldKind"
+        },
+        "startLine": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "startLine",
+        "endLine",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "FoldKind": {
+      "enum": [
+        "block",
+        "comment",
+        "imports"
+      ],
+      "type": "string"
+    },
+    "ForkParams": {
+      "description": "Fork a session: a new session that starts with the conversation of the old one.",
+      "properties": {
+        "at": {
+          "description": "The span to fork at. A daemon that cannot fork at a span forks at the end. A turn\nnumber (`\"3\"`) forks at the end of that turn of the turn ledger: the new session gets a\nworktree at the snapshot of the turn and a handoff packet of the turns 1 to 3.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "prompt": {
+          "description": "The first turn of the fork. The daemon picks a neutral one when it is missing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "description": "The provider of a fork at a turn. Default: the provider of the old session.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "Gate": {
+      "description": "A check before a merge: tests, Guard, build, review.",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/GateState"
+        }
+      },
+      "required": [
+        "label",
+        "state"
+      ],
+      "type": "object"
+    },
+    "GateState": {
+      "oneOf": [
+        {
+          "const": "ok",
+          "description": "`✓`",
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "description": "`○`",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "`✕`",
+          "type": "string"
+        }
+      ]
+    },
+    "HandoffParams": {
+      "description": "Continue a session with another provider. The daemon starts a new session with a summary.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "Highlight": {
+      "description": "One highlighted token. A token does not cross a line.",
+      "properties": {
+        "end": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/TokenKind"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line",
+        "start",
+        "end",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "HistoryPage": {
+      "description": "Result of `session/history`: lines `start .. start + lines.len()` of `total`.",
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/Line"
+          },
+          "type": "array"
+        },
+        "session": {
+          "type": "string"
+        },
+        "start": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subagent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session",
+        "start",
+        "total",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "HistoryParams": {
+      "properties": {
+        "before": {
+          "description": "Return the lines before this index. Omit it for the newest lines.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "description": "Default 200.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "subagent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "HitStatus": {
+      "description": "What a human did about a radar hit.",
+      "oneOf": [
+        {
+          "const": "pinged",
+          "description": "A ping went to one of the sessions (`radar/ping`).",
+          "type": "string"
+        },
+        {
+          "const": "paused",
+          "description": "One of the sessions paused (`session/pause`).",
+          "type": "string"
+        }
+      ]
+    },
+    "Hover": {
+      "description": "Result of `code/hover`.",
+      "properties": {
+        "definitions": {
+          "description": "The definitions, at most 5 (see `code/definition` for all).",
+          "items": {
+            "$ref": "#/$defs/Place"
+          },
+          "type": "array"
+        },
+        "indexing": {
+          "type": "boolean"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SymbolKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "The name under the cursor. Empty when the cursor is not on a name.",
+          "type": "string"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Highlight"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The token under the cursor: its line, start, and end column."
+        },
+        "signature": {
+          "description": "The first line of the declaration, when a definition was found.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/CodeSource"
+        },
+        "text": {
+          "description": "Markdown. The declaration header (`signature`) in a code block, then the doc text when\na language server gave one.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "text",
+        "definitions",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ImportChange": {
+      "description": "One value that `settings/importClaude` changed.",
+      "properties": {
+        "from": true,
+        "key": {
+          "description": "The settings key, for example `providers.claude.model`.",
+          "type": "string"
+        },
+        "to": true
+      },
+      "required": [
+        "key",
+        "to"
+      ],
+      "type": "object"
+    },
+    "ImportReport": {
+      "description": "Result of `settings/importClaude`.",
+      "properties": {
+        "changes": {
+          "description": "The values that changed. Empty when both sides agree.",
+          "items": {
+            "$ref": "#/$defs/ImportChange"
+          },
+          "type": "array"
+        },
+        "found": {
+          "description": "`~/.claude/settings.json` exists and holds JSON.",
+          "type": "boolean"
+        },
+        "settings": {
+          "$ref": "#/$defs/Settings"
+        },
+        "skipped": {
+          "description": "What the daemon did not import, and why.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "found",
+        "changes",
+        "settings"
+      ],
+      "type": "object"
+    },
+    "InboxAnswerParams": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "option": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "InboxFilter": {
+      "enum": [
+        "all",
+        "answers",
+        "errors",
+        "reviews",
+        "conflicts"
+      ],
+      "type": "string"
+    },
+    "InboxItem": {
+      "description": "One thing that needs the user. The first option is the primary button.",
+      "properties": {
+        "agents": {
+          "description": "One agent, or two for a conflict.",
+          "items": {
+            "$ref": "#/$defs/AgentRef"
+          },
+          "type": "array"
+        },
+        "ask": {
+          "description": "The ask of that session, if the item answers one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "contextPct": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/Gate"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/InboxKind"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "part": {
+          "type": "string"
+        },
+        "preview": {
+          "description": "One line for the list card.",
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "result": {
+          "description": "Set when the item is done: `allowed`, `denied`, `approved`, `merged`, ...",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session": {
+          "description": "The session that asks (for a conflict: the session that found it).",
+          "type": "string"
+        },
+        "sides": {
+          "items": {
+            "$ref": "#/$defs/ConflictSide"
+          },
+          "type": "array"
+        },
+        "since": {
+          "description": "When the item opened.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tail": {
+          "description": "The transcript tail of the session, oldest first.",
+          "items": {
+            "$ref": "#/$defs/Line"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "The text of the ask card.",
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "session",
+        "title",
+        "codebase",
+        "part",
+        "agents",
+        "since",
+        "cost",
+        "contextPct",
+        "preview",
+        "text",
+        "options",
+        "prompt",
+        "files",
+        "tail"
+      ],
+      "type": "object"
+    },
+    "InboxKind": {
+      "enum": [
+        "permission",
+        "plan",
+        "question",
+        "error",
+        "review",
+        "conflict"
+      ],
+      "type": "string"
+    },
+    "InboxList": {
+      "description": "Result of `inbox/list`.",
+      "properties": {
+        "done": {
+          "description": "Items done in this daemon run, newest first.",
+          "items": {
+            "$ref": "#/$defs/InboxItem"
+          },
+          "type": "array"
+        },
+        "items": {
+          "description": "Open items, in list order.",
+          "items": {
+            "$ref": "#/$defs/InboxItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items",
+        "done"
+      ],
+      "type": "object"
+    },
+    "InboxListParams": {
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InboxFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: all."
+        }
+      },
+      "type": "object"
+    },
+    "InboxSnoozeParams": {
+      "properties": {
+        "id": {
+          "description": "Omit it to snooze all open items.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minutes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minutes"
+      ],
+      "type": "object"
+    },
+    "InstalledTheme": {
+      "description": "An installed theme.",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "edited": {
+          "description": "Files that the user changed since the add.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "error": {
+          "description": "The theme is invalid; the app uses Minimal and shows this message.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version",
+        "author",
+        "license",
+        "source",
+        "edited"
+      ],
+      "type": "object"
+    },
+    "ItemSource": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "Where the files of an item are: one release asset URL, or a list of raw file URLs."
+    },
+    "ItemType": {
+      "description": "The type of a registry item.",
+      "enum": [
+        "theme",
+        "screen",
+        "parts",
+        "tokens"
+      ],
+      "type": "string"
+    },
+    "JobRef": {
+      "description": "A started job. Poll it with `theme/job`.",
+      "properties": {
+        "job": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job"
+      ],
+      "type": "object"
+    },
+    "JobState": {
+      "enum": [
+        "pending",
+        "done",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "JobStatus": {
+      "description": "The state of a job. `result` has the type of the method that started the job.",
+      "properties": {
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job": {
+          "type": "string"
+        },
+        "result": true,
+        "state": {
+          "$ref": "#/$defs/JobState"
+        }
+      },
+      "required": [
+        "job",
+        "state"
+      ],
+      "type": "object"
+    },
+    "LedgerPrefs": {
+      "description": "Settings of the turn ledger (`docs/design/05-vcs-ledger.md`).",
+      "properties": {
+        "snapshots": {
+          "default": true,
+          "description": "Take a snapshot of the repository at each turn end of a session (hidden commits on\n`refs/aivory/turns/...`; the working tree and the index stay as they are).",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "LedgerTurn": {
+      "description": "One turn of the ledger.",
+      "properties": {
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "diagnosticsAdded": {
+          "description": "The findings that the turn added and removed (`code/diagnostics` has the rows).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "diagnosticsRemoved": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "endedAt": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/TurnFileStat"
+          },
+          "type": "array"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "n": {
+          "description": "The turn number. Turn 0 is the baseline at the start of the session.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "prompt": {
+          "description": "At most [`PROMPT_CHARS`] characters.",
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "snapshot": {
+          "description": "The turn has a snapshot that `ledger/revert` and `code/file` (`rev: \"turn:n\"`) can use.",
+          "type": "boolean"
+        },
+        "startedAt": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "tokensIn": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokensOut": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "n",
+        "prompt",
+        "provider",
+        "startedAt",
+        "endedAt",
+        "snapshot",
+        "files"
+      ],
+      "type": "object"
+    },
+    "LedgerTurnsParams": {
+      "description": "Parameters of `ledger/turns`.",
+      "properties": {
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "Line": {
+      "description": "One transcript line. Clients add the decoration (`› `, `  └ `, `● `, `↳ `, `+ `, `- `).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/LineKind"
+        },
+        "label": {
+          "description": "The bold head: the tool name, the subagent name, or `TURN n`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "type": "object"
+    },
+    "LineKind": {
+      "description": "The kind of a transcript line. The design calls them `x u a t o p m s e h`.",
+      "oneOf": [
+        {
+          "const": "meta",
+          "description": "`x`: meta line (session header, idle marker).",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "`u`: a user prompt, shown as `› text` on a grey band.",
+          "type": "string"
+        },
+        {
+          "const": "agent",
+          "description": "`a`: agent text.",
+          "type": "string"
+        },
+        {
+          "const": "tool",
+          "description": "`t`: a tool call, shown as `● Label  text` (bold label, green first letter).",
+          "type": "string"
+        },
+        {
+          "const": "output",
+          "description": "`o`: tool output, shown as `  └ text`.",
+          "type": "string"
+        },
+        {
+          "const": "added",
+          "description": "`p`: an added line, shown as `+ text` (green).",
+          "type": "string"
+        },
+        {
+          "const": "removed",
+          "description": "`m`: a removed line, shown as `- text` (red).",
+          "type": "string"
+        },
+        {
+          "const": "subagent",
+          "description": "`s`: subagent activity, shown as `↳ label  text` (purple).",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "`e`: an error line (red).",
+          "type": "string"
+        },
+        {
+          "const": "turn",
+          "description": "`h`: a turn divider, shown as `label · text` (deep dive transcript).",
+          "type": "string"
+        }
+      ]
+    },
+    "LineRange": {
+      "description": "A range of lines, from 1, both ends included.",
+      "properties": {
+        "from": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "to": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "LinkState": {
+      "oneOf": [
+        {
+          "enum": [
+            "connected",
+            "connecting",
+            "offline"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "off",
+          "description": "Not configured.",
+          "type": "string"
+        }
+      ]
+    },
+    "Look": {
+      "description": "The look of the whole desktop app (ADR 0022). Each look draws every screen from the same\ndata. `Display.theme` (light, dark) applies to Minimal only.",
+      "oneOf": [
+        {
+          "const": "minimal",
+          "description": "The orchestration board: modules, streams, gates, log, queue, live.",
+          "type": "string"
+        },
+        {
+          "const": "bridge",
+          "description": "A starship console: big readouts, a schematic, numbered rows.",
+          "type": "string"
+        },
+        {
+          "const": "operator",
+          "description": "An operator wall of numbered monitors, one code rain per agent.",
+          "type": "string"
+        },
+        {
+          "const": "neon",
+          "description": "A vector city map: one district per codebase, agents move between parts.",
+          "type": "string"
+        },
+        {
+          "const": "navigator",
+          "description": "A 3D file-system landscape in the style of early-90s workstation software.",
+          "type": "string"
+        },
+        {
+          "const": "holo",
+          "description": "See-through glass panels over slow rings; a bloom of strands, one per session.",
+          "type": "string"
+        },
+        {
+          "const": "tactical",
+          "description": "A phosphor-green radar: bearing is the codebase, range is time since the last move.",
+          "type": "string"
+        },
+        {
+          "const": "command",
+          "description": "A real-time strategy command console: a map of units per codebase, a command sidebar.",
+          "type": "string"
+        }
+      ]
+    },
+    "MailItem": {
+      "description": "One item of the mailbox of a session.",
+      "properties": {
+        "count": {
+          "description": "The number of pings that merged into this item.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "deliveredAt": {
+          "description": "When the daemon put the item in front of an input. Empty while it waits.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "digest": {
+          "description": "True for the digest of the pings over the hourly limit.",
+          "type": "boolean"
+        },
+        "from": {
+          "description": "The senders, comma separated (a merged ping has several).",
+          "type": "string"
+        },
+        "id": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/PingKind"
+        },
+        "resolved": {
+          "description": "A question that has an answer, a request that has a task, or a block that a human\noverrode.",
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "kind",
+        "key",
+        "text",
+        "createdAt",
+        "resolved",
+        "count"
+      ],
+      "type": "object"
+    },
+    "MailList": {
+      "description": "Result of `mail/list`: the mailbox of the session, oldest first.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MailItem"
+          },
+          "type": "array"
+        },
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "items"
+      ],
+      "type": "object"
+    },
+    "MailListParams": {
+      "description": "Parameters of `mail/list`.",
+      "properties": {
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "MapFile": {
+      "description": "`.aivory/map.toml`: `version`, `updated`, `[[part]]` blocks with `name` and `paths`.",
+      "properties": {
+        "author": {
+          "description": "The agent that wrote the last version, for example `claude opus-5.5`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/Part"
+          },
+          "type": "array"
+        },
+        "source": {
+          "description": "The file text, for \"View map.toml\".",
+          "type": "string"
+        },
+        "updated": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "codebase",
+        "version",
+        "updated",
+        "parts",
+        "source"
+      ],
+      "type": "object"
+    },
+    "MemSample": {
+      "properties": {
+        "agentsMb": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "usedMb": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "at",
+        "usedMb",
+        "agentsMb"
+      ],
+      "type": "object"
+    },
+    "Memory": {
+      "description": "The RAM of the machine and of the agent processes (`resources/memory`).",
+      "properties": {
+        "agentsMb": {
+          "description": "The RAM of all agent processes (claude, codex, gemini and their node helpers).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "samples": {
+          "description": "Oldest first, one sample each few seconds, about 30 minutes.",
+          "items": {
+            "$ref": "#/$defs/MemSample"
+          },
+          "type": "array"
+        },
+        "top": {
+          "description": "The agent processes that use the most RAM, largest first.",
+          "items": {
+            "$ref": "#/$defs/AgentMem"
+          },
+          "type": "array"
+        },
+        "totalMb": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "usedMb": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "totalMb",
+        "usedMb",
+        "agentsMb",
+        "samples",
+        "top"
+      ],
+      "type": "object"
+    },
+    "Mode": {
+      "description": "Permission mode of the composer.",
+      "enum": [
+        "plan",
+        "edit",
+        "auto"
+      ],
+      "type": "string"
+    },
+    "ModeParams": {
+      "description": "Set the mode of the composer of a session. It applies from the next turn.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/Mode"
+        }
+      },
+      "required": [
+        "id",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "NewSessionParams": {
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "composer": {
+          "$ref": "#/$defs/ComposerPrefs"
+        },
+        "part": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "task": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "prompt",
+        "composer"
+      ],
+      "type": "object"
+    },
+    "Notify": {
+      "description": "Notification events × channels.",
+      "properties": {
+        "autopilot": {
+          "$ref": "#/$defs/Channels",
+          "description": "A session parks or a queued task starts."
+        },
+        "conflict": {
+          "$ref": "#/$defs/Channels",
+          "description": "Two sessions edit the same code."
+        },
+        "error": {
+          "$ref": "#/$defs/Channels",
+          "description": "A session stops on an error."
+        },
+        "needsAnswer": {
+          "$ref": "#/$defs/Channels",
+          "description": "Question, permission or plan."
+        },
+        "review": {
+          "$ref": "#/$defs/Channels",
+          "description": "A task reaches the review gate."
+        }
+      },
+      "required": [
+        "needsAnswer",
+        "error",
+        "review",
+        "conflict",
+        "autopilot"
+      ],
+      "type": "object"
+    },
+    "OrganizerMode": {
+      "description": "What the organizer agent may do.",
+      "oneOf": [
+        {
+          "const": "fullAuto",
+          "description": "It acts: pauses, parks, stops and resumes sessions, sets the autopilot, queues tasks.",
+          "type": "string"
+        },
+        {
+          "const": "memoryAndSessions",
+          "description": "It watches RAM and sessions and gives feedback; it does not act.",
+          "type": "string"
+        },
+        {
+          "const": "feedbackOnly",
+          "description": "It watches the sessions only (stuck, waiting, conflicts) and gives feedback.",
+          "type": "string"
+        },
+        {
+          "const": "memoryOnly",
+          "description": "It watches RAM only and warns when it runs low.",
+          "type": "string"
+        }
+      ]
+    },
+    "OrganizerStartParams": {
+      "description": "`organizer/start`: start the organizer agent as a session of aivoryd.",
+      "properties": {
+        "codebase": {
+          "description": "The codebase whose folder the agent runs in (default: the first codebase).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/OrganizerMode",
+          "default": "memoryAndSessions"
+        }
+      },
+      "type": "object"
+    },
+    "OutlineNode": {
+      "description": "A node of the structure view.",
+      "properties": {
+        "children": {
+          "items": {
+            "$ref": "#/$defs/OutlineNode"
+          },
+          "type": "array"
+        },
+        "endLine": {
+          "description": "The last line of the declaration.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/SymbolKind"
+        },
+        "line": {
+          "description": "The line of the name.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "startLine": {
+          "description": "The first line of the declaration.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "line",
+        "startLine",
+        "endLine"
+      ],
+      "type": "object"
+    },
+    "Pairing": {
+      "description": "Result of `devices/pair`: show `url` as a QR code, or `code` for typing.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "url",
+        "expires"
+      ],
+      "type": "object"
+    },
+    "Pane": {
+      "description": "One session as the war room shows it: a pane in the grid, or a chip in the quiet section.",
+      "properties": {
+        "ask": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ask"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set for [`SessionState::NeedsYou`] and [`SessionState::Error`]."
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "composer": {
+          "$ref": "#/$defs/ComposerPrefs"
+        },
+        "contextPct": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "controlled": {
+          "description": "aivoryd runs the agent process: it can answer an ask, pause and stop. A session that\nruns in a terminal is `false`; its asks are answered there.",
+          "type": "boolean"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "linesTotal": {
+          "description": "Lines in the full main transcript. `tail` holds the last of them.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "part": {
+          "type": "string"
+        },
+        "prompt": {
+          "description": "The task prompt.",
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "since": {
+          "description": "When the session entered `state`. The meta reads `waits N min`, `idle N min` or `N min`.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "subagents": {
+          "description": "The subagent switcher (the main agent is implicit).",
+          "items": {
+            "$ref": "#/$defs/Subagent"
+          },
+          "type": "array"
+        },
+        "tail": {
+          "description": "The last lines of the main transcript, oldest first.",
+          "items": {
+            "$ref": "#/$defs/Line"
+          },
+          "type": "array"
+        },
+        "task": {
+          "description": "The task that started this session.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "tokens": {
+          "description": "Tokens in and out of the session so far, without prompt-cache reads (the war room\nOverview). 0 when unknown.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "codebase",
+        "part",
+        "provider",
+        "model",
+        "state",
+        "since",
+        "cost",
+        "contextPct",
+        "prompt",
+        "tail",
+        "linesTotal",
+        "composer"
+      ],
+      "type": "object"
+    },
+    "Part": {
+      "description": "A named slice of a codebase, for example `payment` or `ui`.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "paths": {
+          "description": "Glob patterns relative to the repository root.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PartStats": {
+      "description": "A row of the parts table.",
+      "properties": {
+        "claims": {
+          "description": "Files that live sessions claim.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lastChange": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lines": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sessions": {
+          "description": "Live sessions in this part.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "paths",
+        "sessions",
+        "claims",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "PingKind": {
+      "description": "The kind of a ping.",
+      "oneOf": [
+        {
+          "const": "fyi",
+          "description": "Information, shown at the next turn boundary.",
+          "type": "string"
+        },
+        {
+          "const": "question",
+          "description": "A question with a deadline.",
+          "type": "string"
+        },
+        {
+          "const": "request",
+          "description": "A request for work. The daemon makes a task.",
+          "type": "string"
+        },
+        {
+          "const": "block",
+          "description": "\"Stop changing X until Y lands\". The daemon denies the edits of the receiver on the\nkeys until a human overrides it with `block/override`. Only a human sends a block.",
+          "type": "string"
+        }
+      ]
+    },
+    "PinnedRepo": {
+      "description": "A codebase that the user registered. The daemon scans it without a session.",
+      "properties": {
+        "id": {
+          "description": "The codebase id.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The root of the repository.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path"
+      ],
+      "type": "object"
+    },
+    "Place": {
+      "description": "A place in a file, with the text of its line.",
+      "properties": {
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "container": {
+          "description": "The enclosing declaration, for example `Invoice`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SymbolKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "len": {
+          "description": "The length of the name in bytes, when the engine knows it.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "preview": {
+          "description": "The text of the line, trimmed, at most 160 characters. Empty when the file is not\nreadable.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "line",
+        "col",
+        "preview"
+      ],
+      "type": "object"
+    },
+    "PlacePage": {
+      "description": "A page of places.",
+      "properties": {
+        "indexing": {
+          "description": "The index of the codebase is not complete yet: ask again in a moment.",
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Place"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "The name under the cursor that the query used.",
+          "type": "string"
+        },
+        "page": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "perPage": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/CodeSource"
+        },
+        "total": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "description": "`total` is a lower bound.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "items",
+        "total",
+        "page",
+        "perPage",
+        "source"
+      ],
+      "type": "object"
+    },
+    "Playbook": {
+      "enum": [
+        "feature",
+        "fix",
+        "port"
+      ],
+      "type": "string"
+    },
+    "ProjectNewParams": {
+      "description": "Parameters of `project/new`: create `<parent>/<name>`, run `git init`, write the template\nand `.aivory/map.toml`, and register the folder as a codebase.",
+      "properties": {
+        "name": {
+          "description": "The folder name, also the codebase id. No path separators.",
+          "type": "string"
+        },
+        "parent": {
+          "description": "An existing folder.",
+          "type": "string"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: `empty`."
+        }
+      },
+      "required": [
+        "name",
+        "parent"
+      ],
+      "type": "object"
+    },
+    "ProjectTemplate": {
+      "description": "The first files of `project/new`.",
+      "oneOf": [
+        {
+          "const": "empty",
+          "description": "`README.md` and `.gitignore`.",
+          "type": "string"
+        },
+        {
+          "const": "rust",
+          "description": "Plus `Cargo.toml` and `src/main.rs`.",
+          "type": "string"
+        },
+        {
+          "const": "node",
+          "description": "Plus `package.json` and `index.js`.",
+          "type": "string"
+        },
+        {
+          "const": "python",
+          "description": "Plus `pyproject.toml` and `main.py`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ProviderInfo": {
+      "description": "A provider card of Settings.",
+      "properties": {
+        "auth": {
+          "description": "The auth line, for example `subscription · Max · signed in`.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "monogram": {
+          "description": "One letter for the card monogram.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ProviderStatus"
+        },
+        "usage": {
+          "items": {
+            "$ref": "#/$defs/UsageWindow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "monogram",
+        "auth",
+        "status",
+        "models"
+      ],
+      "type": "object"
+    },
+    "ProviderPrefs": {
+      "description": "Defaults of one provider.",
+      "properties": {
+        "effort": {
+          "$ref": "#/$defs/Effort"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "$ref": "#/$defs/Mode"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "model",
+        "effort",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "ProviderRef": {
+      "description": "Parameters of `providers/removeAcp`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ProviderStatus": {
+      "oneOf": [
+        {
+          "enum": [
+            "connected",
+            "off"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "acp",
+          "description": "An ACP agent.",
+          "type": "string"
+        }
+      ]
+    },
+    "PushPlatform": {
+      "description": "The push service of a phone.",
+      "enum": [
+        "apns",
+        "fcm"
+      ],
+      "type": "string"
+    },
+    "QueueOrder": {
+      "enum": [
+        "priority",
+        "oldestFirst",
+        "smallestFirst"
+      ],
+      "type": "string"
+    },
+    "QuietHours": {
+      "properties": {
+        "from": {
+          "description": "`HH:MM`, local time.",
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "to": {
+          "description": "`HH:MM`, local time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "on",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RadarHit": {
+      "description": "A pair of sessions that change the same code.",
+      "properties": {
+        "a": {
+          "description": "The first session (the lower id).",
+          "type": "string"
+        },
+        "at": {
+          "description": "When the radar found the pair.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "b": {
+          "type": "string"
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "conflictFiles": {
+          "description": "The files with a text conflict (the trial merge).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "keys": {
+          "description": "The keys that caused the match, sorted.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "score": {
+          "description": "The risk: 0.1 clean merge with no shared symbol, 0.4 shared symbols, 0.7 a signature\nthat the other side uses, 1.0 a text conflict.",
+          "format": "float",
+          "type": "number"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HitStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What a human did about the pair. `None` for a new pair."
+        },
+        "tier": {
+          "description": "The highest tier that matched: 1 same path, 2 same symbol, 3 dependency.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trial": {
+          "description": "True when a trial merge decided the score.",
+          "type": "boolean"
+        },
+        "trialError": {
+          "description": "Why no trial merge ran, when `trial` is false.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "codebase",
+        "tier",
+        "keys",
+        "score",
+        "trial",
+        "at"
+      ],
+      "type": "object"
+    },
+    "RadarList": {
+      "description": "Result of `radar/list`: the sessions that appear in a hit, and the hits, highest risk first.",
+      "properties": {
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/RadarHit"
+          },
+          "type": "array"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/RadarNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sessions",
+        "hits"
+      ],
+      "type": "object"
+    },
+    "RadarListParams": {
+      "description": "Parameters of `radar/list`.",
+      "properties": {
+        "codebase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "RadarNode": {
+      "description": "A session in the radar graph.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "owner": {
+          "description": "The owner of the session: `you`, or a team member in the team scope.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "part": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "part",
+        "state"
+      ],
+      "type": "object"
+    },
+    "RadarPingParams": {
+      "description": "Parameters of `radar/ping` (and its alias `mail/send`). A ping without `from` comes from the\nhuman at the client.",
+      "properties": {
+        "from": {
+          "description": "The sender: a session id. Omit it for a human.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keys": {
+          "description": "The routing keys that the ping is about. Pings with the same key and kind in 10 minutes\nmerge into one. A block needs at least one key.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/PingKind"
+        },
+        "text": {
+          "type": "string"
+        },
+        "to": {
+          "description": "The receiver session.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "to",
+        "kind",
+        "text"
+      ],
+      "type": "object"
+    },
+    "RegistryAddParams": {
+      "properties": {
+        "name": {
+          "description": "`@name`.",
+          "type": "string"
+        },
+        "url": {
+          "description": "An HTTPS URL of a `registry.json`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "type": "object"
+    },
+    "RegistryEntry": {
+      "description": "A registry of the user, with the items of the last refresh.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RegistryItem"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "official": {
+          "type": "boolean"
+        },
+        "refreshedAt": {
+          "description": "Unix ms of the last refresh. `None`: never refreshed.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "official",
+        "items"
+      ],
+      "type": "object"
+    },
+    "RegistryItem": {
+      "additionalProperties": false,
+      "description": "One item of a registry.",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "catalog": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "description": {
+          "default": "",
+          "type": "string"
+        },
+        "displays": {
+          "items": {
+            "$ref": "#/$defs/DisplayClass"
+          },
+          "type": "array"
+        },
+        "license": {
+          "type": "string"
+        },
+        "min_app": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "preview": {
+          "description": "An image URL.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requires": {
+          "default": [],
+          "description": "Other items.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sha256": {
+          "description": "SHA-256 of the archive, in lowercase hex.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ItemSource"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ItemType"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "version",
+        "title",
+        "author",
+        "license",
+        "source",
+        "sha256",
+        "min_app",
+        "catalog",
+        "displays"
+      ],
+      "type": "object"
+    },
+    "RegistryList": {
+      "properties": {
+        "registries": {
+          "items": {
+            "$ref": "#/$defs/RegistryEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "registries"
+      ],
+      "type": "object"
+    },
+    "RegistryRef": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "RegistryRefreshParams": {
+      "properties": {
+        "name": {
+          "default": null,
+          "description": "One registry, or all when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Remote": {
+      "description": "Settings of the remote link and the phone push.",
+      "properties": {
+        "pushUrl": {
+          "default": "",
+          "description": "The URL of the push gateway (`https://.../v1/push`). Empty: no push to the phones.",
+          "type": "string"
+        },
+        "relay": {
+          "default": "",
+          "description": "The relay of the iroh link: a URL, `default` (the iroh relays), or `none`. Empty means\n`default`. `aivoryd serve --relay` wins over this value.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RemoveResult": {
+      "properties": {
+        "clearedCurrent": {
+          "description": "The theme was the current theme; `display.customTheme` is clear now.",
+          "type": "boolean"
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok",
+        "clearedCurrent"
+      ],
+      "type": "object"
+    },
+    "RenameParams": {
+      "description": "Parameters of `code/rename`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "newName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "path",
+        "line",
+        "col",
+        "newName"
+      ],
+      "type": "object"
+    },
+    "RenamePreview": {
+      "description": "Result of `code/rename`. The daemon never applies the edits.",
+      "properties": {
+        "exact": {
+          "description": "`false` for an answer of the index: it renames every use of the name, also in\nunrelated scopes. A language server gives exact edits.",
+          "type": "boolean"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileEdits"
+          },
+          "type": "array"
+        },
+        "newName": {
+          "type": "string"
+        },
+        "oldName": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/CodeSource"
+        }
+      },
+      "required": [
+        "oldName",
+        "newName",
+        "files",
+        "exact",
+        "source"
+      ],
+      "type": "object"
+    },
+    "RepoAddParams": {
+      "description": "Parameters of `repos/add`.",
+      "properties": {
+        "path": {
+          "description": "A folder inside a git repository. The daemon registers the root of the repository.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "RepoDetail": {
+      "description": "Result of `repos/get`.",
+      "properties": {
+        "activity": {
+          "description": "Newest first.",
+          "items": {
+            "$ref": "#/$defs/ActivityRow"
+          },
+          "type": "array"
+        },
+        "codebase": {
+          "$ref": "#/$defs/Codebase"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileNode"
+          },
+          "type": "array"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/PartStats"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "codebase",
+        "parts",
+        "files",
+        "activity"
+      ],
+      "type": "object"
+    },
+    "RepoList": {
+      "description": "Result of `repos/list`.",
+      "properties": {
+        "codebases": {
+          "items": {
+            "$ref": "#/$defs/Codebase"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "codebases"
+      ],
+      "type": "object"
+    },
+    "RevertParams": {
+      "description": "Parameters of `ledger/revert`.",
+      "properties": {
+        "session": {
+          "type": "string"
+        },
+        "turn": {
+          "description": "Undo this turn: the working tree of the session returns to the snapshot before it.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session",
+        "turn"
+      ],
+      "type": "object"
+    },
+    "RevertResult": {
+      "description": "Result of `ledger/revert`.",
+      "properties": {
+        "restored": {
+          "description": "The turn number of the snapshot that the working tree has now.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "session": {
+          "type": "string"
+        },
+        "snapshot": {
+          "description": "The first 12 characters of the snapshot commit.",
+          "type": "string"
+        },
+        "turn": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session",
+        "turn",
+        "restored",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "SendParams": {
+      "properties": {
+        "attachments": {
+          "description": "Paths of attached files and screen captures.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerPrefs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New mode, model or effort for this turn. A new provider needs `session/handoff`."
+        },
+        "id": {
+          "type": "string"
+        },
+        "subagent": {
+          "description": "Send to this subagent instead of the main agent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "type": "object"
+    },
+    "SessionDiff": {
+      "description": "Result of `session/diff`: the diff of the session worktree.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/DiffFile"
+          },
+          "type": "array"
+        },
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "files"
+      ],
+      "type": "object"
+    },
+    "SessionRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "SessionState": {
+      "description": "The one status model of all screens. The declaration order is the display order\n(needs you first). The design calls the states `q e w i p d`.",
+      "oneOf": [
+        {
+          "const": "needsYou",
+          "description": "Waits for an answer (`q`): permission, plan or question.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Stopped on an error (`e`).",
+          "type": "string"
+        },
+        {
+          "const": "working",
+          "description": "Runs (`w`).",
+          "type": "string"
+        },
+        {
+          "const": "idle",
+          "description": "Live, but waits for a task (`i`).",
+          "type": "string"
+        },
+        {
+          "const": "parked",
+          "description": "Stopped and resumable (`p`). On the task board: planned.",
+          "type": "string"
+        },
+        {
+          "const": "done",
+          "description": "Finished (`d`).",
+          "type": "string"
+        }
+      ]
+    },
+    "SessionStats": {
+      "description": "The stats strip of the deep dive.",
+      "properties": {
+        "contextPct": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "subagents": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "toolCalls": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turns": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subagents",
+        "turns",
+        "toolCalls",
+        "cost",
+        "contextPct"
+      ],
+      "type": "object"
+    },
+    "SessionTrace": {
+      "description": "Result of `session/spans`.",
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/DagEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/DagNode"
+          },
+          "type": "array"
+        },
+        "session": {
+          "type": "string"
+        },
+        "spans": {
+          "description": "Parents before children, siblings by start time.",
+          "items": {
+            "$ref": "#/$defs/Span"
+          },
+          "type": "array"
+        },
+        "stats": {
+          "$ref": "#/$defs/SessionStats"
+        }
+      },
+      "required": [
+        "session",
+        "stats",
+        "spans",
+        "nodes",
+        "edges"
+      ],
+      "type": "object"
+    },
+    "Settings": {
+      "description": "Everything that `settings/set` can change. Changes save at once.",
+      "properties": {
+        "acp": {
+          "default": [],
+          "description": "The ACP agents of the user (`providers/addAcp`). Each one shows as a provider card.",
+          "items": {
+            "$ref": "#/$defs/AcpAgent"
+          },
+          "type": "array"
+        },
+        "autopilot": {
+          "$ref": "#/$defs/Autopilot"
+        },
+        "coffeeReminder": {
+          "default": true,
+          "description": "One quiet coffee hint per app start. Old JSON has no value: on.",
+          "type": "boolean"
+        },
+        "display": {
+          "$ref": "#/$defs/Display"
+        },
+        "ledger": {
+          "$ref": "#/$defs/LedgerPrefs",
+          "default": {
+            "snapshots": true
+          }
+        },
+        "notify": {
+          "$ref": "#/$defs/Notify"
+        },
+        "pinned": {
+          "default": [],
+          "description": "The codebases of the user (`repos/add`): the daemon scans them without a session.",
+          "items": {
+            "$ref": "#/$defs/PinnedRepo"
+          },
+          "type": "array"
+        },
+        "providers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ProviderPrefs"
+          },
+          "description": "Key: provider id.",
+          "type": "object"
+        },
+        "quietHours": {
+          "$ref": "#/$defs/QuietHours"
+        },
+        "remote": {
+          "$ref": "#/$defs/Remote",
+          "default": {
+            "pushUrl": "",
+            "relay": ""
+          }
+        }
+      },
+      "required": [
+        "providers",
+        "autopilot",
+        "display",
+        "notify",
+        "quietHours"
+      ],
+      "type": "object"
+    },
+    "SettingsSetParams": {
+      "description": "Set one settings value by its dotted key (see [`Settings::set_key`]).",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": true
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SettingsView": {
+      "description": "Result of `settings/get`.",
+      "properties": {
+        "account": {
+          "$ref": "#/$defs/Account"
+        },
+        "budget": {
+          "$ref": "#/$defs/Budget"
+        },
+        "daemons": {
+          "items": {
+            "$ref": "#/$defs/Daemon"
+          },
+          "type": "array"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/Device"
+          },
+          "type": "array"
+        },
+        "providers": {
+          "items": {
+            "$ref": "#/$defs/ProviderInfo"
+          },
+          "type": "array"
+        },
+        "settings": {
+          "$ref": "#/$defs/Settings"
+        }
+      },
+      "required": [
+        "settings",
+        "providers",
+        "daemons",
+        "devices",
+        "account",
+        "budget"
+      ],
+      "type": "object"
+    },
+    "Span": {
+      "description": "One bar of the waterfall and one entry of the span tree.",
+      "properties": {
+        "agent": {
+          "description": "`main` or the subagent name.",
+          "type": "string"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "end": {
+          "description": "`None` while the span runs.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SpanKind"
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "parent": {
+          "description": "`None` for the run span.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "tokensCacheRead": {
+          "description": "The part of `tokens_in` that the prompt cache served. `None` when the transcript does\nnot tell.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokensCacheWrite": {
+          "description": "The part of `tokens_in` that wrote the prompt cache (Claude only). `None` when the\ntranscript does not tell.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokensIn": {
+          "description": "Input tokens, including the cache reads and cache writes of the call.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokensOut": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool": {
+          "description": "The tool id for a tool span, for example `bash` or `file_edit`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "agent",
+        "model",
+        "start",
+        "state",
+        "tokensIn",
+        "tokensOut",
+        "cost",
+        "input",
+        "output"
+      ],
+      "type": "object"
+    },
+    "SpanKind": {
+      "enum": [
+        "run",
+        "turn",
+        "llm",
+        "tool",
+        "agent"
+      ],
+      "type": "string"
+    },
+    "StartWhen": {
+      "oneOf": [
+        {
+          "enum": [
+            "now"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "queue",
+          "description": "Autopilot starts it when a slot is free.",
+          "type": "string"
+        },
+        {
+          "const": "planOnly",
+          "description": "Start in plan mode and wait for the plan approval.",
+          "type": "string"
+        }
+      ]
+    },
+    "Step": {
+      "description": "One step of the playbook stepper.",
+      "properties": {
+        "actor": {
+          "description": "Who does the step: `main · opus-5.5`, `test-writer`, `you`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "description": "Known for done steps.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/StepState"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "type": "object"
+    },
+    "StepState": {
+      "oneOf": [
+        {
+          "enum": [
+            "notStarted",
+            "working",
+            "done"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "waiting",
+          "description": "Waits for the user.",
+          "type": "string"
+        }
+      ]
+    },
+    "Subagent": {
+      "description": "A subagent of a session. `session/history` with `subagent` gives its transcript.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "task": {
+          "description": "What the main agent asked it to do.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state",
+        "task"
+      ],
+      "type": "object"
+    },
+    "SubscribeParams": {
+      "properties": {
+        "cursor": {
+          "description": "The last `seq` the client applied. Omit it for a fresh snapshot.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "epoch": {
+          "description": "The epoch of that cursor ([`WarRoom::epoch`]).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Subscription": {
+      "description": "Result of `warroom/subscribe`. Either `snapshot` is set, or `deltas` holds everything after\nthe given cursor (same epoch). Notifications that follow have `seq > cursor`.",
+      "properties": {
+        "cursor": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deltas": {
+          "items": {
+            "$ref": "#/$defs/DeltaNote"
+          },
+          "type": "array"
+        },
+        "epoch": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WarRoom"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "epoch",
+        "cursor"
+      ],
+      "type": "object"
+    },
+    "Symbol": {
+      "description": "A declaration found by name.",
+      "properties": {
+        "container": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/SymbolKind"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "signature": {
+          "description": "The declaration header on one line.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "path",
+        "line",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "SymbolKind": {
+      "description": "The kind of a declaration.",
+      "enum": [
+        "module",
+        "namespace",
+        "class",
+        "struct",
+        "enum",
+        "variant",
+        "interface",
+        "trait",
+        "impl",
+        "function",
+        "method",
+        "constructor",
+        "field",
+        "property",
+        "variable",
+        "constant",
+        "typeAlias",
+        "macro",
+        "section"
+      ],
+      "type": "string"
+    },
+    "SymbolPage": {
+      "description": "Result of `code/symbols`.",
+      "properties": {
+        "indexing": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Symbol"
+          },
+          "type": "array"
+        },
+        "page": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "perPage": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "perPage"
+      ],
+      "type": "object"
+    },
+    "SymbolsParams": {
+      "description": "Parameters of `code/symbols`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SymbolKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "perPage": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "query": {
+          "description": "A name, a prefix, or a few letters in order (`inv` finds `Invoice`).",
+          "type": "string"
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "query"
+      ],
+      "type": "object"
+    },
+    "Task": {
+      "properties": {
+        "agents": {
+          "description": "The provider of each agent that works on the task (the provider circles).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "column": {
+          "$ref": "#/$defs/TaskColumn"
+        },
+        "cost": {
+          "description": "USD.",
+          "format": "double",
+          "type": "number"
+        },
+        "createdAt": {
+          "default": 0,
+          "description": "When the task was created. Old JSON has no value: `0` (the oldest).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/Gate"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "part": {
+          "type": "string"
+        },
+        "playbook": {
+          "$ref": "#/$defs/Playbook"
+        },
+        "priority": {
+          "$ref": "#/$defs/TaskPriority",
+          "default": "normal",
+          "description": "Old JSON has no priority: `Normal`."
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/TaskSession"
+          },
+          "type": "array"
+        },
+        "started": {
+          "description": "`None` while the task is queued.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "step": {
+          "description": "Index of the current step, 0-5 (5 = all done).",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "steps": {
+          "description": "Always five, in playbook order.",
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        },
+        "waitingFor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AskKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the task waits (the orange wait reason)."
+        }
+      },
+      "required": [
+        "id",
+        "column",
+        "title",
+        "codebase",
+        "part",
+        "playbook",
+        "step",
+        "prompt",
+        "cost",
+        "gates",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "TaskColumn": {
+      "enum": [
+        "planned",
+        "working",
+        "waiting",
+        "review",
+        "done"
+      ],
+      "type": "string"
+    },
+    "TaskCreateParams": {
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "part": {
+          "type": "string"
+        },
+        "playbook": {
+          "$ref": "#/$defs/Playbook"
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskPriority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: `Normal`."
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "provider": {
+          "description": "Default: the provider defaults of Settings.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "when": {
+          "$ref": "#/$defs/StartWhen"
+        }
+      },
+      "required": [
+        "title",
+        "codebase",
+        "part",
+        "playbook",
+        "prompt",
+        "when"
+      ],
+      "type": "object"
+    },
+    "TaskList": {
+      "description": "Result of `tasks/list`.",
+      "properties": {
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/Task"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tasks"
+      ],
+      "type": "object"
+    },
+    "TaskListParams": {
+      "properties": {
+        "codebase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "TaskPriority": {
+      "description": "How soon a queued task starts when the autopilot order is `Priority`.",
+      "enum": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "type": "string"
+    },
+    "TaskSession": {
+      "description": "A session of a task, as the task panel lists it.",
+      "properties": {
+        "role": {
+          "description": "`main · opus-5.5`, `sub · running`.",
+          "type": "string"
+        },
+        "session": {
+          "description": "The session to open. Subagent rows open their parent session.",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "title",
+        "role",
+        "state"
+      ],
+      "type": "object"
+    },
+    "TaskUpdateParams": {
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskColumn"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "part": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "TextEdit": {
+      "description": "One text edit. The range is in the old text.",
+      "properties": {
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "endCol": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "endLine": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "newText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "col",
+        "endLine",
+        "endCol",
+        "newText"
+      ],
+      "type": "object"
+    },
+    "Theme": {
+      "enum": [
+        "light",
+        "dark",
+        "system"
+      ],
+      "type": "string"
+    },
+    "ThemeAddParams": {
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "type": "object"
+    },
+    "ThemeAsset": {
+      "description": "The result of `theme/asset`.",
+      "properties": {
+        "base64": {
+          "type": "string"
+        },
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "bytes",
+        "base64"
+      ],
+      "type": "object"
+    },
+    "ThemeAssetParams": {
+      "description": "`theme/asset`: one file of `assets/` or `previews/`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path"
+      ],
+      "type": "object"
+    },
+    "ThemeBundle": {
+      "description": "The result of `theme/get`: a resolved bundle for one display class. Read-only.",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "display": {
+          "$ref": "#/$defs/DisplayClass"
+        },
+        "fonts": {
+          "items": {
+            "$ref": "#/$defs/ThemeFont"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "layouts": {
+          "additionalProperties": true,
+          "description": "The `root` node of each screen of the class, by screen name.",
+          "type": "object"
+        },
+        "license": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parts": {
+          "additionalProperties": true,
+          "description": "The `root` node of each part, by name.",
+          "type": "object"
+        },
+        "preview": {
+          "description": "The path of `previews/<class>.png` when the theme has it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "description": "SHA-256 of the archive from `theme.lock`; a theme without a lock has the hash of its\nmanifest and tokens.",
+          "type": "string"
+        },
+        "strings": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "description": "`strings[lang][dotted key]`.",
+          "type": "object"
+        },
+        "tokens": {
+          "description": "The merged tokens (the shape of `TokenFile`)."
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version",
+        "author",
+        "license",
+        "sha256",
+        "display",
+        "tokens",
+        "layouts",
+        "parts",
+        "strings",
+        "fonts"
+      ],
+      "type": "object"
+    },
+    "ThemeFont": {
+      "description": "A font file of a theme and the family name inside it.",
+      "properties": {
+        "family": {
+          "type": "string"
+        },
+        "file": {
+          "description": "The path below the theme folder, for `theme/asset`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "family"
+      ],
+      "type": "object"
+    },
+    "ThemeGetParams": {
+      "description": "`theme/get`: one installed theme for one display class.",
+      "properties": {
+        "display": {
+          "$ref": "#/$defs/DisplayClass"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "display"
+      ],
+      "type": "object"
+    },
+    "ThemeList": {
+      "properties": {
+        "themes": {
+          "items": {
+            "$ref": "#/$defs/InstalledTheme"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "themes"
+      ],
+      "type": "object"
+    },
+    "ThemeRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ThemeSourceParams": {
+      "description": "`theme/inspect`: a source such as `github:owner/repo@v1.0.0` or a GitHub release URL.",
+      "properties": {
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "type": "object"
+    },
+    "Timeline": {
+      "description": "Result of `ledger/timeline`: the events of one file, oldest first.",
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/TimelineEvent"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "events"
+      ],
+      "type": "object"
+    },
+    "TimelineEvent": {
+      "description": "One event of the history of a file.",
+      "oneOf": [
+        {
+          "properties": {
+            "author": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "time": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "turns": {
+              "description": "The turns that the commit carries (the `Aivory-Turns` trailer).",
+              "items": {
+                "$ref": "#/$defs/TurnId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "commit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "summary",
+            "time"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "added": {
+              "description": "The lines of this file that the turn added and removed.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cost": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "model": {
+              "type": "string"
+            },
+            "n": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "removed": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "session": {
+              "type": "string"
+            },
+            "time": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": {
+              "const": "turn",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "n",
+            "prompt",
+            "time",
+            "added",
+            "removed"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TimelineParams": {
+      "description": "Parameters of `ledger/timeline`.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "codebase",
+        "path"
+      ],
+      "type": "object"
+    },
+    "TokenKind": {
+      "description": "The kind of a highlighted token.",
+      "enum": [
+        "keyword",
+        "type",
+        "function",
+        "variable",
+        "string",
+        "number",
+        "comment",
+        "operator",
+        "punctuation",
+        "constant",
+        "attribute",
+        "macro"
+      ],
+      "type": "string"
+    },
+    "TurnFileStat": {
+      "description": "A file that a turn changed.",
+      "properties": {
+        "added": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "removed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "added",
+        "removed"
+      ],
+      "type": "object"
+    },
+    "TurnId": {
+      "description": "A turn in a timeline or a commit.",
+      "properties": {
+        "n": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "n"
+      ],
+      "type": "object"
+    },
+    "TurnList": {
+      "description": "Result of `ledger/turns`.",
+      "properties": {
+        "session": {
+          "type": "string"
+        },
+        "turns": {
+          "items": {
+            "$ref": "#/$defs/LedgerTurn"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "session",
+        "turns"
+      ],
+      "type": "object"
+    },
+    "UsageWindow": {
+      "description": "A provider usage window, for example `claude 5 h window 62%`.",
+      "properties": {
+        "estimate": {
+          "description": "The value comes from local transcripts, not from the provider. Show \"estimate\".",
+          "type": "boolean"
+        },
+        "label": {
+          "description": "`5 h window`, `Week`, `Daily quota`, `Monthly budget $60`.",
+          "type": "string"
+        },
+        "pct": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "resetsAt": {
+          "description": "When the window frees up: the oldest counted call leaves it. `None` when unknown.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "used": {
+          "description": "Tokens counted in the window (0 when unknown).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "provider",
+        "label",
+        "pct"
+      ],
+      "type": "object"
+    },
+    "WarRoom": {
+      "description": "The complete war-room view. `warroom/snapshot` returns it; `warroom/subscribe` keeps it\ncurrent with [`crate::rpc::Delta`]s.",
+      "properties": {
+        "activity": {
+          "description": "Oldest first, [`ACTIVITY_SAMPLES`] at most.",
+          "items": {
+            "$ref": "#/$defs/ActivitySample"
+          },
+          "type": "array"
+        },
+        "autopilot": {
+          "$ref": "#/$defs/Autopilot"
+        },
+        "board": {
+          "$ref": "#/$defs/Board",
+          "default": {
+            "asks": [],
+            "blocked": {
+              "count": 0,
+              "ids": []
+            },
+            "idle": {
+              "count": 0,
+              "ids": []
+            },
+            "needsYou": {
+              "count": 0,
+              "ids": []
+            },
+            "working": {
+              "count": 0,
+              "ids": []
+            }
+          },
+          "description": "The gates of the board and the order of the asks. The daemon computes it\n([`WarRoom::compute_board`]) and keeps it current with [`crate::rpc::Delta::Board`].\nOld JSON has no board: empty."
+        },
+        "codebases": {
+          "items": {
+            "$ref": "#/$defs/Codebase"
+          },
+          "type": "array"
+        },
+        "cursor": {
+          "description": "The sequence number of the last delta in this view.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "epoch": {
+          "description": "Changes when the daemon restarts. A cursor is valid only with its epoch.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hub": {
+          "$ref": "#/$defs/LinkState"
+        },
+        "inboxOpen": {
+          "description": "Open inbox items (the rail badge).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "now": {
+          "description": "Daemon time of the view.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "queued": {
+          "description": "Tasks that wait for a free autopilot slot.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "relay": {
+          "$ref": "#/$defs/LinkState"
+        },
+        "sessions": {
+          "description": "Live, parked and done sessions, in a stable order.",
+          "items": {
+            "$ref": "#/$defs/Pane"
+          },
+          "type": "array"
+        },
+        "usage": {
+          "items": {
+            "$ref": "#/$defs/UsageWindow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "epoch",
+        "cursor",
+        "now",
+        "codebases",
+        "sessions",
+        "activity",
+        "autopilot",
+        "queued",
+        "inboxOpen",
+        "usage",
+        "hub",
+        "relay"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "JSON-RPC 2.0 surface of aivoryd. Generated from crates/aivory-protocol; do not edit.",
+  "methods": {
+    "autopilot/get": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/Autopilot"
+      }
+    },
+    "autopilot/set": {
+      "params": {
+        "$ref": "#/$defs/AutopilotPatch"
+      },
+      "result": {
+        "$ref": "#/$defs/Autopilot"
+      }
+    },
+    "block/override": {
+      "params": {
+        "$ref": "#/$defs/BlockOverrideParams"
+      },
+      "result": {
+        "$ref": "#/$defs/BlockOverrideResult"
+      }
+    },
+    "claims/list": {
+      "params": {
+        "$ref": "#/$defs/ClaimsListParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ClaimList"
+      }
+    },
+    "code/definition": {
+      "params": {
+        "$ref": "#/$defs/CodePosParams"
+      },
+      "result": {
+        "$ref": "#/$defs/PlacePage"
+      }
+    },
+    "code/diagnostics": {
+      "params": {
+        "$ref": "#/$defs/DiagnosticsParams"
+      },
+      "result": {
+        "$ref": "#/$defs/DiagnosticsResult"
+      }
+    },
+    "code/file": {
+      "params": {
+        "$ref": "#/$defs/CodeFileParams"
+      },
+      "result": {
+        "$ref": "#/$defs/CodeFile"
+      }
+    },
+    "code/hover": {
+      "params": {
+        "$ref": "#/$defs/CodePosParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Hover"
+      }
+    },
+    "code/references": {
+      "params": {
+        "$ref": "#/$defs/CodePosParams"
+      },
+      "result": {
+        "$ref": "#/$defs/PlacePage"
+      }
+    },
+    "code/rename": {
+      "params": {
+        "$ref": "#/$defs/RenameParams"
+      },
+      "result": {
+        "$ref": "#/$defs/RenamePreview"
+      }
+    },
+    "code/symbols": {
+      "params": {
+        "$ref": "#/$defs/SymbolsParams"
+      },
+      "result": {
+        "$ref": "#/$defs/SymbolPage"
+      }
+    },
+    "daemon/info": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/DaemonInfo"
+      }
+    },
+    "daemon/restart": {
+      "params": {
+        "$ref": "#/$defs/DaemonRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "daemon/scale": {
+      "params": {
+        "$ref": "#/$defs/DaemonScaleParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Autopilot"
+      }
+    },
+    "daemon/shutdown": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "devices/pair": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/Pairing"
+      }
+    },
+    "devices/push": {
+      "params": {
+        "$ref": "#/$defs/DevicePushParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "devices/remove": {
+      "params": {
+        "$ref": "#/$defs/DeviceRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "inbox/answer": {
+      "params": {
+        "$ref": "#/$defs/InboxAnswerParams"
+      },
+      "result": {
+        "$ref": "#/$defs/InboxItem"
+      }
+    },
+    "inbox/list": {
+      "params": {
+        "$ref": "#/$defs/InboxListParams"
+      },
+      "result": {
+        "$ref": "#/$defs/InboxList"
+      }
+    },
+    "inbox/snooze": {
+      "params": {
+        "$ref": "#/$defs/InboxSnoozeParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "ledger/blame": {
+      "params": {
+        "$ref": "#/$defs/BlameParams"
+      },
+      "result": {
+        "$ref": "#/$defs/FileBlame"
+      }
+    },
+    "ledger/revert": {
+      "params": {
+        "$ref": "#/$defs/RevertParams"
+      },
+      "result": {
+        "$ref": "#/$defs/RevertResult"
+      }
+    },
+    "ledger/timeline": {
+      "params": {
+        "$ref": "#/$defs/TimelineParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Timeline"
+      }
+    },
+    "ledger/turns": {
+      "params": {
+        "$ref": "#/$defs/LedgerTurnsParams"
+      },
+      "result": {
+        "$ref": "#/$defs/TurnList"
+      }
+    },
+    "mail/list": {
+      "params": {
+        "$ref": "#/$defs/MailListParams"
+      },
+      "result": {
+        "$ref": "#/$defs/MailList"
+      }
+    },
+    "mail/send": {
+      "params": {
+        "$ref": "#/$defs/RadarPingParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "map/addPart": {
+      "params": {
+        "$ref": "#/$defs/AddPartParams"
+      },
+      "result": {
+        "$ref": "#/$defs/MapFile"
+      }
+    },
+    "organizer/start": {
+      "params": {
+        "$ref": "#/$defs/OrganizerStartParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Created"
+      }
+    },
+    "project/new": {
+      "params": {
+        "$ref": "#/$defs/ProjectNewParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Codebase"
+      }
+    },
+    "providers/addAcp": {
+      "params": {
+        "$ref": "#/$defs/AddAcpParams"
+      },
+      "result": {
+        "$ref": "#/$defs/AcpAdded"
+      }
+    },
+    "providers/removeAcp": {
+      "params": {
+        "$ref": "#/$defs/ProviderRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "radar/list": {
+      "params": {
+        "$ref": "#/$defs/RadarListParams"
+      },
+      "result": {
+        "$ref": "#/$defs/RadarList"
+      }
+    },
+    "radar/ping": {
+      "params": {
+        "$ref": "#/$defs/RadarPingParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "registry/add": {
+      "params": {
+        "$ref": "#/$defs/RegistryAddParams"
+      },
+      "result": {
+        "$ref": "#/$defs/RegistryEntry"
+      }
+    },
+    "registry/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/RegistryList"
+      }
+    },
+    "registry/refresh": {
+      "params": {
+        "$ref": "#/$defs/RegistryRefreshParams"
+      },
+      "result": {
+        "$ref": "#/$defs/JobRef"
+      }
+    },
+    "registry/remove": {
+      "params": {
+        "$ref": "#/$defs/RegistryRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "repos/add": {
+      "params": {
+        "$ref": "#/$defs/RepoAddParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Codebase"
+      }
+    },
+    "repos/get": {
+      "params": {
+        "$ref": "#/$defs/CodebaseRef"
+      },
+      "result": {
+        "$ref": "#/$defs/RepoDetail"
+      }
+    },
+    "repos/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/RepoList"
+      }
+    },
+    "repos/map": {
+      "params": {
+        "$ref": "#/$defs/CodebaseRef"
+      },
+      "result": {
+        "$ref": "#/$defs/MapFile"
+      }
+    },
+    "repos/remove": {
+      "params": {
+        "$ref": "#/$defs/CodebaseRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "resources/memory": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/Memory"
+      }
+    },
+    "session/answer": {
+      "params": {
+        "$ref": "#/$defs/AnswerParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/diff": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/SessionDiff"
+      }
+    },
+    "session/dispatch": {
+      "params": {
+        "$ref": "#/$defs/DispatchParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Dispatched"
+      }
+    },
+    "session/fork": {
+      "params": {
+        "$ref": "#/$defs/ForkParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Created"
+      }
+    },
+    "session/handoff": {
+      "params": {
+        "$ref": "#/$defs/HandoffParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Created"
+      }
+    },
+    "session/history": {
+      "params": {
+        "$ref": "#/$defs/HistoryParams"
+      },
+      "result": {
+        "$ref": "#/$defs/HistoryPage"
+      }
+    },
+    "session/mode": {
+      "params": {
+        "$ref": "#/$defs/ModeParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/new": {
+      "params": {
+        "$ref": "#/$defs/NewSessionParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Created"
+      }
+    },
+    "session/park": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/pause": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/resume": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/send": {
+      "params": {
+        "$ref": "#/$defs/SendParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "session/spans": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/SessionTrace"
+      }
+    },
+    "session/stop": {
+      "params": {
+        "$ref": "#/$defs/SessionRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "settings/get": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/SettingsView"
+      }
+    },
+    "settings/importClaude": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/ImportReport"
+      }
+    },
+    "settings/set": {
+      "params": {
+        "$ref": "#/$defs/SettingsSetParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Settings"
+      }
+    },
+    "tasks/create": {
+      "params": {
+        "$ref": "#/$defs/TaskCreateParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Task"
+      }
+    },
+    "tasks/list": {
+      "params": {
+        "$ref": "#/$defs/TaskListParams"
+      },
+      "result": {
+        "$ref": "#/$defs/TaskList"
+      }
+    },
+    "tasks/update": {
+      "params": {
+        "$ref": "#/$defs/TaskUpdateParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Task"
+      }
+    },
+    "theme/add": {
+      "params": {
+        "$ref": "#/$defs/ThemeAddParams"
+      },
+      "result": {
+        "$ref": "#/$defs/InstalledTheme"
+      }
+    },
+    "theme/asset": {
+      "params": {
+        "$ref": "#/$defs/ThemeAssetParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ThemeAsset"
+      }
+    },
+    "theme/checkUpdates": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/JobRef"
+      }
+    },
+    "theme/diff": {
+      "params": {
+        "$ref": "#/$defs/ThemeRef"
+      },
+      "result": {
+        "$ref": "#/$defs/JobRef"
+      }
+    },
+    "theme/get": {
+      "params": {
+        "$ref": "#/$defs/ThemeGetParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ThemeBundle"
+      }
+    },
+    "theme/inspect": {
+      "params": {
+        "$ref": "#/$defs/ThemeSourceParams"
+      },
+      "result": {
+        "$ref": "#/$defs/JobRef"
+      }
+    },
+    "theme/job": {
+      "params": {
+        "$ref": "#/$defs/JobRef"
+      },
+      "result": {
+        "$ref": "#/$defs/JobStatus"
+      }
+    },
+    "theme/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/ThemeList"
+      }
+    },
+    "theme/remove": {
+      "params": {
+        "$ref": "#/$defs/ThemeRef"
+      },
+      "result": {
+        "$ref": "#/$defs/RemoveResult"
+      }
+    },
+    "theme/update": {
+      "params": {
+        "$ref": "#/$defs/ThemeRef"
+      },
+      "result": {
+        "$ref": "#/$defs/JobRef"
+      }
+    },
+    "warroom/snapshot": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/WarRoom"
+      }
+    },
+    "warroom/subscribe": {
+      "params": {
+        "$ref": "#/$defs/SubscribeParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Subscription"
+      }
+    }
+  },
+  "notifications": {
+    "warroom/delta": {
+      "params": {
+        "$ref": "#/$defs/DeltaNote"
+      }
+    }
+  },
+  "title": "AIVory Code protocol",
+  "version": "0.1.0"
+}

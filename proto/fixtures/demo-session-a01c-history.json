@@ -1,0 +1,117 @@
+{
+  "lines": [
+    {
+      "kind": "meta",
+      "text": "claude opus-5.5 · aivory-code · session a01c"
+    },
+    {
+      "kind": "user",
+      "text": "read .aivory/map.toml and stay inside part \"orchestrator\""
+    },
+    {
+      "kind": "agent",
+      "text": "Part \"orchestrator\" maps to crates/orch/src/. I keep my edits inside it."
+    },
+    {
+      "kind": "tool",
+      "label": "Read",
+      "text": "README.md"
+    },
+    {
+      "kind": "output",
+      "text": "66 lines"
+    },
+    {
+      "kind": "tool",
+      "label": "Glob",
+      "text": "\"crates/orch/src/**\""
+    },
+    {
+      "kind": "output",
+      "text": "34 files"
+    },
+    {
+      "kind": "agent",
+      "text": "I know the layout of the part. Ready for the task."
+    },
+    {
+      "kind": "user",
+      "text": "cap subagent fan-out per session and per codebase"
+    },
+    {
+      "kind": "agent",
+      "text": "I start with the code in part \"orchestrator\"."
+    },
+    {
+      "kind": "tool",
+      "label": "Read",
+      "text": "crates/orch/src/spawn.rs"
+    },
+    {
+      "kind": "output",
+      "text": "222 lines"
+    },
+    {
+      "kind": "tool",
+      "label": "Grep",
+      "text": "\"orchestrator\" crates/orch/src"
+    },
+    {
+      "kind": "output",
+      "text": "8 matches in 4 files"
+    },
+    {
+      "kind": "tool",
+      "label": "Read",
+      "text": "crates/orch/src/budget.rs"
+    },
+    {
+      "kind": "output",
+      "text": "178 lines"
+    },
+    {
+      "kind": "tool",
+      "label": "Edit",
+      "text": "crates/orch/src/budget.rs"
+    },
+    {
+      "kind": "added",
+      "text": "pub max_children: u8,      // default 4"
+    },
+    {
+      "kind": "added",
+      "text": "pub max_per_codebase: u8, // default 12"
+    },
+    {
+      "kind": "subagent",
+      "label": "explorer",
+      "text": "mapped 14 spawn call sites"
+    },
+    {
+      "kind": "subagent",
+      "label": "test-writer",
+      "text": "writing budget::exceeds"
+    },
+    {
+      "kind": "subagent",
+      "label": "reviewer",
+      "text": "waits for the diff"
+    },
+    {
+      "kind": "tool",
+      "label": "Bash",
+      "text": "cargo test -p orch budget"
+    },
+    {
+      "kind": "output",
+      "text": "test result: ok. 22 passed; 0 failed"
+    },
+    {
+      "kind": "agent",
+      "text": "Now I wire the budget into the spawn path."
+    }
+  ],
+  "session": "a01c",
+  "start": 0,
+  "total": 25
+}

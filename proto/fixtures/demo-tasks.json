@@ -1,0 +1,912 @@
+{
+  "tasks": [
+    {
+      "codebase": "aivory-guard",
+      "column": "planned",
+      "cost": 0.0,
+      "createdAt": 1792591800000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t1",
+      "part": "api",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Add rate limits per organisation to the public api, with headers and a 429 body.",
+      "step": 0,
+      "steps": [
+        {
+          "name": "Plan",
+          "state": "notStarted"
+        },
+        {
+          "name": "Implement",
+          "state": "notStarted"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Rate limits per org"
+    },
+    {
+      "codebase": "aivory-code",
+      "column": "planned",
+      "cost": 0.0,
+      "createdAt": 1792592100000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t2",
+      "part": "ui",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Derive the dark theme from the light tokens. Keep the session panes square.",
+      "step": 0,
+      "steps": [
+        {
+          "name": "Plan",
+          "state": "notStarted"
+        },
+        {
+          "name": "Implement",
+          "state": "notStarted"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Dark theme tokens"
+    },
+    {
+      "codebase": "billing",
+      "column": "planned",
+      "cost": 0.0,
+      "createdAt": 1792592400000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t3",
+      "part": "invoices",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Send the invoice PDF with a plain text e-mail in English and German.",
+      "step": 0,
+      "steps": [
+        {
+          "name": "Plan",
+          "state": "notStarted"
+        },
+        {
+          "name": "Implement",
+          "state": "notStarted"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Invoice e-mail templates"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude",
+        "claude",
+        "claude"
+      ],
+      "codebase": "aivory-code",
+      "column": "working",
+      "cost": 3.12,
+      "createdAt": 1792591920000,
+      "gates": [
+        {
+          "label": "tests 22/22",
+          "state": "ok"
+        },
+        {
+          "label": "Guard pending",
+          "state": "pending"
+        },
+        {
+          "label": "review open",
+          "state": "pending"
+        }
+      ],
+      "id": "t4",
+      "part": "orchestrator",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Cap subagent fan-out per session and per codebase. Default 4 children, 12 per codebase.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "a01c",
+          "state": "working",
+          "title": "Subagent fan-out limits"
+        },
+        {
+          "role": "sub · running",
+          "session": "a01c",
+          "state": "working",
+          "title": "test-writer"
+        },
+        {
+          "role": "sub · waits",
+          "session": "a01c",
+          "state": "idle",
+          "title": "reviewer"
+        },
+        {
+          "role": "sub · done",
+          "session": "a01c",
+          "state": "done",
+          "title": "explorer"
+        }
+      ],
+      "started": 1792592220000,
+      "step": 2,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Implement",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "name": "Test",
+          "state": "working"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Subagent fan-out limits"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude",
+        "claude"
+      ],
+      "codebase": "aivory-guard",
+      "column": "working",
+      "cost": 4.05,
+      "createdAt": 1792591440000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t5",
+      "part": "scanner",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Only rescan files whose hash changed since the last scan.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "5e81",
+          "state": "working",
+          "title": "Incremental scan cache"
+        }
+      ],
+      "started": 1792591740000,
+      "step": 2,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Implement",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "name": "Test",
+          "state": "working"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Incremental scan cache"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude"
+      ],
+      "codebase": "smart-inference",
+      "column": "working",
+      "cost": 2.2,
+      "createdAt": 1792592220000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t6",
+      "part": "router",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Route by task class with a fallback chain per provider.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "90c4",
+          "state": "working",
+          "title": "Model routing table"
+        }
+      ],
+      "started": 1792592520000,
+      "step": 1,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "name": "Implement",
+          "state": "working"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Model routing table"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude",
+        "claude"
+      ],
+      "codebase": "slaide",
+      "column": "working",
+      "cost": 1.66,
+      "createdAt": 1792592460000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t7",
+      "part": "render",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Export charts as native pptx charts, not as images.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "s3d1",
+          "state": "working",
+          "title": "PPTX chart export"
+        }
+      ],
+      "started": 1792592760000,
+      "step": 1,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "name": "Implement",
+          "state": "working"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "PPTX chart export"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude",
+        "claude"
+      ],
+      "codebase": "billing",
+      "column": "waiting",
+      "cost": 2.41,
+      "createdAt": 1792590900000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t8",
+      "part": "payment",
+      "playbook": "fix",
+      "priority": "high",
+      "prompt": "Add retry with exponential backoff to the stripe webhook handler.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "7f3a",
+          "state": "needsYou",
+          "title": "Stripe webhook retries"
+        }
+      ],
+      "started": 1792591200000,
+      "step": 1,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Reproduce",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "name": "Fix",
+          "state": "waiting"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Stripe webhook retries",
+      "waitingFor": "permission"
+    },
+    {
+      "agents": [
+        "codex"
+      ],
+      "codebase": "aivory-code",
+      "column": "waiting",
+      "cost": 0.88,
+      "createdAt": 1792592760000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t9",
+      "part": "ui",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "The session grid lags with 40 tiles. Virtualize it.",
+      "sessions": [
+        {
+          "role": "main · gpt-5.2-codex",
+          "session": "c218",
+          "state": "needsYou",
+          "title": "Virtualize the session grid"
+        }
+      ],
+      "started": 1792593060000,
+      "step": 0,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "name": "Plan",
+          "state": "waiting"
+        },
+        {
+          "name": "Implement",
+          "state": "notStarted"
+        },
+        {
+          "name": "Test",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Virtualize the session grid",
+      "waitingFor": "plan"
+    },
+    {
+      "agents": [
+        "gemini",
+        "gemini"
+      ],
+      "codebase": "aivory-guard",
+      "column": "waiting",
+      "cost": 0.52,
+      "createdAt": 1792591680000,
+      "gates": [
+        {
+          "label": "tests",
+          "state": "pending"
+        },
+        {
+          "label": "Guard",
+          "state": "pending"
+        },
+        {
+          "label": "review",
+          "state": "pending"
+        }
+      ],
+      "id": "t10",
+      "part": "rules",
+      "playbook": "port",
+      "priority": "low",
+      "prompt": "Port the OWASP top-10 rules to the v2 rule format.",
+      "sessions": [
+        {
+          "role": "main · 3-pro",
+          "session": "9b0e",
+          "state": "needsYou",
+          "title": "OWASP rule pack v2"
+        }
+      ],
+      "started": 1792591980000,
+      "step": 1,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Inventory",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "name": "Port",
+          "state": "waiting"
+        },
+        {
+          "name": "Fixtures",
+          "state": "notStarted"
+        },
+        {
+          "name": "Review",
+          "state": "notStarted"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "OWASP rule pack v2",
+      "waitingFor": "question"
+    },
+    {
+      "agents": [
+        "claude"
+      ],
+      "codebase": "aivory-code",
+      "column": "review",
+      "cost": 0.74,
+      "createdAt": 1792589700000,
+      "gates": [
+        {
+          "label": "tests 31/31",
+          "state": "ok"
+        },
+        {
+          "label": "Guard clean",
+          "state": "ok"
+        },
+        {
+          "label": "review open",
+          "state": "pending"
+        }
+      ],
+      "id": "t11",
+      "part": "ledger",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Compact ledger segments older than 7 days.",
+      "sessions": [
+        {
+          "role": "main · sonnet-5.5",
+          "session": "a7e2",
+          "state": "working",
+          "title": "Ledger compaction"
+        }
+      ],
+      "started": 1792590000000,
+      "step": 3,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Implement",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 480000,
+          "name": "Test",
+          "state": "done"
+        },
+        {
+          "actor": "reviewer · you",
+          "name": "Review",
+          "state": "working"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Ledger compaction"
+    },
+    {
+      "agents": [
+        "claude",
+        "claude"
+      ],
+      "codebase": "kronk",
+      "column": "review",
+      "cost": 2.88,
+      "createdAt": 1792586100000,
+      "gates": [
+        {
+          "label": "tests 17/17",
+          "state": "ok"
+        },
+        {
+          "label": "Guard 1 finding",
+          "state": "failed"
+        },
+        {
+          "label": "review open",
+          "state": "pending"
+        }
+      ],
+      "id": "t12",
+      "part": "runner",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Add a seccomp profile to the runner sandbox.",
+      "sessions": [
+        {
+          "role": "main · opus-5.5",
+          "session": "k4c2",
+          "state": "working",
+          "title": "Runner sandbox seccomp"
+        }
+      ],
+      "started": 1792586400000,
+      "step": 3,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Implement",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 480000,
+          "name": "Test",
+          "state": "done"
+        },
+        {
+          "actor": "reviewer · you",
+          "name": "Review",
+          "state": "working"
+        },
+        {
+          "name": "Merge",
+          "state": "notStarted"
+        }
+      ],
+      "title": "Runner sandbox seccomp"
+    },
+    {
+      "agents": [
+        "goose"
+      ],
+      "codebase": "aivory-code",
+      "column": "done",
+      "cost": 0.4,
+      "createdAt": 1792580220000,
+      "gates": [
+        {
+          "label": "tests 9/9",
+          "state": "ok"
+        },
+        {
+          "label": "Guard clean",
+          "state": "ok"
+        },
+        {
+          "label": "reviewed",
+          "state": "ok"
+        }
+      ],
+      "id": "t13",
+      "part": "sync",
+      "playbook": "feature",
+      "priority": "normal",
+      "prompt": "Merge concurrent edits of .aivory/map.toml from two agents.",
+      "sessions": [
+        {
+          "role": "main · goose-1.9",
+          "session": "d3f0",
+          "state": "done",
+          "title": "CRDT merge for map.toml"
+        }
+      ],
+      "started": 1792580520000,
+      "step": 5,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Plan",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Implement",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 480000,
+          "name": "Test",
+          "state": "done"
+        },
+        {
+          "actor": "reviewer · you",
+          "durationMs": 660000,
+          "name": "Review",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 840000,
+          "name": "Merge",
+          "state": "done"
+        }
+      ],
+      "title": "CRDT merge for map.toml"
+    },
+    {
+      "agents": [
+        "claude"
+      ],
+      "codebase": "infra",
+      "column": "done",
+      "cost": 0.18,
+      "createdAt": 1792575300000,
+      "gates": [
+        {
+          "label": "tests ok",
+          "state": "ok"
+        },
+        {
+          "label": "Guard clean",
+          "state": "ok"
+        },
+        {
+          "label": "reviewed",
+          "state": "ok"
+        }
+      ],
+      "id": "t14",
+      "part": "ci",
+      "playbook": "fix",
+      "priority": "high",
+      "prompt": "Cache cargo builds in CI.",
+      "sessions": [
+        {
+          "role": "main · haiku-5.5",
+          "session": "i0a8",
+          "state": "done",
+          "title": "Cache cargo builds in CI"
+        }
+      ],
+      "started": 1792575600000,
+      "step": 5,
+      "steps": [
+        {
+          "actor": "main · opus-5.5",
+          "durationMs": 120000,
+          "name": "Reproduce",
+          "state": "done"
+        },
+        {
+          "actor": "main + 2 sub",
+          "durationMs": 300000,
+          "name": "Fix",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 480000,
+          "name": "Test",
+          "state": "done"
+        },
+        {
+          "actor": "reviewer · you",
+          "durationMs": 660000,
+          "name": "Review",
+          "state": "done"
+        },
+        {
+          "actor": "test-writer",
+          "durationMs": 840000,
+          "name": "Merge",
+          "state": "done"
+        }
+      ],
+      "title": "Cache cargo builds in CI"
+    }
+  ]
+}

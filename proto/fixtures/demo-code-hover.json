@@ -1,0 +1,25 @@
+{
+  "definitions": [
+    {
+      "col": 11,
+      "container": "Budget",
+      "kind": "method",
+      "len": 5,
+      "line": 18,
+      "name": "check",
+      "path": "crates/orch/src/budget.rs",
+      "preview": "pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError>"
+    }
+  ],
+  "kind": "method",
+  "name": "check",
+  "range": {
+    "end": 25,
+    "kind": "variable",
+    "line": 11,
+    "start": 20
+  },
+  "signature": "pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError>",
+  "source": "index",
+  "text": "```rust\npub fn check(&self, cb: &Codebase) -> Result<(), BudgetError>\n```\n\nmethod in `crates/orch/src/budget.rs:18`"
+}

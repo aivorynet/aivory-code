@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "count": 1,
+      "createdAt": 1792593180000,
+      "deliveredAt": 1792593240000,
+      "from": "you",
+      "id": 1,
+      "key": "path:guard/scanner/cache.py",
+      "kind": "block",
+      "resolved": false,
+      "text": "Stop changing guard/scanner/cache.py until 6c40 lands."
+    }
+  ],
+  "session": "5e81"
+}

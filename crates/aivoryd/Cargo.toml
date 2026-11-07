@@ -1,0 +1,54 @@
+[package]
+name = "aivoryd"
+description = "AIVory Code daemon: lists and resumes native agent CLI sessions, serves the war room"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "aivoryd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aivoryd"
+path = "src/main.rs"
+
+[dependencies]
+aivory-agents.workspace = true
+aivory-coord.workspace = true
+aivory-diag.workspace = true
+aivory-engine.workspace = true
+aivory-index.workspace = true
+aivory-syntax.workspace = true
+aivory-link.workspace = true
+aivory-theme.workspace = true
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+sysinfo = { version = "0.31", default-features = false, features = ["system"] }
+getrandom = "0.3"
+sha1_smol = "1"
+sha2 = "0.10"
+aivory-map.workspace = true
+aivory-protocol.workspace = true
+aivory-vcs.workspace = true
+aivory-sessions.workspace = true
+clap.workspace = true
+# MIT. The turn ledger opens its own connection on the state database (same version as the engine).
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+
+[dev-dependencies]
+# MIT or Apache-2.0. Scratch repos for the code service tests.
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[lints]
+workspace = true

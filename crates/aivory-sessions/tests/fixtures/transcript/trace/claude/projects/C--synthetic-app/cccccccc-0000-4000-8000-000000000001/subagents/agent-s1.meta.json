@@ -1,0 +1,7 @@
+{
+ "agentType": "Explore",
+ "description": "Find usages",
+ "toolUseId": "tu2",
+ "spawnDepth": 1,
+ "finished": true
+}

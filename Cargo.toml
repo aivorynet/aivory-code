@@ -1,0 +1,86 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/aivory-sessions",
+    "crates/aivory-agents",
+    "crates/aivory-protocol",
+    "crates/aivory-map",
+    "crates/aivoryd",
+    "crates/aivory-engine",
+    "crates/aivory-syntax",
+    "crates/aivory-index",
+    "crates/aivory-vcs",
+    "crates/aivory-link",
+    "crates/aivory-diag",
+    "crates/aivory-coord",
+    "crates/aivory-theme",
+    "apps/desktop",
+]
+# The desktop app (GPUI) builds for minutes; build it with `-p aivory-desktop` or `--workspace`.
+default-members = [
+    "crates/aivory-sessions",
+    "crates/aivory-agents",
+    "crates/aivory-protocol",
+    "crates/aivory-map",
+    "crates/aivoryd",
+    "crates/aivory-engine",
+    "crates/aivory-syntax",
+    "crates/aivory-index",
+    "crates/aivory-vcs",
+    "crates/aivory-link",
+    "crates/aivory-diag",
+    "crates/aivory-coord",
+    "crates/aivory-theme",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+aivory-sessions = { path = "crates/aivory-sessions" }
+aivory-agents = { path = "crates/aivory-agents" }
+aivory-protocol = { path = "crates/aivory-protocol" }
+aivory-map = { path = "crates/aivory-map" }
+aivoryd = { path = "crates/aivoryd" }
+aivory-engine = { path = "crates/aivory-engine" }
+aivory-syntax = { path = "crates/aivory-syntax" }
+aivory-index = { path = "crates/aivory-index" }
+aivory-vcs = { path = "crates/aivory-vcs" }
+aivory-link = { path = "crates/aivory-link" }
+aivory-diag = { path = "crates/aivory-diag" }
+aivory-coord = { path = "crates/aivory-coord" }
+aivory-theme = { path = "crates/aivory-theme" }
+clap = { version = "4", features = ["derive", "env"] }
+globset = "0.4"
+rayon = "1"
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "1"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

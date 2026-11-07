@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#E9ECF1}
+a{color:#4B5BDB}a:hover{color:#3A48B8}
+:where(.app) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app *{box-sizing:border-box}
+.board{width:1440px;display:flex;flex-direction:column;gap:0;font-family:'IBM Plex Sans',system-ui,sans-serif}
+.cap{height:36px;display:flex;align-items:flex-end;padding-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#4A5568}
+.app{width:1440px;height:900px;display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:3px minmax(0,1fr) 30px;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;color:#1A1A2E;-webkit-font-smoothing:antialiased;position:relative;overflow:hidden}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{grid-column:1 / -1;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 12px;background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);min-height:0}
+.logo{width:40px;height:14px;color:#0D0D0E;margin-bottom:18px}
+.ri{position:relative;width:60px;height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;color:#5A6578!important;font-size:10.5px;text-decoration:none}
+.ri:hover{background:#F1F3F6;color:#1A1A2E!important}
+.ri.on{background:#EEF1F8;color:#1A1A2E!important;font-weight:500}
+.ri .bd{position:absolute;top:6px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.rail .grow{flex:1}
+.mainc{display:flex;flex-direction:column;min-width:0;min-height:0}
+.hd{flex:none;display:flex;align-items:center;gap:14px;flex-wrap:nowrap;padding:12px 32px;height:60px;background:#FFFFFF;border-bottom:1px solid rgba(13,13,14,.08)}
+.hd h1{margin:0;font-size:16px;font-weight:600;white-space:nowrap}
+.hd .mono{font-size:12px;color:#4A5568;white-space:nowrap}
+.back{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#4A5568!important;text-decoration:none;padding:6px 10px 6px 6px;border-radius:8px}
+.back:hover{background:#F1F3F6;color:#1A1A2E!important}
+.crumb{font-size:11.5px!important;color:#5A6578!important}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;background:#EEF1F8;color:#1A1A2E}
+.pill.cl{background:#EEF2FE;color:#4B5BDB;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:400}
+.pill.gr{background:#F1F3F6;color:#4A5568;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:400}
+.sp{flex:1}
+.hb{height:32px;padding:0 12px!important;border-radius:8px;border:1px solid rgba(13,13,14,.14)!important;font-size:12.5px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.hb:hover{border-color:#1A1A2E!important}
+.hb .kb{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A93A6}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.i{background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}.dot.p,.dot.d{background:#A0AEC0}.dot.ok{background:#16A34A}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:999px;flex:none}
+.card{background:#FFFFFF;border-radius:12px;box-shadow:0 1px 2px rgba(13,13,14,.04),0 8px 24px rgba(13,13,14,.06)}
+.gb{height:30px;padding:0 12px!important;border-radius:6px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:12.5px;white-space:nowrap}
+.gb:hover{border-color:#8A93A6!important}
+.gb.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important;font-weight:500}
+.gb.dng{color:#B91C1C!important}
+.gb.sm{height:26px;padding:0 10px!important;font-size:12px}
+.stb{grid-column:1 / -1;display:flex;align-items:center;gap:20px;padding:0 16px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;white-space:nowrap;overflow:hidden}
+.stb span{display:flex;align-items:center;gap:6px}
+.stb .sp{flex:1}
+.tabs{display:flex;gap:2px;padding:2px;background:#ECEEF2;border-radius:8px;align-self:flex-start}
+.tab{height:30px;padding:0 14px!important;border-radius:6px;font-size:12.5px;color:#4A5568!important;display:flex;align-items:center;gap:6px;justify-content:center;white-space:nowrap}
+.tab.on{background:#FFFFFF;color:#1A1A2E!important;font-weight:500;box-shadow:0 1px 2px rgba(13,13,14,.08)}
+.tab .bg{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600}
+.bg.e{color:#B91C1C}.bg.q{color:#C2410C}.bg.v{color:#6D28D9}
+.ptag{padding:1px 8px;border-radius:999px;font-size:10.5px;background:#F1F3F6;color:#4A5568;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.claim{padding:1px 8px;border-radius:999px;font-size:10.5px;background:#EEF2FF;color:#4B5BDB;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.claim.q{background:#FFF1E6;color:#C2410C}
+.claim.pale{background:#F5F6FD;color:#6B77C8}
+
+/* lens body */
+.lens{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) 320px;position:relative}
+.tr{background:#FFFFFF;border-right:1px solid rgba(13,13,14,.08);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tr-h{padding:12px 14px 8px;display:flex;flex-direction:column;gap:8px}
+.flt{height:32px;border-radius:8px;border:1px solid rgba(13,13,14,.14);padding:0 10px;display:flex;align-items:center;gap:8px;color:#8A93A6;font-size:12.5px}
+.flt .kb{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px}
+.trm{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.tn{display:flex;align-items:center;gap:8px;height:30px;padding-right:12px;font-family:'JetBrains Mono',monospace;font-size:12px;flex:none}
+.tn:hover{background:#F8F9FB}
+.tn.on{background:#EEF3FE}
+.tn .ic{width:14px;color:#8A93A6;text-align:center;flex:none}
+.tn .nm2{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn .pc{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#B91C1C;flex:none}
+.tn .pc i{width:6px;height:6px;border-radius:999px;background:#DC2626;display:block}
+
+.cv{background:#FFFFFF;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.cv-h{flex:none;height:40px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap}
+.cv-h .sep{color:#A0A7B5}
+.cv-h .meta{color:#5A6578;font-size:11px}
+.leg{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:#5A6578}
+.leg .sw{display:flex;gap:2px}
+.leg .sw i{display:block;width:12px;height:6px;border-radius:2px}
+.cb{flex:1;min-height:0;overflow:hidden;position:relative;padding:6px 0 0}
+.ln{position:relative;display:grid;grid-template-columns:4px 38px 24px minmax(0,1fr);height:22px;line-height:22px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.ln:hover{background:#F8F9FB}
+.ln.hh{background:rgba(75,91,219,.05)}.ln.hi{background:rgba(75,91,219,.025)}
+.ln .bl{display:block;height:22px;border-radius:0}
+.ln .no{color:#A0A7B5;text-align:right;padding-right:8px;user-select:none}
+.ln .gt{position:relative;display:block}
+.ln .gd{position:absolute;left:3px;top:7px;width:8px;height:8px;border-radius:999px;display:none}
+.ln .gd.e{display:block;background:#DC2626}.ln .gd.w{display:block;background:#F59E0B}.ln .gd.i{display:block;background:transparent;box-shadow:inset 0 0 0 1.5px #8A96A8}
+.ln .ht{position:absolute;right:2px;top:0;width:3px;height:22px;background:#4B5BDB;display:none}
+.ln .ht.e{display:block}.ln .ht.i{display:block;opacity:.35}
+.ln .tx{white-space:pre;overflow:hidden;padding-right:12px;color:#1A1A2E}
+.ln .htag{position:absolute;right:14px;top:3px;height:16px;line-height:16px;padding:0 8px;border-radius:999px;font-size:10.5px}
+.c{color:#8A93A6}.k{color:#4B5BDB}.t{color:#0D9488}.f{color:#6D28D9}.s{color:#15803D}.n{color:#C2410C}.a{color:#5A6578}
+.ue{text-decoration:underline wavy #DC2626;text-decoration-thickness:1px;text-underline-offset:3px}
+.uw{text-decoration:underline wavy #F59E0B;text-decoration-thickness:1px;text-underline-offset:3px}
+.ui{text-decoration:underline dotted #8A96A8;text-decoration-thickness:1px;text-underline-offset:3px}
+.sy.hl,.sy:hover{background:#EEF3FE;border-radius:4px}
+.bcard,.dcard{display:none;position:absolute;z-index:30;left:112px;top:24px;width:380px;padding:14px 16px;border-radius:12px;background:#FFFFFF;border:1px solid rgba(13,13,14,.08);box-shadow:0 1px 2px rgba(13,13,14,.04),0 12px 32px rgba(13,13,14,.14);flex-direction:column;gap:8px;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;line-height:1.45;color:#1A1A2E;white-space:normal}
+.dcard{width:420px;left:150px}
+.bcard.up,.dcard.up{top:auto;bottom:24px}
+.ln:hover .bcard,.bcard.on,.dcard.on{display:flex}
+.ln:has(.sy:hover) .bcard{display:none}
+.ln:has(.sy:hover) .dcard{display:flex}
+.kick{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#2C4FA8}
+.bm{font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568}
+.ba{display:flex;gap:8px;margin-top:2px}
+.sig{font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5}
+.doc{font-size:12.5px;color:#4A5568}
+
+.pn{background:#FFFFFF;border-left:1px solid rgba(13,13,14,.08);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pn-t{flex:none;padding:12px 16px 6px}
+.pn .tabs{width:100%;align-self:stretch}
+.pn .tab{flex:1;padding:0 6px!important;font-size:12px}
+.sec{flex:none;padding:14px 16px 6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A6578;display:flex;gap:8px}
+.sec span{font-weight:500;letter-spacing:0}
+.or{flex:none;display:flex;align-items:center;gap:8px;height:30px;padding-right:16px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.or:hover{background:#F8F9FB}
+.or.on{background:#EEF3FE}
+.or .g{width:22px;flex:none;color:#8A93A6;text-align:center;font-size:10.5px}
+.or .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.or .rg{color:#8A93A6;font-size:10.5px;white-space:nowrap}
+.pr{flex:none;display:grid;grid-template-columns:14px minmax(0,1fr);gap:2px 8px;padding:10px 16px;align-items:start}
+.pr:hover{background:#F8F9FB}
+.pr .dot{margin-top:5px}
+.pr .m{font-size:12.5px;line-height:1.4}
+.pr .w{grid-column:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.ntag{padding:1px 8px;border-radius:999px;font-size:10.5px;background:#EEF3FE;color:#2C4FA8;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.stg{flex:none;display:flex;align-items:center;gap:8px;height:28px;padding:0 16px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#4A5568}
+.stg b{flex:1;font-weight:400}
+.stg span{color:#8A93A6}
+.stg .off{color:#8A93A6}
+.tl{flex:none;position:relative;padding:11px 16px 11px 42px!important;display:flex;flex-direction:column;align-items:stretch;gap:3px;text-align:left;width:100%}
+.tl:hover{background:#F8F9FB}
+.tl.on{background:#EEF3FE}
+.tl::before{content:'';position:absolute;left:21px;top:0;bottom:0;width:1px;background:rgba(13,13,14,.12)}
+.tl .pt{position:absolute;left:16px;top:15px;width:11px;height:11px;border-radius:999px;background:#FFFFFF;box-shadow:inset 0 0 0 1.5px #8A96A8;z-index:1}
+.tl .pt.turn{box-shadow:none}
+.tl .pt.gate{background:#16A34A;box-shadow:none}
+.tl .h{display:flex;gap:8px;align-items:baseline;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.tl .h b{font-weight:600;color:#1A1A2E}
+.tl .h .ad{margin-left:auto;white-space:nowrap}
+.tl .h .ad i{font-style:normal;color:#15803D}.tl .h .ad em{font-style:normal;color:#B91C1C}
+.tl .m{font-size:12.5px;line-height:1.4}
+.tl .x{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.hit{flex:none;margin:0 16px 10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(13,13,14,.08);display:flex;flex-direction:column;gap:6px}
+.hit .r1{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.hit .r1 b{font-weight:600}
+.hit .r2{font-size:12.5px;color:#4A5568}
+.hit .r3{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit .r4{display:flex;gap:8px;margin-top:2px}
+.sc{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:20px;padding:0 8px;border-radius:999px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;background:#F1F3F6;color:#5A6578}
+.sc.r4{background:#FDECEC;color:#B91C1C}.sc.r3{background:#FFF1E6;color:#C2410C}.sc.r2{background:#FFF8EB;color:#92400E}.sc.r1{background:#F1F3F6;color:#5A6578}
+.tl2{flex:none;padding:6px 16px;display:flex;flex-direction:column;gap:2px}
+.tl2 .h{display:flex;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.tl2 .h b{font-weight:600;color:#1A1A2E}
+.tl2 .m{font-size:12.5px;line-height:1.4;color:#4A5568}
+.cl1{flex:none;display:flex;align-items:center;gap:8px;padding:6px 16px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#4A5568}
+.cl1 b{font-weight:600;color:#1A1A2E}
+.cl1 span.l{margin-left:auto;color:#8A93A6}
+
+/* diff mode */
+.dbar{flex:none;display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(13,13,14,.08);background:#F6F7F9}
+.dbar .q{flex:1;min-width:0;font-size:13px;line-height:1.4}
+.dl{display:grid;grid-template-columns:40px 40px 18px minmax(0,1fr);height:22px;line-height:22px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.dl .no{color:#A0A7B5;text-align:right;padding-right:8px}
+.dl .mk{text-align:center;color:#8A93A6}
+.dl .tx{white-space:pre;overflow:hidden;padding-right:12px}
+.dl.a{background:#F0FAF3}.dl.a .tx,.dl.a .mk{color:#15803D}
+.dl.r{background:#FEF3F3}.dl.r .tx,.dl.r .mk{color:#B91C1C}
+.dl.h{background:#F3F5F8}.dl.h .tx{color:#5A6578}
+
+/* references overlay */
+.refs{position:absolute;z-index:40;top:0;left:300px;right:320px;background:#FFFFFF;border-radius:0 0 12px 12px;box-shadow:0 1px 2px rgba(13,13,14,.06),0 16px 40px rgba(13,13,14,.18);border:1px solid rgba(13,13,14,.08);border-top:0;display:flex;flex-direction:column}
+.refs-h{display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-bottom:1px solid rgba(13,13,14,.08)}
+.refs-h b{font-size:13px;font-weight:600}
+.refs-h .sp{flex:1}
+.refs-h .x{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:#5A6578}
+.refs-h .x:hover{background:#F1F3F6}
+.rg1{display:flex;align-items:center;gap:8px;height:30px;padding:0 16px;background:#F6F7F9;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600}
+.rr{display:flex;align-items:center;gap:12px;height:28px;padding:0 16px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.rr:hover{background:#F8F9FB}
+.rr.on{background:#EEF3FE}
+.rr .ln2{width:30px;text-align:right;color:#A0A7B5;flex:none}
+.rr .pv{flex:1;min-width:0;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.rr .pv b{font-weight:500;background:#EEF3FE;border-radius:4px}
+.refs-f{display:flex;gap:16px;align-items:center;height:34px;padding:0 16px;border-top:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A93A6}
+
+/* repos radar */
+.body2{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr)}
+.list{min-height:0;overflow:hidden;padding:16px 16px 24px 32px;display:flex;flex-direction:column;gap:6px;border-right:1px solid rgba(13,13,14,.08)}
+.rp{display:flex;flex-direction:column;gap:5px;width:100%;padding:12px 14px!important;border-radius:10px;text-align:left;border:1px solid transparent!important}
+.rp:hover{background:#FFFFFF!important;border-color:rgba(13,13,14,.08)!important}
+.rp.on{background:#FFFFFF!important;border-color:#3574F0!important;box-shadow:0 0 0 3px rgba(53,116,240,.12)}
+.rp1{display:flex;align-items:center;gap:8px}
+.rp1 b{flex:1;font-size:13.5px;font-weight:600}
+.rp1 .dots{display:flex;gap:3px}
+.rp2{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578;display:flex;justify-content:space-between;gap:8px}
+.det{min-height:0;overflow:hidden;padding:20px 32px 0 28px;display:flex;flex-direction:column;gap:18px}
+.dh{display:flex;align-items:flex-end;gap:16px}
+.dh h2{margin:0;font-size:20px;font-weight:600}
+.dh .mono{font-size:12px;color:#5A6578}
+.fh{display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px;height:24px}
+.fh b{font-weight:600;white-space:nowrap}
+.fh span{color:#5A6578;white-space:nowrap}
+.fh .sp{flex:1}
+.lg{display:flex;align-items:center;gap:5px;font-size:11px;color:#5A6578}
+.lg i{display:block;width:16px;height:4px;border-radius:2px}
+.gbox{position:relative;height:240px;margin-top:6px}
+.gbox svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.nd{position:absolute;width:160px;height:50px;transform:translate(-50%,-50%);background:#FFFFFF;border-radius:12px;box-shadow:0 1px 2px rgba(13,13,14,.06),0 6px 18px rgba(13,13,14,.08);padding:8px 12px;display:flex;flex-direction:column;gap:3px}
+.nd1{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
+.nd1 .dot{margin-left:auto}
+.nd2{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6578;white-space:nowrap}
+.elab{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+.elab .sc{background:#FFFFFF;box-shadow:inset 0 0 0 1.5px currentColor}
+.elab small{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6578;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;white-space:nowrap}
+.hh2{display:flex;align-items:center;gap:10px;height:42px;padding:0 18px;border-bottom:1px solid rgba(13,13,14,.08);font-family:'JetBrains Mono',monospace;font-size:12px}
+.hh2 b{font-weight:600}.hh2 span{color:#5A6578}
+.hr{display:grid;grid-template-columns:52px 290px minmax(0,1fr) 262px;gap:14px;align-items:center;height:62px;padding:0 18px;border-bottom:1px solid rgba(13,13,14,.06)}
+.hr:last-child{border-bottom:0}
+.hr .who{display:flex;flex-direction:column;gap:4px}
+.hr .pair{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
+.hr .pair em{font-style:normal;color:#8A93A6;font-weight:400}
+.hr .tier{font-size:12px;color:#4A5568}
+.hr .keys{display:flex;flex-direction:column;gap:3px;min-width:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.hr .keys span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hr .acts{display:flex;gap:6px;justify-content:flex-end}
+.hr.low{opacity:.6}
+</style>
+</helmet>
+<div class="board">
+<sc-for list="{{frames}}" as="f" hint-placeholder-count="5">
+<div class="cap">{{f.cap}}</div>
+<div class="app" id="frame-{{f.id}}">
+<div class="rbw" aria-hidden="true"></div>
+<nav class="rail" aria-label="Main">
+<svg class="logo" viewBox="0 0 403 138" role="img" aria-label="AIVory Code"><path fill="currentColor" d="M0,136.215l13.916,0l62.676,-111.474l62.578,111.474l13.968,0l-76.484,-136.215l-76.654,136.215Z"></path><path fill="currentColor" d="M200.399,136.215l11.439,0l-0.026,-136.215l-11.413,0l0,136.215Z"></path><path fill="currentColor" d="M325.722,111.475l-62.661,-111.436l-13.932,-0.039l76.593,136.215l76.593,-136.215l-13.917,0l-62.676,111.475Z"></path></svg>
+<a class="ri" href="Main.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>War room</a>
+<a class="ri" href="Inbox.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 9.5l1.6-6A1 1 0 0 1 4.6 3h6.8a1 1 0 0 1 1 .5L14 9.5V13H2z"></path><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"></path></svg>Inbox<span class="bd">6</span></a>
+<a class="ri" href="Tasks.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</a>
+<a class="ri on" href="Repos.dc.html" aria-current="page"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="4.5" cy="4" r="1.6"></circle><circle cx="4.5" cy="12" r="1.6"></circle><circle cx="11.5" cy="6" r="1.6"></circle><path d="M4.5 5.6v4.8M11.5 7.6c0 2-2 2.4-5.4 3.2"></path></svg>Repos</a>
+<span class="grow"></span>
+<a class="ri" href="Settings.dc.html"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg>Settings</a>
+</nav>
+
+<div class="mainc">
+
+<sc-if value="{{f.isLens}}" hint-placeholder-val="{{true}}">
+<header class="hd">
+<a class="back" href="Repos.dc.html"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 3L5 8l5 5"></path></svg>Repos</a>
+<span class="crumb mono">billing / invoices · main</span>
+<h1>invoice.rs</h1>
+<span class="pill gr">Rust</span>
+<span class="pill cl">claimed by 8a22</span>
+<span class="pill gr">from session 7f3a</span>
+<span class="sp"></span>
+<button class="hb">Go to symbol<span class="kb">⌘O</span></button>
+<button class="hb">Open session 8a22</button>
+</header>
+<div class="lens">
+<div class="tr" aria-label="Files">
+<div class="tr-h"><div class="flt"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg>Go to file<span class="kb">⌘P</span></div><div class="trm"><span>billing</span><span>·</span><span>main</span><span>·</span><span>3 parts</span></div></div>
+<sc-for list="{{f.tree}}" as="r"><div class="tn {{r.on}}" style="padding-left: {{r.ind}}px"><span class="ic">{{r.ic}}</span><span class="nm2">{{r.n}}</span><sc-if value="{{r.hasClaim}}" hint-placeholder-val="{{false}}"><span class="claim {{r.cc}}">{{r.claim}}</span></sc-if><sc-if value="{{r.hasPart}}" hint-placeholder-val="{{false}}"><span class="ptag">{{r.part}}</span></sc-if><sc-if value="{{r.hasPc}}" hint-placeholder-val="{{false}}"><span class="pc"><i></i>{{r.pc}}</span></sc-if></div></sc-for>
+</div>
+
+<div class="cv">
+<sc-if value="{{f.isFile}}" hint-placeholder-val="{{true}}">
+<div class="cv-h"><span>Invoice</span><span class="sep">›</span><span>total</span><span class="meta">Rust · 51 lines · rust-analyzer ready</span><span class="leg">turn blame<span class="sw"><i style="background: #3574F0"></i><i style="background: #6B8AFF"></i><i style="background: #A9BCFA"></i><i style="background: #CBD5F5"></i><i style="background: #E3E7EF"></i></span>new → old</span></div>
+<div class="cb">
+<sc-for list="{{f.lines}}" as="l"><div class="ln {{l.cls}}"><span class="bl" style="background: {{l.bc}}"></span><span class="no">{{l.n}}</span><span class="gt"><i class="gd {{l.diag}}"></i><i class="ht {{l.heat}}"></i></span><span class="tx"><sc-for list="{{l.segs}}" as="g"><span class="{{g.k}}">{{g.t}}</span></sc-for></span><sc-if value="{{l.heatTag}}" hint-placeholder-val="{{false}}"><span class="htag claim {{l.heatCls}}">{{l.heatTag}}</span></sc-if><sc-if value="{{l.isTurn}}" hint-placeholder-val="{{false}}"><div class="bcard {{l.cardOn}} {{l.up}}"><span class="kick">Blame by prompt · turn {{l.turn}}</span><span>“{{l.prompt}}”</span><span class="bm">{{l.model}} · session {{l.session}} · {{l.time}} · {{l.cost}}</span><span class="ba"><button class="gb dng">Revert turn</button><button class="gb">Fork from this turn</button></span></div></sc-if><sc-if value="{{l.isCommit}}" hint-placeholder-val="{{false}}"><div class="bcard {{l.cardOn}} {{l.up}}"><span class="kick">Blame · commit a41c9e0</span><span>“billing: invoice lines and tax rules”</span><span class="bm">Paul Piper · 12:10 · not from an AIVory turn</span><span class="ba"><button class="gb">Show in timeline</button></span></div></sc-if><sc-if value="{{l.hasDoc}}" hint-placeholder-val="{{false}}"><div class="dcard {{l.docOn}} {{l.up}}"><span class="kick">Invoice::total</span><span class="sig"><span class="k">pub fn</span> <span class="f">total</span>(&amp;<span class="k">self</span>, on: <span class="t">NaiveDate</span>) -&gt; <span class="t">Money</span></span><span class="doc">Sum of all lines after discount, with the tax of `on` added. Rounds once at the end, half to even.</span><span class="bm">invoice.rs:17 · 6 usages · 3 sessions</span><span class="ba"><button class="gb pri">Go to definition</button><button class="gb" onClick="{{f.openRefs}}">Find usages</button></span></div></sc-if></div></sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{f.isDiff}}" hint-placeholder-val="{{false}}">
+<div class="cv-h"><span>8a22 · turn 5</span><span class="meta">gemini-3-pro · 14:36 · $0.31</span><span class="leg"><span style="color:#15803D">+8</span><span style="color:#B91C1C">−4</span></span></div>
+<div class="dbar"><span class="q">“take the tax date as a parameter of total, so that old invoices keep their tax”</span><button class="gb dng sm">Revert turn</button><button class="gb sm">Fork from this turn</button><button class="gb sm" onClick="{{f.closeDiff}}">Back to file</button></div>
+<div class="cb">
+<sc-for list="{{f.diff}}" as="d"><div class="dl {{d.t}}"><span class="no">{{d.o}}</span><span class="no">{{d.n}}</span><span class="mk">{{d.m}}</span><span class="tx"><sc-for list="{{d.segs}}" as="g"><span class="{{g.k}}">{{g.t}}</span></sc-for></span></div></sc-for>
+</div>
+</sc-if>
+</div>
+
+<div class="pn" aria-label="Side panel">
+<div class="pn-t"><div class="tabs" role="tablist"><sc-for list="{{f.tabs}}" as="t"><button class="tab {{t.on}}" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}">{{t.label}}<sc-if value="{{t.hasBg}}" hint-placeholder-val="{{false}}"><span class="bg {{t.bgc}}">{{t.bg}}</span></sc-if></button></sc-for></div></div>
+
+<sc-if value="{{f.tOutline}}" hint-placeholder-val="{{true}}">
+<div class="sec">Structure<span>invoice.rs</span></div>
+<sc-for list="{{f.outline}}" as="o"><div class="or {{o.on}}" style="padding-left: {{o.ind}}px"><span class="g">{{o.g}}</span><span class="nm">{{o.n}}</span><sc-if value="{{o.hasPill}}" hint-placeholder-val="{{false}}"><span class="claim {{o.pc}}">{{o.pill}}</span></sc-if><sc-if value="{{o.hasDot}}" hint-placeholder-val="{{false}}"><i class="dot {{o.dot}}"></i></sc-if><span class="rg">{{o.rg}}</span></div></sc-for>
+<div class="sec">Callers of total<span>call hierarchy · 4</span></div>
+<sc-for list="{{f.callers}}" as="o"><div class="or" style="padding-left: 16px"><span class="g">→</span><span class="nm">{{o.n}}</span><sc-if value="{{o.hasDot}}" hint-placeholder-val="{{false}}"><i class="dot {{o.dot}}"></i></sc-if><span class="rg">{{o.rg}}</span></div></sc-for>
+<div class="sec">Tests of total<span>3</span></div>
+<sc-for list="{{f.tests}}" as="o"><div class="or" style="padding-left: 16px"><span class="g">▸</span><span class="nm">{{o.n}}</span><i class="dot {{o.dot}}"></i><span class="rg">{{o.rg}}</span></div></sc-for>
+</sc-if>
+
+<sc-if value="{{f.tProblems}}" hint-placeholder-val="{{false}}">
+<div class="sec">This file<span>3 · 2 added in turn 5</span></div>
+<sc-for list="{{f.probs}}" as="p"><div class="pr"><i class="dot {{p.dot}}"></i><span class="m">{{p.m}}</span><span class="w"><span>{{p.src}}</span><span>{{p.at}}</span><sc-if value="{{p.isNew}}" hint-placeholder-val="{{false}}"><span class="ntag">new in turn 5</span></sc-if></span></div></sc-for>
+<div class="sec">Other files<span>2 · caused by turn 5</span></div>
+<sc-for list="{{f.probs2}}" as="p"><div class="pr"><i class="dot {{p.dot}}"></i><span class="m">{{p.m}}</span><span class="w"><span>{{p.src}}</span><span>{{p.at}}</span><span class="claim {{p.cc}}">{{p.claim}}</span></span></div></sc-for>
+<div class="sec">Diagnostics run<span>after turn 8a22 · 5 · 14:36</span></div>
+<sc-for list="{{f.stages}}" as="s"><div class="stg"><i class="dot {{s.dot}}"></i><b class="{{s.cls}}">{{s.n}}</b><span>{{s.t}}</span></div></sc-for>
+</sc-if>
+
+<sc-if value="{{f.tTimeline}}" hint-placeholder-val="{{false}}">
+<div class="sec">invoice.rs<span>click shows the diff</span></div>
+<sc-for list="{{f.points}}" as="p"><button class="tl {{p.on}}" onClick="{{p.pick}}"><i class="pt {{p.pt}}" style="{{p.ptStyle}}"></i><span class="h"><b>{{p.who}}</b><span>{{p.time}}</span><sc-if value="{{p.hasAd}}" hint-placeholder-val="{{false}}"><span class="ad"><i>+{{p.a}}</i> <em>−{{p.r}}</em></span></sc-if></span><span class="m">{{p.m}}</span><span class="x">{{p.x}}</span></button></sc-for>
+</sc-if>
+
+<sc-if value="{{f.tRadar}}" hint-placeholder-val="{{false}}">
+<div class="sec">Claims on this file<span>2 sessions</span></div>
+<div class="cl1"><i class="pdot" style="background: #4B5BDB"></i><b>8a22</b>editing<span class="l">L15–24 · lease 7 min</span></div>
+<div class="cl1"><i class="pdot" style="background: #D97757"></i><b>8d07</b>intent<span class="l">L36–39 · lease 3 min</span></div>
+<div class="sec">Radar hits<span>2 · session 7f3a is one side</span></div>
+<sc-for list="{{f.hits}}" as="h"><div class="hit"><span class="r1"><span class="sc {{h.rc}}">{{h.score}}</span><b>{{h.pair}}</b></span><span class="r2">{{h.tier}}</span><span class="r3">{{h.key}}</span><span class="r4"><button class="gb sm">Open both</button><button class="gb sm">Send ping</button></span></div></sc-for>
+<div class="sec">Pings<span>last hour</span></div>
+<sc-for list="{{f.pings}}" as="g"><div class="tl2"><span class="h"><b>{{g.k}}</b><span>{{g.t}}</span></span><span class="m">{{g.m}}</span></div></sc-for>
+</sc-if>
+</div>
+
+<sc-if value="{{f.hasRefs}}" hint-placeholder-val="{{false}}">
+<div class="refs">
+<div class="refs-h"><b>Usages of Invoice::total</b><span class="mono" style="font-size: 11.5px; color: #5A6578">6 in 3 files</span><span class="sp"></span><button class="x" aria-label="Close" onClick="{{f.closeRefs}}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div>
+<sc-for list="{{f.refs}}" as="r"><sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}"><div class="rg1"><span>{{r.file}}</span><span class="ptag">{{r.part}}</span><sc-if value="{{r.hasClaim}}" hint-placeholder-val="{{false}}"><span class="claim {{r.cc}}">{{r.claim}}</span></sc-if></div></sc-if><sc-if value="{{r.isRow}}" hint-placeholder-val="{{true}}"><div class="rr {{r.on}}"><span class="ln2">{{r.n}}</span><span class="pv"><sc-for list="{{r.segs}}" as="g"><span class="{{g.k}}">{{g.t}}</span></sc-for></span><sc-if value="{{r.hasDot}}" hint-placeholder-val="{{false}}"><i class="dot e"></i></sc-if></div></sc-if></sc-for>
+<div class="refs-f"><span>↑ ↓ move</span><span>Enter opens</span><span>Esc closes</span></div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{f.isRepos}}" hint-placeholder-val="{{false}}">
+<header class="hd">
+<h1>Repos</h1>
+<span class="mono">10 codebases · 3 daemons · 31 parts</span>
+<span class="sp"></span>
+<button class="hb">Add a repo</button>
+<button class="hb" style="background: #0D0D0E; color: #FFFFFF; border-color: #0D0D0E; font-weight: 500">New project</button>
+</header>
+<div class="body2">
+<div class="list" aria-label="Codebases"><sc-for list="{{f.repos}}" as="r"><div class="rp {{r.on}}"><span class="rp1"><b>{{r.name}}</b><span class="dots"><sc-for list="{{r.dots}}" as="d"><i class="dot {{d}}"></i></sc-for></span></span><span class="rp2"><span>{{r.meta}}</span><span>{{r.daemon}}</span></span></div></sc-for></div>
+<div class="det">
+<div class="dh"><div><h2>billing</h2><span class="mono">~/work/billing · main · 2 worktrees · build-01 (ssh) · Rust, SQL</span></div><span class="sp"></span><a class="hb" href="Main.dc.html" style="text-decoration: none; color: #1A1A2E">Show in war room</a></div>
+<div class="tabs" role="tablist" aria-label="Repo views"><button class="tab">Parts</button><button class="tab">Files</button><button class="tab">Activity</button><button class="tab on">Radar<span class="bg q">2</span></button></div>
+<div class="card" style="padding: 14px 18px 12px">
+<div class="fh"><b>sessions → shared keys</b><span>5 sessions · 4 pairs · 2 at risk</span><span class="sp"></span><span class="lg"><i style="background: #A0AEC0"></i>0.1 clean</span><span class="lg"><i style="background: #F59E0B"></i>0.4 symbols</span><span class="lg"><i style="background: #F97316"></i>0.7 signature</span><span class="lg"><i style="background: #DC2626"></i>1.0 conflict</span></div>
+<div class="gbox">
+<svg viewBox="0 0 928 240" preserveAspectRatio="none" aria-hidden="true"><sc-for list="{{f.edges}}" as="e"><path d="{{e.d}}" fill="none" stroke="{{e.c}}" stroke-width="{{e.w}}" stroke-linecap="round" vector-effect="non-scaling-stroke"></path></sc-for></svg>
+<sc-for list="{{f.nodes}}" as="n"><div class="nd" style="left: {{n.x}}%; top: {{n.y}}px"><span class="nd1"><i class="pdot" style="background: {{n.pc}}"></i>{{n.id}}<i class="dot {{n.st}}"></i></span><span class="nd2">{{n.sub}}</span></div></sc-for>
+<sc-for list="{{f.elabs}}" as="e"><div class="elab" title="{{e.key}}" style="left: {{e.x}}%; top: {{e.y}}px; color: {{e.c}}"><span class="sc {{e.rc}}" style="color: {{e.c}}">{{e.score}}</span></div></sc-for>
+</div>
+</div>
+<div class="card">
+<div class="hh2"><b>Hits</b><span>4 pairs · sorted by score · trial merge with git merge-tree</span></div>
+<sc-for list="{{f.hitrows}}" as="h"><div class="hr {{h.low}}"><span class="sc {{h.rc}}">{{h.score}}</span><span class="who"><span class="pair"><i class="pdot" style="background: {{h.c1}}"></i>{{h.a}}<em>↔</em><i class="pdot" style="background: {{h.c2}}"></i>{{h.b}}</span><span class="tier">{{h.tier}}</span></span><span class="keys"><span>{{h.k1}}</span><span>{{h.k2}}</span></span><span class="acts"><button class="gb sm">Open both</button><button class="gb sm">Send ping</button><button class="gb sm">Pause one ▾</button></span></div></sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+
+<footer class="stb">
+<span><i class="dot ok"></i>aivoryd running</span>
+<span>desktop · build-01 (ssh) · runner-eu</span>
+<span class="sp"></span>
+<span><i class="dot ok"></i>hub</span>
+<span>14:40</span>
+</footer>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":4720}}'>
+/* ---------- sample data: demo codebase "billing", file billing/invoices/invoice.rs ---------- */
+const SRC = [
+  'use crate::money::{Currency, Money, Rounding};',
+  'use crate::tax::TaxRule;',
+  'use chrono::NaiveDate;',
+  '',
+  '/// An invoice: lines, tax rules, and the currency of the total.',
+  '#[derive(Debug, Clone)]',
+  'pub struct Invoice {',
+  '    pub id: InvoiceId,',
+  '    pub currency: Currency,',
+  '    pub lines: Vec<Line>,',
+  '    pub rules: Vec<TaxRule>,',
+  '}',
+  '',
+  'impl Invoice {',
+  '    /// Sum of all lines after discount, with the tax of `on` added.',
+  '    /// Rounds once at the end, half to even.',
+  '    pub fn total(&self, on: NaiveDate) -> Money {',
+  '        let net: Money = self.lines.iter().map(Line::net).sum();',
+  '        let tax: Money = self.rules.iter()',
+  '            .filter(|r| r.valid_on(on))',
+  '            .map(|r| r.apply(net))',
+  '            .sum();',
+  '        (net + tax).round(Rounding::HalfEven)',
+  '    }',
+  '',
+  '    /// What the customer still owes.',
+  '    pub fn due(&self, paid: Money) -> Money {',
+  '        let owed = self.total(self.issued);',
+  '        if paid > owed { Money::zero(self.currency) } else { owed - paid }',
+  '    }',
+  '',
+  '    pub fn summary(&self) -> String {',
+  '        format!("{} {}", self.id, self.total())',
+  '    }',
+  '',
+  '    pub fn add_line(&mut self, line: Line) {',
+  '        self.lines.push(line);',
+  '        self.lines.sort_by_key(|l| l.position);',
+  '    }',
+  '}',
+  '',
+  '#[cfg(test)]',
+  'mod tests {',
+  '    use super::*;',
+  '',
+  '    #[test]',
+  '    fn total_rounds_once() {',
+  '        let inv = Invoice::fixture(3);',
+  '        assert_eq!(inv.total(date(2026, 10, 1)), Money::eur(12005));',
+  '    }',
+  '}'
+];
+/* turn blame. rank 0 = newest turn of this file. */
+const BC = ['#3574F0', '#6B8AFF', '#A9BCFA', '#CBD5F5', '#E3E7EF'];
+const TURN = {
+  T5: { rank: 0, turn: '8a22 · 5', session: '8a22', model: 'gemini-3-pro', time: '14:36', cost: '$0.31', prompt: 'take the tax date as a parameter of total, so that old invoices keep their tax' },
+  T4: { rank: 1, turn: '8a22 · 4', session: '8a22', model: 'gemini-3-pro', time: '14:24', cost: '$0.42', prompt: 'round once at the end, half to even' },
+  T3: { rank: 2, turn: '7f3a · 3', session: '7f3a', model: 'claude sonnet-5.5', time: '14:02', cost: '$0.18', prompt: 'add a test that total rounds once' },
+  T2: { rank: 3, turn: '7f3a · 2', session: '7f3a', model: 'claude sonnet-5.5', time: '13:40', cost: '$0.12', prompt: 'add the currency to the invoice' },
+  C: { rank: 4 }
+};
+const BLAME = { 3: 'T5', 9: 'T2', 15: 'T5', 16: 'T4', 17: 'T5', 18: 'T4', 19: 'T5', 20: 'T5', 21: 'T4', 22: 'T4', 23: 'T4', 28: 'T5', 46: 'T3', 47: 'T3', 48: 'T3', 49: 'T3', 50: 'T3' };
+/* diagnostics: line -> [severity, text inside the line that gets the mark] */
+const DIAG = { 15: ['i', '`on`'], 29: ['w', 'if paid > owed { Money::zero(self.currency) } else { owed - paid }'], 33: ['e', 'self.total()'] };
+const UCLS = { e: 'ue', w: 'uw', i: 'ui' };
+/* file heat: claims of other sessions on line ranges */
+const HEAT = [{ from: 15, to: 24, by: '8a22', state: 'editing', cls: 'e', tag: '8a22 editing' }, { from: 36, to: 39, by: '8d07', state: 'intent', cls: 'i', tag: '8d07 intent' }];
+const KW = new Set(['use', 'pub', 'struct', 'impl', 'fn', 'let', 'if', 'else', 'mod', 'self', 'crate', 'super', 'mut', 'for', 'in', 'cfg']);
+
+/* ---------- a small Rust tokenizer: token kinds k kw, t type, f fn, s string, n number, c comment, a attribute or macro ---------- */
+function tok(line) {
+  const re = /(\/\/.*$)|(#\[.*?\])|("(?:[^"\\]|\\.)*")|(\b\d[\d_]*\b)|([A-Za-z_][A-Za-z_0-9]*!?)|(\s+)|(.)/g;
+  const out = []; let m;
+  while ((m = re.exec(line))) {
+    const t = m[0];
+    let k = '';
+    if (m[1]) k = 'c';
+    else if (m[2]) k = 'a';
+    else if (m[3]) k = 's';
+    else if (m[4]) k = 'n';
+    else if (m[5]) {
+      if (t.endsWith('!')) k = 'a';
+      else if (KW.has(t)) k = 'k';
+      else if (/^[A-Z]/.test(t)) k = 't';
+      else if (line[re.lastIndex] === '(') k = 'f' + (t === 'total' ? ' sy' : '');
+    }
+    out.push({ t, k });
+  }
+  return out;
+}
+function mark(segs, text, cls) {
+  const line = segs.map(s => s.t).join(''), a = line.indexOf(text);
+  if (a < 0) return segs;
+  const b = a + text.length, out = []; let p = 0;
+  segs.forEach(s => {
+    const e = p + s.t.length;
+    if (e <= a || p >= b) out.push(s);
+    else {
+      if (p < a) out.push({ t: s.t.slice(0, a - p), k: s.k });
+      out.push({ t: s.t.slice(Math.max(a, p) - p, Math.min(b, e) - p), k: (s.k + ' ' + cls).trim() });
+      if (e > b) out.push({ t: s.t.slice(b - p), k: s.k });
+    }
+    p = e;
+  });
+  return out;
+}
+
+/* ---------- side panel data ---------- */
+const OUTLINE = [
+  ['use', 0, 'imports', '1–3', '', ''], ['S', 0, 'Invoice', '7–12', '', ''], ['·', 18, 'id: InvoiceId', '8', '', ''], ['·', 18, 'currency: Currency', '9', '', ''], ['·', 18, 'lines: Vec<Line>', '10', '', ''], ['·', 18, 'rules: Vec<TaxRule>', '11', '', ''],
+  ['I', 0, 'impl Invoice', '14–40', '', ''], ['fn', 18, 'total(&self, on)', '17–24', 'on', '8a22'], ['fn', 18, 'due(&self, paid)', '27–30', '', ''], ['fn', 18, 'summary(&self)', '32–34', 'e', ''], ['fn', 18, 'add_line(&mut self, line)', '36–39', 'pale', '8d07'],
+  ['M', 0, 'mod tests', '43–51', '', ''], ['fn', 18, 'total_rounds_once()', '47–50', '', '']
+];
+const CALLERS = [['Invoice::due', 'invoice.rs:28', ''], ['Invoice::summary', 'invoice.rs:33', 'e'], ['charge::pay', 'charge.rs:41', 'e'], ['queries::bind_total', 'queries.rs:58', 'e']];
+const TESTS = [['tests::total_rounds_once', 'passes', 'ok'], ['tests::total_rounds', 'passes', 'ok'], ['tests::pays_once', 'fails', 'e']];
+const PROBS = [
+  { dot: 'e', m: 'This method takes 1 argument but 0 arguments were supplied.', src: 'rustc E0061', at: 'L33', isNew: true },
+  { dot: 'i', m: 'The parameter `on` has no description in the doc comment.', src: 'pack · doc-params', at: 'L15', isNew: true },
+  { dot: 'q', m: 'Use `saturating_sub` instead of the manual check.', src: 'clippy · implicit_saturating_sub', at: 'L29', isNew: false }
+];
+const PROBS2 = [
+  { dot: 'e', m: 'This method takes 1 argument but 0 arguments were supplied.', src: 'rustc E0061', at: 'charge.rs · L41', claim: 'claimed by 7f3a', cc: 'q' },
+  { dot: 'e', m: 'This method takes 1 argument but 0 arguments were supplied.', src: 'rustc E0061', at: 'queries.rs · L58', claim: 'claimed by 8d07', cc: '' }
+];
+const STAGES = [
+  ['Syntax errors (L0)', '12 ms', 'ok', ''], ['Pack inspections and ast-grep', '180 ms', 'ok', ''], ['clippy, changed files only', '4.1 s', 'ok', ''], ['rust-analyzer', '0.9 s', 'ok', ''], ['AIVory Guard · off for this team', 'off', 'i', 'off']
+];
+const POINTS = [
+  { kind: 'turn', who: '8a22 · turn 5', time: '14:36', m: 'take the tax date as a parameter of total', x: 'gemini-3-pro · $0.31 · 2 problems added', a: 8, r: 4, ptc: '#3574F0' },
+  { kind: 'gate', who: 'gate', time: '14:31', m: 'tests 31/31 passed', x: 'after 8a22 · turn 4', a: 0, r: 0 },
+  { kind: 'turn', who: '8a22 · turn 4', time: '14:24', m: 'round once at the end, half to even', x: 'gemini-3-pro · $0.42', a: 6, r: 4, ptc: '#6B8AFF' },
+  { kind: 'turn', who: '7f3a · turn 3', time: '14:02', m: 'add a test that total rounds once', x: 'claude sonnet-5.5 · $0.18', a: 9, r: 0, ptc: '#A9BCFA' },
+  { kind: 'turn', who: '7f3a · turn 2', time: '13:40', m: 'add the currency to the invoice', x: 'claude sonnet-5.5 · $0.12', a: 2, r: 0, ptc: '#CBD5F5' },
+  { kind: 'gate', who: 'review', time: '12:20', m: 'approved by Paul Piper', x: 'before the commit was pushed', a: 0, r: 0 },
+  { kind: 'gate', who: 'gate', time: '12:15', m: 'Guard scan clean', x: 'security and compliance · changed hunks', a: 0, r: 0 },
+  { kind: 'commit', who: 'a41c9e0', time: '12:10', m: 'billing: invoice lines and tax rules', x: 'Paul Piper · committed', a: 88, r: 0 },
+  { kind: 'commit', who: '9be02d7', time: 'yesterday', m: 'billing: scaffold the invoice module', x: 'Paul Piper · committed', a: 40, r: 0 }
+];
+const DIFF = [
+  ['h', '', '', '', '@@ -1,3 +1,4 @@'],
+  ['', 1, 1, ' ', 'use crate::money::{Currency, Money, Rounding};'], ['', 2, 2, ' ', 'use crate::tax::TaxRule;'], ['a', '', 3, '+', 'use chrono::NaiveDate;'], ['', 3, 4, ' ', ''],
+  ['h', '', '', '', '@@ -14,11 +15,14 @@ impl Invoice {'],
+  ['', 14, 15, ' ', 'impl Invoice {'],
+  ['r', 15, '', '−', '    /// Sum of all lines after discount, with tax added.'],
+  ['a', '', 16, '+', '    /// Sum of all lines after discount, with the tax of `on` added.'],
+  ['', 16, 17, ' ', '    /// Rounds once at the end, half to even.'],
+  ['r', 17, '', '−', '    pub fn total(&self) -> Money {'],
+  ['a', '', 18, '+', '    pub fn total(&self, on: NaiveDate) -> Money {'],
+  ['', 18, 19, ' ', '        let net: Money = self.lines.iter().map(Line::net).sum();'],
+  ['r', 19, '', '−', '        let tax: Money = self.rules.iter().map(|r| r.apply(net)).sum();'],
+  ['a', '', 20, '+', '        let tax: Money = self.rules.iter()'],
+  ['a', '', 21, '+', '            .filter(|r| r.valid_on(on))'],
+  ['a', '', 22, '+', '            .map(|r| r.apply(net))'],
+  ['a', '', 23, '+', '            .sum();'],
+  ['', 20, 24, ' ', '        (net + tax).round(Rounding::HalfEven)'],
+  ['', 21, 25, ' ', '    }'],
+  ['', 22, 26, ' ', ''],
+  ['h', '', '', '', '@@ -27,5 +31,5 @@ impl Invoice {'],
+  ['', 26, 30, ' ', '    pub fn due(&self, paid: Money) -> Money {'],
+  ['r', 27, '', '−', '        let owed = self.total();'],
+  ['a', '', 31, '+', '        let owed = self.total(self.issued);'],
+  ['', 28, 32, ' ', '        if paid > owed { Money::zero(self.currency) } else { owed - paid }'],
+  ['', 29, 33, ' ', '    }'],
+  ['', 30, 34, ' ', ''],
+  ['', 31, 35, ' ', '    pub fn summary(&self) -> String {'],
+  ['', 32, 36, ' ', '        format!("{} {}", self.id, self.total())'],
+  ['', 33, 37, ' ', '    }'],
+  ['', 34, 38, ' ', ''],
+  ['', 35, 39, ' ', '    pub fn add_line(&mut self, line: Line) {']
+];
+
+const TREE = [
+  [14, '▾', 'billing/invoices/', 'invoices', '', '', 0], [32, '·', 'mod.rs'], [32, '·', 'invoice.rs', '', 'claimed by 8a22', '', 3, 'on'], [32, '·', 'line.rs'], [32, '·', 'money.rs'], [32, '·', 'tax.rs'], [32, '·', 'tests.rs'],
+  [14, '▾', 'billing/db/', 'database'], [32, '·', 'mod.rs'], [32, '·', 'schema.rs'], [32, '·', 'queries.rs', '', 'claimed by 8d07', '', 1],
+  [14, '▸', 'migrations/', 'database'],
+  [14, '▾', 'src/payment/', 'payment'], [32, '·', 'mod.rs'], [32, '·', 'charge.rs', '', 'claimed by 7f3a', 'q', 1], [32, '·', 'refund.rs'], [32, '·', 'tests.rs', '', '', '', 1],
+  [14, '▸', 'src/api/', 'payment'], [14, '▸', 'docs/'], [14, '·', 'Cargo.toml'], [14, '·', 'Cargo.lock'], [14, '·', 'README.md'], [14, '·', 'deny.toml'], [14, '·', '.gitignore'], [14, '·', 'rustfmt.toml'], [14, '·', 'LICENSE']
+];
+
+const REPOS = [
+  ['aivory-code', 'aivory-code', ['q', 'w', 'w', 'i'], '4 sessions · 4 parts', 'desktop'], ['aivory-guard', '', ['q', 'w', 'w', 'i'], '4 sessions · 4 parts', 'desktop'], ['billing', '', ['q', 'w', 'w'], '3 sessions · 3 parts', 'build-01 (ssh)'],
+  ['smart-inference', '', ['e', 'w', 'w'], '3 sessions · 3 parts', 'build-01 (ssh)'], ['kronk', '', ['w', 'w'], '2 sessions · 3 parts', 'desktop'], ['slaide', '', ['w', 'i', 'w'], '3 sessions · 3 parts', 'runner-eu'],
+  ['aivory-hugo', '', ['w'], '1 sessions · 3 parts', 'desktop'], ['mobile', '', ['w'], '1 sessions · 3 parts', 'desktop'], ['docs', '', [], 'quiet · 2 parts', 'desktop'], ['infra', '', [], 'quiet · 2 parts', 'runner-eu']
+];
+/* radar: nodes {id, provider, part, owner, state, x (viewBox 928), y (px)} */
+const PV = { claude: '#D97757', codex: '#1A1A2E', gemini: '#4B5BDB', opencode: '#7C3AED', goose: '#0D9488' };
+const RN = {
+  '7f3a': { p: 'claude', sub: 'payment · you', st: 'q', x: 150, y: 52 }, 'k9d4': { p: 'opencode', sub: 'payment · Jonas', st: 'w', x: 150, y: 188 },
+  '8a22': { p: 'gemini', sub: 'invoices · you', st: 'w', x: 464, y: 52 }, '8d07': { p: 'claude', sub: 'database · you', st: 'w', x: 464, y: 188 }, 'm2e5': { p: 'codex', sub: 'invoices · Mara', st: 'w', x: 778, y: 120 }
+};
+const RC = { 0.1: ['#A0AEC0', 'r1', '#5A6578'], 0.4: ['#F59E0B', 'r2', '#92400E'], 0.7: ['#F97316', 'r3', '#C2410C'], 1.0: ['#DC2626', 'r4', '#B91C1C'] };
+const HITS = [
+  { s: 1.0, a: 'k9d4', b: '7f3a', tier: 'Tier 1 · same path · text conflict', k1: 'path:src/payment/charge.rs', k2: 'test:payment::charge::tests::pays_once', d: 'M150,77 L150,163', ex: 150, ey: 120, lab: 'charge.rs', w: 4 },
+  { s: 0.7, a: '7f3a', b: '8a22', tier: 'Tier 3 · dependency · clean, signature used', k1: 'sym:rust:billing::Invoice::total', k2: '8a22 changed it, 7f3a calls it', d: 'M232,52 L382,52', ex: 307, ey: 52, lab: 'Invoice::total', w: 3.5 },
+  { s: 0.4, a: '8a22', b: 'm2e5', tier: 'Tier 2 · same symbol · clean, symbols shared', k1: 'sym:rust:billing::Money::round', k2: 'both change the declaration body', d: 'M546,52 C625,52 625,120 696,120', ex: 621, ey: 86, lab: 'Money::round', w: 2.5 },
+  { s: 0.1, a: '8d07', b: 'm2e5', tier: 'Tier 1 · same path · clean, no shared symbols', k1: 'mod:billing/db', k2: 'path:billing/db/schema.rs', d: 'M546,188 C625,188 625,120 696,120', ex: 621, ey: 154, lab: 'billing/db', w: 2 }
+];
+const pct = x => Math.round(x / 928 * 1000) / 10;
+
+class Component extends DCLogic {
+  state = { fs: {
+    blame: { tab: 'outline' }, doc: { tab: 'problems' }, diff: { tab: 'timeline', diff: true }, refs: { tab: 'radar', refs: true }, radar: {}
+  } };
+
+  setF(id, p) { this.setState({ fs: { ...this.state.fs, [id]: { ...this.state.fs[id], ...p } } }); }
+
+  lines(fr, st) {
+    const out = [];
+    SRC.forEach((text, i) => {
+      const n = i + 1, key = BLAME[n] || 'C', tn = TURN[key];
+      let segs = tok(text);
+      const dg = DIAG[n];
+      if (dg) segs = mark(segs, dg[1], UCLS[dg[0]]);
+      const h = HEAT.find(x => n >= x.from && n <= x.to);
+      const hasSym = segs.some(s => /sy/.test(s.k));
+      const pinB = fr.id === 'blame' && n === 23, pinD = fr.id === 'doc' && n === 28;
+      if (pinD) segs = segs.map(s => /sy/.test(s.k) ? { t: s.t, k: s.k + ' hl' } : s);
+      out.push({
+        n, segs, bc: BC[tn.rank], diag: dg ? dg[0] : '', heat: h ? h.cls : '', cls: h ? (h.cls === 'e' ? 'hh' : 'hi') : '',
+        heatTag: h && n === h.from ? h.tag : '', heatCls: h && h.cls === 'i' ? 'pale' : '',
+        isTurn: key !== 'C', isCommit: key === 'C' && text !== '', turn: tn.turn, prompt: tn.prompt, model: tn.model, session: tn.session, time: tn.time, cost: tn.cost,
+        cardOn: pinB ? 'on' : '', up: n >= 26 ? 'up' : '', hasDoc: hasSym, docOn: pinD ? 'on' : ''
+      });
+    });
+    return out;
+  }
+
+  renderVals() {
+    const st = this.state;
+    const FR = [
+      { id: 'blame', cap: 'Frame 1 · Lens · a hover on a line shows blame by prompt · Outline tab', lens: true },
+      { id: 'doc', cap: 'Frame 2 · Lens · a hover on a symbol shows the doc card · Problems tab', lens: true },
+      { id: 'diff', cap: 'Frame 3 · Lens · Timeline tab · a click on a point shows the diff of that turn', lens: true },
+      { id: 'refs', cap: 'Frame 4 · Lens · Find usages shows the list under the header · Radar tab', lens: true },
+      { id: 'radar', cap: 'Frame 5 · Repos · the Radar tab (fourth tab next to Parts, Files, Activity)', lens: false }
+    ];
+    const tabDefs = [['outline', 'Outline', '', ''], ['problems', 'Problems', '3', 'e'], ['timeline', 'Timeline', '', ''], ['radar', 'Radar', '2', 'v']];
+    return {
+      frames: FR.map(fr => {
+        const s = st.fs[fr.id] || {};
+        const base = { id: fr.id, cap: fr.cap, isLens: fr.lens, isRepos: !fr.lens };
+        if (!fr.lens) {
+          return {
+            ...base,
+            repos: REPOS.map(r => ({ name: r[0], on: r[0] === 'billing' ? 'on' : '', dots: r[2], meta: r[3], daemon: r[4] })),
+            edges: HITS.map(h => ({ d: h.d, c: RC[h.s][0], w: h.w })),
+            nodes: Object.keys(RN).map(k => ({ id: k, pc: PV[RN[k].p], sub: RN[k].sub, st: RN[k].st, x: pct(RN[k].x), y: RN[k].y })),
+            elabs: HITS.map(h => ({ x: pct(h.ex), y: h.ey, c: RC[h.s][2], rc: RC[h.s][1], score: h.s.toFixed(1), key: h.lab })),
+            hitrows: HITS.map(h => ({ score: h.s.toFixed(1), rc: RC[h.s][1], a: h.a, b: h.b, c1: PV[RN[h.a].p], c2: PV[RN[h.b].p], tier: h.tier, k1: h.k1, k2: h.k2, low: h.s < 0.4 ? 'low' : '' }))
+          };
+        }
+        const tab = s.tab || 'outline', diffOn = !!s.diff;
+        const hasRefs = !!s.refs;
+        return {
+          ...base,
+          tree: TREE.map(r => ({ ind: r[0], ic: r[1], n: r[2], part: r[3] || '', hasPart: !!r[3], claim: r[4] || '', hasClaim: !!r[4], cc: r[5] || '', pc: r[6] || '', hasPc: !!r[6], on: r[7] || '' })),
+          isFile: !diffOn, isDiff: diffOn,
+          lines: this.lines(fr, st),
+          diff: DIFF.map(d => ({ t: d[0], o: d[1], n: d[2], m: d[3], segs: d[0] === 'h' ? [{ t: d[4], k: '' }] : tok(d[4]) })),
+          openRefs: () => this.setF(fr.id, { refs: true }), closeRefs: () => this.setF(fr.id, { refs: false }), closeDiff: () => this.setF(fr.id, { diff: false, tab: 'timeline' }),
+          hasRefs,
+          refs: [
+            { isHead: true, file: 'billing/invoices/invoice.rs', part: 'invoices', hasClaim: true, claim: 'claimed by 8a22', cc: '' },
+            { isRow: true, n: 28, segs: mark(tok('        let owed = self.total(self.issued);'), 'total', 'hl') },
+            { isRow: true, n: 33, hasDot: true, segs: mark(tok('        format!("{} {}", self.id, self.total())'), 'total', 'hl') },
+            { isRow: true, n: 49, segs: mark(tok('        assert_eq!(inv.total(date(2026, 10, 1)), Money::eur(12005));'), 'total', 'hl') },
+            { isHead: true, file: 'src/payment/charge.rs', part: 'payment', hasClaim: true, claim: 'claimed by 7f3a', cc: 'q' },
+            { isRow: true, n: 41, on: 'on', hasDot: true, segs: mark(tok('        let amount = invoice.total();'), 'total', 'hl') },
+            { isRow: true, n: 77, segs: mark(tok('        ledger.post(invoice.total());'), 'total', 'hl') },
+            { isHead: true, file: 'billing/db/queries.rs', part: 'database', hasClaim: true, claim: 'claimed by 8d07', cc: '' },
+            { isRow: true, n: 58, hasDot: true, segs: mark(tok('        .bind(invoice.total().cents())'), 'total', 'hl') }
+          ].map(r => ({ isHead: !!r.isHead, isRow: !!r.isRow, file: r.file, part: r.part, hasClaim: !!r.hasClaim, claim: r.claim, cc: r.cc || '', n: r.n, on: r.on || '', hasDot: !!r.hasDot, segs: r.segs || [] })),
+          tabs: tabDefs.map(([k, label, bg, bgc]) => ({ label, on: tab === k ? 'on' : '', sel: tab === k ? 'true' : 'false', hasBg: !!bg, bg, bgc, pick: () => this.setF(fr.id, { tab: k }) })),
+          tOutline: tab === 'outline', tProblems: tab === 'problems', tTimeline: tab === 'timeline', tRadar: tab === 'radar',
+          outline: OUTLINE.map(o => ({ g: o[0], ind: 16 + o[1], n: o[2], rg: o[3], on: o[4] === 'on' ? 'on' : '', hasPill: o[4] === 'on' || o[4] === 'pale', pc: o[4] === 'pale' ? 'pale' : '', pill: o[5], hasDot: o[4] === 'e', dot: 'e' })),
+          callers: CALLERS.map(c => ({ n: c[0], rg: c[1], hasDot: !!c[2], dot: c[2] })),
+          tests: TESTS.map(c => ({ n: c[0], rg: c[1], dot: c[2] })),
+          probs: PROBS, probs2: PROBS2,
+          stages: STAGES.map(c => ({ n: c[0], t: c[1], dot: c[2], cls: c[3] })),
+          points: POINTS.map((p, i) => ({
+            who: p.who, time: p.time, m: p.m, x: p.x, a: p.a, r: p.r, hasAd: p.kind !== 'gate', on: (fr.id === 'diff' && i === 0 && diffOn) || (s.sel === i && diffOn) ? 'on' : '',
+            pt: p.kind, ptStyle: p.kind === 'turn' ? 'background: ' + p.ptc : '', pick: () => this.setF(fr.id, { diff: true, sel: i })
+          })),
+          pings: [
+            { k: 'FYI to 7f3a', t: '14:37', m: '8a22 changed the signature of Invoice::total.' },
+            { k: 'FYI to 8a22', t: '14:37', m: '7f3a calls Invoice::total in charge.rs.' },
+            { k: 'Question to 8d07', t: '14:12', m: 'Do you still need add_line? Answer by 14:30.' }
+          ],
+          hits: [
+            { score: '0.7', rc: 'r3', pair: '7f3a ↔ 8a22', tier: 'Tier 3 · dependency · clean merge, signature used by the other side', key: 'sym:rust:billing::Invoice::total' },
+            { score: '0.4', rc: 'r2', pair: '8a22 ↔ m2e5', tier: 'Tier 2 · same symbol · clean merge, shared symbols changed', key: 'sym:rust:billing::Money::round' }
+          ]
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

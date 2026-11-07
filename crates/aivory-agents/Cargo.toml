@@ -1,0 +1,33 @@
+[package]
+name = "aivory-agents"
+description = "Drivers that run the native agent CLIs and map their output to AgentEvent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-protocol.workspace = true
+aivory-sessions.workspace = true
+getrandom = "0.3"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# A test helper that speaks the stream-json protocol of Claude Code. Only the tests use it.
+[[bin]]
+name = "fake-claude"
+path = "tests/support/fake_claude.rs"
+test = false
+doc = false
+
+# A test helper that speaks `codex app-server` and `gemini --acp`. Only the tests use it.
+[[bin]]
+name = "fake-agent"
+path = "tests/support/fake_agent.rs"
+test = false
+doc = false
+
+[lints]
+workspace = true

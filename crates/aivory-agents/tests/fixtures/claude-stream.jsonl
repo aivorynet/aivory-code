@@ -1,0 +1,16 @@
+{"type":"system","subtype":"init","cwd":"C:\\synthetic\\app","session_id":"sess-claude-1","model":"claude-test","permissionMode":"default","apiKeySource":"none","uuid":"e0"}
+{"type":"system","subtype":"hook_started","hook_name":"synthetic","session_id":"sess-claude-1"}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m1","role":"assistant"}},"session_id":"sess-claude-1"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hel"}},"session_id":"sess-claude-1"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}},"session_id":"sess-claude-1"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"thinking_delta","thinking":"synthetic"}},"session_id":"sess-claude-1"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-test","content":[{"type":"text","text":"Hello"}]},"session_id":"sess-claude-1"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-test","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"echo hi"}}]},"session_id":"sess-claude-1"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"hi","is_error":false}]},"session_id":"sess-claude-1"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_2","content":[{"type":"text","text":"line one"},{"type":"text","text":"line two"}],"is_error":true}]},"session_id":"sess-claude-1"}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m2","role":"assistant"}},"session_id":"sess-claude-1"}
+{"type":"assistant","message":{"id":"m2","role":"assistant","model":"claude-test","content":[{"type":"thinking","thinking":"synthetic"},{"type":"text","text":"Done without deltas"}]},"session_id":"sess-claude-1"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"},"session_id":"sess-claude-1"}
+{"type":"future_event_type","some_unknown_field":{"nested":[1,2,3]}}
+this line is not json
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1234,"total_cost_usd":0.0123,"result":"Done","session_id":"sess-claude-1","usage":{"input_tokens":3,"output_tokens":5,"cache_read_input_tokens":7,"cache_creation_input_tokens":2,"output_tokens_details":{"thinking_tokens":4}},"permission_denials":[{"tool_name":"Write","tool_use_id":"toolu_9","tool_input":{"file_path":"x.txt"}}]}

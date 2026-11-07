@@ -1,0 +1,62 @@
+[package]
+name = "aivory-desktop"
+description = "AIVory Code desktop app: the war room and the session screens (GPUI)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "aivory"
+path = "src/main.rs"
+
+[dependencies]
+aivory-protocol.workspace = true
+aivory-syntax.workspace = true
+base64 = "0.22"
+serde.workspace = true
+aivory-theme.workspace = true
+aivoryd.workspace = true
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap.workspace = true
+futures = "0.3"
+gpui = { package = "gpui-pre", version = "0.3.9" }
+gpui-base = "0.8.0"
+gpui_platform = { package = "gpui-pre-platform", version = "0.3.9" }
+qrcode = { version = "0.14", default-features = false }
+serde_json.workspace = true
+xcap = { version = "0.9", default-features = false }
+pulldown-cmark = { version = "0.13", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Media_SpeechRecognition"] }
+# The offline dictation (Apache-2.0 both): the microphone, and a streaming recognizer that
+# runs on the CPU. The recognizer links statically; its build script downloads the prebuilt
+# library archive of the release.
+cpal = "0.18"
+sherpa-onnx = "1.13"
+
+[dev-dependencies]
+gpui = { package = "gpui-pre", version = "0.3.9", features = ["test-support"] }
+
+[lints]
+workspace = true
+
+# Installer config for `cargo-packager` (MIT/Apache-2.0). See docs/release.md.
+[package.metadata.packager]
+product-name = "AIVory Code"
+identifier = "com.ilscipio.aivory.code"
+publisher = "Ilscipio"
+description = "AIVory Code: the war room for coding agents"
+license-file = "../../LICENSE"
+out-dir = "../../dist"
+binaries-dir = "../../target/release"
+binaries = [
+  { path = "aivory", main = true },
+  { path = "aivoryd" },
+]
+icons = ["packaging/icons/32x32.png", "packaging/icons/128x128.png", "packaging/icons/512x512.png", "packaging/icons/icon.icns", "packaging/icons/icon.ico"]

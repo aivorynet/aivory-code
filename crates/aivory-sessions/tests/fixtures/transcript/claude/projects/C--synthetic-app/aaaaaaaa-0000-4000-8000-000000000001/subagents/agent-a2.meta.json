@@ -1,0 +1,7 @@
+{
+ "agentType": "general-purpose",
+ "description": "Write tests",
+ "toolUseId": "tu-b",
+ "spawnDepth": 1,
+ "model": "sonnet"
+}

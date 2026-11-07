@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "kind": "struct",
+      "line": 6,
+      "name": "Budget",
+      "path": "crates/orch/src/budget.rs",
+      "signature": "pub struct Budget"
+    },
+    {
+      "kind": "impl",
+      "line": 12,
+      "name": "Budget",
+      "path": "crates/orch/src/budget.rs",
+      "signature": "impl Budget"
+    },
+    {
+      "container": "Orchestrator",
+      "kind": "field",
+      "line": 5,
+      "name": "budget",
+      "path": "crates/orch/src/spawn.rs",
+      "signature": "budget: Budget"
+    },
+    {
+      "kind": "enum",
+      "line": 28,
+      "name": "BudgetError",
+      "path": "crates/orch/src/budget.rs",
+      "signature": "pub enum BudgetError"
+    }
+  ],
+  "page": 1,
+  "perPage": 20,
+  "total": 4
+}

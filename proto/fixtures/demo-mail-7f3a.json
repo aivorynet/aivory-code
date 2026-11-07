@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "count": 1,
+      "createdAt": 1792593300000,
+      "deliveredAt": 1792593360000,
+      "from": "8a22",
+      "id": 1,
+      "key": "sym:rust:billing::Invoice::total",
+      "kind": "fyi",
+      "resolved": false,
+      "text": "8a22 also changes sym:rust:billing::Invoice::total (radar tier 3, risk 0.7)"
+    },
+    {
+      "count": 1,
+      "createdAt": 1792593420000,
+      "from": "k9d4",
+      "id": 2,
+      "key": "path:src/payment/charge.rs",
+      "kind": "fyi",
+      "resolved": false,
+      "text": "k9d4 also changes path:src/payment/charge.rs (radar tier 1, risk 1.0; text conflict in src/payment/charge.rs)"
+    }
+  ],
+  "session": "7f3a"
+}

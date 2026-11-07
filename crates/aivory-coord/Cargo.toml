@@ -1,0 +1,26 @@
+[package]
+name = "aivory-coord"
+description = "AIVory Code local coordination: routing keys, semantic deltas, claims, conflict radar, mailbox"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-syntax = { workspace = true }
+aivory-index = { workspace = true }
+aivory-vcs = { workspace = true }
+# MIT or Apache-2.0 (CC0 for the C part). Hash of a declaration body.
+blake3 = "1"
+# MIT. `bundled` compiles SQLite (public domain); same version as `aivory-engine`, so one SQLite links.
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

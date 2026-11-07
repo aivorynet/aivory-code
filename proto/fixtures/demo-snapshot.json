@@ -1,0 +1,3588 @@
+{
+  "activity": [
+    {
+      "active": 12,
+      "at": 1792590060000,
+      "idle": 8,
+      "waiting": 1
+    },
+    {
+      "active": 12,
+      "at": 1792590120000,
+      "idle": 8,
+      "waiting": 1
+    },
+    {
+      "active": 13,
+      "at": 1792590180000,
+      "idle": 7,
+      "waiting": 1
+    },
+    {
+      "active": 13,
+      "at": 1792590240000,
+      "idle": 7,
+      "waiting": 1
+    },
+    {
+      "active": 13,
+      "at": 1792590300000,
+      "idle": 7,
+      "waiting": 2
+    },
+    {
+      "active": 13,
+      "at": 1792590360000,
+      "idle": 7,
+      "waiting": 2
+    },
+    {
+      "active": 14,
+      "at": 1792590420000,
+      "idle": 6,
+      "waiting": 2
+    },
+    {
+      "active": 14,
+      "at": 1792590480000,
+      "idle": 6,
+      "waiting": 2
+    },
+    {
+      "active": 15,
+      "at": 1792590540000,
+      "idle": 6,
+      "waiting": 1
+    },
+    {
+      "active": 15,
+      "at": 1792590600000,
+      "idle": 6,
+      "waiting": 1
+    },
+    {
+      "active": 15,
+      "at": 1792590660000,
+      "idle": 6,
+      "waiting": 1
+    },
+    {
+      "active": 15,
+      "at": 1792590720000,
+      "idle": 6,
+      "waiting": 1
+    },
+    {
+      "active": 16,
+      "at": 1792590780000,
+      "idle": 5,
+      "waiting": 2
+    },
+    {
+      "active": 16,
+      "at": 1792590840000,
+      "idle": 5,
+      "waiting": 2
+    },
+    {
+      "active": 17,
+      "at": 1792590900000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792590960000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792591020000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792591080000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 18,
+      "at": 1792591140000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792591200000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792591260000,
+      "idle": 5,
+      "waiting": 1
+    },
+    {
+      "active": 18,
+      "at": 1792591320000,
+      "idle": 5,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792591380000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792591440000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792591500000,
+      "idle": 3,
+      "waiting": 2
+    },
+    {
+      "active": 19,
+      "at": 1792591560000,
+      "idle": 3,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792591620000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792591680000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 17,
+      "at": 1792591740000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792591800000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792591860000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 17,
+      "at": 1792591920000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 16,
+      "at": 1792591980000,
+      "idle": 4,
+      "waiting": 4
+    },
+    {
+      "active": 16,
+      "at": 1792592040000,
+      "idle": 4,
+      "waiting": 4
+    },
+    {
+      "active": 16,
+      "at": 1792592100000,
+      "idle": 5,
+      "waiting": 3
+    },
+    {
+      "active": 16,
+      "at": 1792592160000,
+      "idle": 5,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792592220000,
+      "idle": 5,
+      "waiting": 2
+    },
+    {
+      "active": 17,
+      "at": 1792592280000,
+      "idle": 5,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792592340000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792592400000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 19,
+      "at": 1792592460000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792592520000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792592580000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 19,
+      "at": 1792592640000,
+      "idle": 4,
+      "waiting": 1
+    },
+    {
+      "active": 18,
+      "at": 1792592700000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792592760000,
+      "idle": 4,
+      "waiting": 2
+    },
+    {
+      "active": 18,
+      "at": 1792592820000,
+      "idle": 3,
+      "waiting": 3
+    },
+    {
+      "active": 18,
+      "at": 1792592880000,
+      "idle": 3,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792592940000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792593000000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 17,
+      "at": 1792593060000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 17,
+      "at": 1792593120000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 16,
+      "at": 1792593180000,
+      "idle": 4,
+      "waiting": 4
+    },
+    {
+      "active": 16,
+      "at": 1792593240000,
+      "idle": 4,
+      "waiting": 4
+    },
+    {
+      "active": 15,
+      "at": 1792593300000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 15,
+      "at": 1792593360000,
+      "idle": 4,
+      "waiting": 3
+    },
+    {
+      "active": 15,
+      "at": 1792593420000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 15,
+      "at": 1792593480000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 14,
+      "at": 1792593540000,
+      "idle": 3,
+      "waiting": 4
+    },
+    {
+      "active": 14,
+      "at": 1792593600000,
+      "idle": 3,
+      "waiting": 4
+    }
+  ],
+  "autopilot": {
+    "maxPerCodebase": 4,
+    "maxRunning": 14,
+    "on": true,
+    "order": "priority",
+    "parkAfterMin": 15,
+    "startQueued": true
+  },
+  "board": {
+    "asks": [
+      "7f3a",
+      "c218",
+      "9b0e",
+      "41dd"
+    ],
+    "blocked": {
+      "count": 1,
+      "ids": [
+        "41dd"
+      ]
+    },
+    "idle": {
+      "count": 3,
+      "ids": [
+        "s7a0",
+        "d3f0",
+        "6f19"
+      ]
+    },
+    "needsYou": {
+      "count": 3,
+      "ids": [
+        "7f3a",
+        "c218",
+        "9b0e"
+      ]
+    },
+    "working": {
+      "count": 14,
+      "ids": [
+        "5e81",
+        "k4c2",
+        "a01c",
+        "90c4",
+        "6c40",
+        "s3d1",
+        "h8f3",
+        "8a22",
+        "a7e2",
+        "m6b4",
+        "k1b7",
+        "s9e2",
+        "93e8",
+        "8d07"
+      ]
+    }
+  },
+  "codebases": [
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-code",
+      "languages": [
+        "Rust"
+      ],
+      "parts": [
+        {
+          "name": "ui",
+          "paths": [
+            "crates/ui/**",
+            "assets/**"
+          ]
+        },
+        {
+          "name": "orchestrator",
+          "paths": [
+            "crates/orch/**"
+          ]
+        },
+        {
+          "name": "ledger",
+          "paths": [
+            "crates/ledger/**"
+          ]
+        },
+        {
+          "name": "sync",
+          "paths": [
+            "crates/sync/**",
+            ".aivory/map.toml"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-code",
+      "worktrees": 4
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-guard",
+      "languages": [
+        "Python",
+        "TS"
+      ],
+      "parts": [
+        {
+          "name": "scanner",
+          "paths": [
+            "guard/scanner/**"
+          ]
+        },
+        {
+          "name": "api",
+          "paths": [
+            "guard/api/**"
+          ]
+        },
+        {
+          "name": "rules",
+          "paths": [
+            "rules/**",
+            "guard/rules/**"
+          ]
+        },
+        {
+          "name": "dashboard",
+          "paths": [
+            "web/**"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-guard",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "build-01 (ssh)",
+      "id": "billing",
+      "languages": [
+        "Rust",
+        "SQL"
+      ],
+      "parts": [
+        {
+          "name": "payment",
+          "paths": [
+            "src/payment/**"
+          ]
+        },
+        {
+          "name": "invoices",
+          "paths": [
+            "billing/invoices/**"
+          ]
+        },
+        {
+          "name": "database",
+          "paths": [
+            "billing/db/**",
+            "migrations/**"
+          ]
+        }
+      ],
+      "path": "~/work/billing",
+      "worktrees": 2
+    },
+    {
+      "branch": "main",
+      "daemon": "build-01 (ssh)",
+      "id": "smart-inference",
+      "languages": [
+        "Go"
+      ],
+      "parts": [
+        {
+          "name": "router",
+          "paths": [
+            "router/**"
+          ]
+        },
+        {
+          "name": "cache",
+          "paths": [
+            "cache/**"
+          ]
+        },
+        {
+          "name": "metering",
+          "paths": [
+            "metering/**"
+          ]
+        }
+      ],
+      "path": "~/work/smart-inference",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "kronk",
+      "languages": [
+        "Rust"
+      ],
+      "parts": [
+        {
+          "name": "git",
+          "paths": [
+            "git/**"
+          ]
+        },
+        {
+          "name": "runner",
+          "paths": [
+            "runner/**"
+          ]
+        },
+        {
+          "name": "mcp",
+          "paths": [
+            "mcp/**"
+          ]
+        }
+      ],
+      "path": "~/work/kronk",
+      "worktrees": 2
+    },
+    {
+      "branch": "main",
+      "daemon": "runner-eu",
+      "id": "slaide",
+      "languages": [
+        "Python",
+        "TS"
+      ],
+      "parts": [
+        {
+          "name": "editor",
+          "paths": [
+            "editor/**"
+          ]
+        },
+        {
+          "name": "render",
+          "paths": [
+            "render/**"
+          ]
+        },
+        {
+          "name": "export",
+          "paths": [
+            "export/**"
+          ]
+        }
+      ],
+      "path": "~/work/slaide",
+      "worktrees": 3
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "aivory-hugo",
+      "languages": [
+        "Hugo"
+      ],
+      "parts": [
+        {
+          "name": "pages",
+          "paths": [
+            "pages/**"
+          ]
+        },
+        {
+          "name": "theme",
+          "paths": [
+            "theme/**"
+          ]
+        },
+        {
+          "name": "i18n",
+          "paths": [
+            "i18n/**"
+          ]
+        }
+      ],
+      "path": "~/work/aivory-hugo",
+      "worktrees": 1
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "mobile",
+      "languages": [
+        "Kotlin"
+      ],
+      "parts": [
+        {
+          "name": "ui",
+          "paths": [
+            "ui/**"
+          ]
+        },
+        {
+          "name": "sync",
+          "paths": [
+            "sync/**"
+          ]
+        },
+        {
+          "name": "push",
+          "paths": [
+            "push/**"
+          ]
+        }
+      ],
+      "path": "~/work/mobile",
+      "worktrees": 1
+    },
+    {
+      "branch": "main",
+      "daemon": "desktop",
+      "id": "docs",
+      "languages": [
+        "Markdown"
+      ],
+      "parts": [
+        {
+          "name": "guides",
+          "paths": [
+            "guides/**"
+          ]
+        },
+        {
+          "name": "api-ref",
+          "paths": [
+            "api-ref/**"
+          ]
+        }
+      ],
+      "path": "~/work/docs",
+      "worktrees": 0
+    },
+    {
+      "branch": "main",
+      "daemon": "runner-eu",
+      "id": "infra",
+      "languages": [
+        "YAML"
+      ],
+      "parts": [
+        {
+          "name": "k8s",
+          "paths": [
+            "k8s/**"
+          ]
+        },
+        {
+          "name": "ci",
+          "paths": [
+            "ci/**"
+          ]
+        }
+      ],
+      "path": "~/work/infra",
+      "worktrees": 0
+    }
+  ],
+  "cursor": 0,
+  "epoch": 0,
+  "hub": "connected",
+  "inboxOpen": 6,
+  "now": 1792593600000,
+  "queued": 3,
+  "relay": "connected",
+  "sessions": [
+    {
+      "ask": {
+        "id": "7f3a-ask-1",
+        "kind": "permission",
+        "options": [
+          "Allow",
+          "Always allow",
+          "Deny"
+        ],
+        "reason": "The retry table needs a new column. The migrator subagent wrote 0042_webhook_attempts.sql. I want to apply it to staging and then run the webhook tests.",
+        "risky": true,
+        "text": "sqlx migrate run --database-url $STAGING_DB"
+      },
+      "codebase": "billing",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 66,
+      "controlled": true,
+      "cost": 2.41,
+      "id": "7f3a",
+      "linesTotal": 22,
+      "model": "opus-5.5",
+      "part": "payment",
+      "prompt": "add retry with exponential backoff to the stripe webhook handler",
+      "provider": "claude",
+      "since": 1792593240000,
+      "state": "needsYou",
+      "subagents": [
+        {
+          "id": "7f3a-test-writer",
+          "name": "test-writer",
+          "state": "done",
+          "task": "write 4 cases for retry::backoff"
+        },
+        {
+          "id": "7f3a-migrator",
+          "name": "migrator",
+          "state": "done",
+          "task": "write a migration for webhook attempts"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · billing · session 7f3a"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"payment\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"payment\" maps to src/payment/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "83 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"src/payment/**\""
+        },
+        {
+          "kind": "output",
+          "text": "11 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "add retry with exponential backoff to the stripe webhook handler"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"payment\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "src/payment/webhook.rs"
+        },
+        {
+          "kind": "output",
+          "text": "211 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"payment\" src/payment"
+        },
+        {
+          "kind": "output",
+          "text": "3 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "src/payment/retry.rs"
+        },
+        {
+          "kind": "output",
+          "text": "79 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "src/payment/retry.rs"
+        },
+        {
+          "kind": "added",
+          "text": "let delay = BASE_MS * 2u64.pow(attempt).min(30_000);"
+        },
+        {
+          "kind": "removed",
+          "text": "thread::sleep(Duration::from_secs(1));"
+        },
+        {
+          "kind": "subagent",
+          "label": "test-writer",
+          "text": "4 cases for retry::backoff  ✓"
+        },
+        {
+          "kind": "subagent",
+          "label": "migrator",
+          "text": "wrote 0042_webhook_attempts.sql"
+        },
+        {
+          "kind": "agent",
+          "text": "The retry table needs a new column. I want to apply the migration to staging."
+        }
+      ],
+      "task": "t8",
+      "title": "Stripe webhook retries",
+      "tokens": 289200
+    },
+    {
+      "ask": {
+        "id": "c218-ask-1",
+        "kind": "plan",
+        "options": [
+          "Approve",
+          "Edit plan",
+          "Reject"
+        ],
+        "steps": [
+          "Measure tile rows and keep a row index",
+          "Lay out only the rows in the viewport, plus one",
+          "Cache shaped text per session line",
+          "Bench again. Target: under 4 ms"
+        ],
+        "text": "Virtualize the grid in 4 steps."
+      },
+      "codebase": "aivory-code",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "gpt-5.2-codex",
+        "provider": "codex"
+      },
+      "contextPct": 31,
+      "controlled": true,
+      "cost": 0.88,
+      "id": "c218",
+      "linesTotal": 20,
+      "model": "gpt-5.2-codex",
+      "part": "ui",
+      "prompt": "the session grid lags with 40 tiles. virtualize it",
+      "provider": "codex",
+      "since": 1792593420000,
+      "state": "needsYou",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "codex gpt-5.2-codex · aivory-code · session c218"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ui\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ui\" maps to crates/ui/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "83 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/ui/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "31 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "the session grid lags with 40 tiles. virtualize it"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ui\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ui/src/grid.rs"
+        },
+        {
+          "kind": "output",
+          "text": "131 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"ui\" crates/ui/src"
+        },
+        {
+          "kind": "output",
+          "text": "8 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ui/src/tile.rs"
+        },
+        {
+          "kind": "output",
+          "text": "159 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "cargo bench -p ui grid_render"
+        },
+        {
+          "kind": "output",
+          "text": "grid_render/40  time: [18.2 ms 18.6 ms 19.1 ms]"
+        },
+        {
+          "kind": "agent",
+          "text": "40 tiles cost 18 ms per frame. Most of it is text layout of hidden rows."
+        },
+        {
+          "kind": "agent",
+          "text": "The plan is ready."
+        }
+      ],
+      "task": "t9",
+      "title": "Virtualize the session grid",
+      "tokens": 105600
+    },
+    {
+      "ask": {
+        "id": "9b0e-ask-1",
+        "kind": "question",
+        "options": [
+          "Keep as fallback",
+          "Drop them"
+        ],
+        "text": "Keep the legacy regex rules as a fallback, or drop them in v2?"
+      },
+      "codebase": "aivory-guard",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "3-pro",
+        "provider": "gemini"
+      },
+      "contextPct": 64,
+      "controlled": true,
+      "cost": 0.52,
+      "id": "9b0e",
+      "linesTotal": 20,
+      "model": "3-pro",
+      "part": "rules",
+      "prompt": "port the OWASP top-10 rules to the v2 rule format",
+      "provider": "gemini",
+      "since": 1792593480000,
+      "state": "needsYou",
+      "subagents": [
+        {
+          "id": "9b0e-rule-tester",
+          "name": "rule-tester",
+          "state": "working",
+          "task": "run all 41 fixtures against the v2 rules"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-pro · aivory-guard · session 9b0e"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"rules\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"rules\" maps to rules/owasp/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "88 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"rules/owasp/**\""
+        },
+        {
+          "kind": "output",
+          "text": "36 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "port the OWASP top-10 rules to the v2 rule format"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"rules\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "rules/owasp/a03_injection.yaml"
+        },
+        {
+          "kind": "output",
+          "text": "316 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"rules\" rules/owasp"
+        },
+        {
+          "kind": "output",
+          "text": "4 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guard/rules/loader.py"
+        },
+        {
+          "kind": "output",
+          "text": "224 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "rules/v2/a03_injection.toml"
+        },
+        {
+          "kind": "added",
+          "text": "[[match]] pattern = \"cursor.execute(f-string)\""
+        },
+        {
+          "kind": "subagent",
+          "label": "rule-tester",
+          "text": "38 of 41 fixtures pass"
+        },
+        {
+          "kind": "agent",
+          "text": "Three fixtures only match with the legacy regex engine."
+        }
+      ],
+      "task": "t10",
+      "title": "OWASP rule pack v2",
+      "tokens": 62400
+    },
+    {
+      "codebase": "aivory-code",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 79,
+      "controlled": true,
+      "cost": 3.12,
+      "id": "a01c",
+      "linesTotal": 25,
+      "model": "opus-5.5",
+      "part": "orchestrator",
+      "prompt": "cap subagent fan-out per session and per codebase",
+      "provider": "claude",
+      "since": 1792592220000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "a01c-explorer",
+          "name": "explorer",
+          "state": "done",
+          "task": "map every spawn call site"
+        },
+        {
+          "id": "a01c-test-writer",
+          "name": "test-writer",
+          "state": "working",
+          "task": "write tests for budget::exceeds"
+        },
+        {
+          "id": "a01c-reviewer",
+          "name": "reviewer",
+          "state": "idle",
+          "task": "review the budget diff when it is ready"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · aivory-code · session a01c"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"orchestrator\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"orchestrator\" maps to crates/orch/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "66 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/orch/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "34 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "cap subagent fan-out per session and per codebase"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"orchestrator\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/orch/src/spawn.rs"
+        },
+        {
+          "kind": "output",
+          "text": "222 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"orchestrator\" crates/orch/src"
+        },
+        {
+          "kind": "output",
+          "text": "8 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/orch/src/budget.rs"
+        },
+        {
+          "kind": "output",
+          "text": "178 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "crates/orch/src/budget.rs"
+        },
+        {
+          "kind": "added",
+          "text": "pub max_children: u8,      // default 4"
+        },
+        {
+          "kind": "added",
+          "text": "pub max_per_codebase: u8, // default 12"
+        },
+        {
+          "kind": "subagent",
+          "label": "explorer",
+          "text": "mapped 14 spawn call sites"
+        },
+        {
+          "kind": "subagent",
+          "label": "test-writer",
+          "text": "writing budget::exceeds"
+        },
+        {
+          "kind": "subagent",
+          "label": "reviewer",
+          "text": "waits for the diff"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "cargo test -p orch budget"
+        },
+        {
+          "kind": "output",
+          "text": "test result: ok. 22 passed; 0 failed"
+        },
+        {
+          "kind": "agent",
+          "text": "Now I wire the budget into the spawn path."
+        }
+      ],
+      "task": "t4",
+      "title": "Subagent fan-out limits",
+      "tokens": 374400
+    },
+    {
+      "codebase": "aivory-code",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "sonnet-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 51,
+      "controlled": true,
+      "cost": 0.74,
+      "id": "a7e2",
+      "linesTotal": 21,
+      "model": "sonnet-5.5",
+      "part": "ledger",
+      "prompt": "compact ledger segments older than 7 days",
+      "provider": "claude",
+      "since": 1792593060000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · aivory-code · session a7e2"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ledger\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ledger\" maps to crates/ledger/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "98 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/ledger/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "16 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "compact ledger segments older than 7 days"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ledger\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ledger/src/segment.rs"
+        },
+        {
+          "kind": "output",
+          "text": "126 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"ledger\" crates/ledger/src"
+        },
+        {
+          "kind": "output",
+          "text": "5 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ledger/src/compact.rs"
+        },
+        {
+          "kind": "output",
+          "text": "154 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "crates/ledger/src/compact.rs"
+        },
+        {
+          "kind": "added",
+          "text": "fn merge(a: &Segment, b: &Segment) -> Segment {"
+        },
+        {
+          "kind": "added",
+          "text": "    let mut out = Segment::with_capacity(a.len() + b.len());"
+        },
+        {
+          "kind": "added",
+          "text": "    out.extend(a.newest_per_key(b));"
+        },
+        {
+          "kind": "agent",
+          "text": "Merge keeps the newest entry per key. Next: tombstones."
+        }
+      ],
+      "task": "t11",
+      "title": "Ledger compaction",
+      "tokens": 88800
+    },
+    {
+      "codebase": "aivory-code",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "goose-1.9",
+        "provider": "goose"
+      },
+      "contextPct": 79,
+      "controlled": true,
+      "cost": 0.4,
+      "id": "d3f0",
+      "linesTotal": 22,
+      "model": "goose-1.9",
+      "part": "sync",
+      "prompt": "merge concurrent edits of .aivory/map.toml from two agents",
+      "provider": "goose",
+      "since": 1792592880000,
+      "state": "idle",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "goose goose-1.9 · aivory-code · session d3f0"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"sync\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"sync\" maps to crates/sync/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "72 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/sync/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "30 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "merge concurrent edits of .aivory/map.toml from two agents"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"sync\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/sync/src/map_merge.rs"
+        },
+        {
+          "kind": "output",
+          "text": "364 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"sync\" crates/sync/src"
+        },
+        {
+          "kind": "output",
+          "text": "10 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": ".aivory/map.toml"
+        },
+        {
+          "kind": "output",
+          "text": "136 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "crates/sync/src/map_merge.rs"
+        },
+        {
+          "kind": "added",
+          "text": "parts.sort_by(|a, b| a.path.cmp(&b.path));"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "cargo test -p sync map_merge"
+        },
+        {
+          "kind": "output",
+          "text": "test result: ok. 9 passed; 0 failed"
+        },
+        {
+          "kind": "agent",
+          "text": "Done. The merge does not depend on the order now."
+        },
+        {
+          "kind": "meta",
+          "text": "— idle · waits for a next task —"
+        }
+      ],
+      "task": "t13",
+      "title": "CRDT merge for map.toml",
+      "tokens": 48000
+    },
+    {
+      "codebase": "aivory-guard",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 66,
+      "controlled": true,
+      "cost": 4.05,
+      "id": "5e81",
+      "linesTotal": 22,
+      "model": "opus-5.5",
+      "part": "scanner",
+      "prompt": "only rescan files whose hash changed since the last scan",
+      "provider": "claude",
+      "since": 1792591740000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "5e81-bench",
+          "name": "bench",
+          "state": "done",
+          "task": "compare a full scan with an incremental scan"
+        },
+        {
+          "id": "5e81-test-writer",
+          "name": "test-writer",
+          "state": "working",
+          "task": "cover cache invalidation on rename"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · aivory-guard · session 5e81"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"scanner\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"scanner\" maps to guard/scanner/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "67 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"guard/scanner/**\""
+        },
+        {
+          "kind": "output",
+          "text": "15 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "only rescan files whose hash changed since the last scan"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"scanner\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guard/scanner/walker.py"
+        },
+        {
+          "kind": "output",
+          "text": "379 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"scanner\" guard/scanner"
+        },
+        {
+          "kind": "output",
+          "text": "10 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guard/scanner/cache.py"
+        },
+        {
+          "kind": "output",
+          "text": "151 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "guard/scanner/cache.py"
+        },
+        {
+          "kind": "added",
+          "text": "if self.index.get(path) == digest:"
+        },
+        {
+          "kind": "added",
+          "text": "    return CachedResult(path)"
+        },
+        {
+          "kind": "subagent",
+          "label": "bench",
+          "text": "full scan 41.2s → incremental 3.8s"
+        },
+        {
+          "kind": "subagent",
+          "label": "test-writer",
+          "text": "cache invalidation on rename"
+        },
+        {
+          "kind": "agent",
+          "text": "Rename handling needs the inode. I add it to the index."
+        }
+      ],
+      "task": "t5",
+      "title": "Incremental scan cache",
+      "tokens": 486000
+    },
+    {
+      "codebase": "aivory-guard",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "sonnet-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 77,
+      "controlled": true,
+      "cost": 0.95,
+      "id": "6c40",
+      "linesTotal": 20,
+      "model": "sonnet-5.5",
+      "part": "rules",
+      "prompt": "cut the false positives in the secrets rules",
+      "provider": "claude",
+      "since": 1792592700000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "6c40-corpus-builder",
+          "name": "corpus-builder",
+          "state": "working",
+          "task": "collect negative samples for the secrets rules"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · aivory-guard · session 6c40"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"rules\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"rules\" maps to rules/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "84 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"rules/**\""
+        },
+        {
+          "kind": "output",
+          "text": "32 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "cut the false positives in the secrets rules"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"rules\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "rules/secrets.toml"
+        },
+        {
+          "kind": "output",
+          "text": "168 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"rules\" rules"
+        },
+        {
+          "kind": "output",
+          "text": "9 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guard/rules/entropy.py"
+        },
+        {
+          "kind": "output",
+          "text": "172 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "aivory-guard eval rules/secrets --corpus fp-2026"
+        },
+        {
+          "kind": "output",
+          "text": "false positives 212 → 37"
+        },
+        {
+          "kind": "subagent",
+          "label": "corpus-builder",
+          "text": "added 18 negative samples"
+        },
+        {
+          "kind": "agent",
+          "text": "An entropy threshold of 4.2 removes most of them."
+        }
+      ],
+      "title": "Secrets rule tuning",
+      "tokens": 114000
+    },
+    {
+      "codebase": "aivory-guard",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "3-flash",
+        "provider": "gemini"
+      },
+      "contextPct": 38,
+      "controlled": true,
+      "cost": 0.22,
+      "id": "6f19",
+      "linesTotal": 20,
+      "model": "3-flash",
+      "part": "dashboard",
+      "prompt": "show a heatmap of findings per directory",
+      "provider": "gemini",
+      "since": 1792593360000,
+      "state": "idle",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-flash · aivory-guard · session 6f19"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"dashboard\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"dashboard\" maps to web/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "60 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"web/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "8 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "show a heatmap of findings per directory"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"dashboard\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "web/src/Heatmap.tsx"
+        },
+        {
+          "kind": "output",
+          "text": "120 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"dashboard\" web/src"
+        },
+        {
+          "kind": "output",
+          "text": "3 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "web/src/api.ts"
+        },
+        {
+          "kind": "output",
+          "text": "60 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "web/src/Heatmap.tsx"
+        },
+        {
+          "kind": "added",
+          "text": "const cell = scale(count) // 0..4"
+        },
+        {
+          "kind": "agent",
+          "text": "The heatmap renders. The task is complete."
+        },
+        {
+          "kind": "meta",
+          "text": "— idle —"
+        }
+      ],
+      "title": "Findings heatmap",
+      "tokens": 26400
+    },
+    {
+      "codebase": "billing",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "3-pro",
+        "provider": "gemini"
+      },
+      "contextPct": 64,
+      "controlled": true,
+      "cost": 0.58,
+      "id": "8a22",
+      "linesTotal": 21,
+      "model": "3-pro",
+      "part": "invoices",
+      "prompt": "match the new invoice PDF layout from the design file",
+      "provider": "gemini",
+      "since": 1792592940000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-pro · billing · session 8a22"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"invoices\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"invoices\" maps to billing/invoices/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "76 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"billing/invoices/**\""
+        },
+        {
+          "kind": "output",
+          "text": "34 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "match the new invoice PDF layout from the design file"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"invoices\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "billing/invoices/pdf.ts"
+        },
+        {
+          "kind": "output",
+          "text": "232 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"invoices\" billing/invoices"
+        },
+        {
+          "kind": "output",
+          "text": "5 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "billing/invoices/template.hbs"
+        },
+        {
+          "kind": "output",
+          "text": "188 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "billing/invoices/template.hbs"
+        },
+        {
+          "kind": "added",
+          "text": "<td class=\"num\">fmt(total)</td>"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "npm run render:sample"
+        },
+        {
+          "kind": "output",
+          "text": "wrote out/invoice-sample.pdf (2 pages)"
+        },
+        {
+          "kind": "agent",
+          "text": "Page 2 breaks inside the table. I add a keep-together rule."
+        }
+      ],
+      "title": "Invoice PDF layout",
+      "tokens": 69600
+    },
+    {
+      "codebase": "billing",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "sonnet-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 40,
+      "controlled": true,
+      "cost": 0.33,
+      "id": "8d07",
+      "linesTotal": 21,
+      "model": "sonnet-5.5",
+      "part": "database",
+      "prompt": "speed up the invoice lookup by customer and month",
+      "provider": "claude",
+      "since": 1792593300000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · billing · session 8d07"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"database\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"database\" maps to billing/db/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "70 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"billing/db/**\""
+        },
+        {
+          "kind": "output",
+          "text": "8 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "speed up the invoice lookup by customer and month"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"database\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "billing/db/schema.sql"
+        },
+        {
+          "kind": "output",
+          "text": "370 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"database\" billing/db"
+        },
+        {
+          "kind": "output",
+          "text": "3 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "billing/db/queries.sql"
+        },
+        {
+          "kind": "output",
+          "text": "230 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "psql -c \"EXPLAIN ANALYZE select ...\""
+        },
+        {
+          "kind": "output",
+          "text": "Seq Scan on invoices  (actual time=412.8 ms)"
+        },
+        {
+          "kind": "added",
+          "text": "CREATE INDEX invoices_cust_month ON invoices (customer_id, month);"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "psql -c \"EXPLAIN ANALYZE select ...\""
+        },
+        {
+          "kind": "output",
+          "text": "Index Scan using invoices_cust_month  (actual time=0.9 ms)"
+        }
+      ],
+      "title": "Invoice lookup index",
+      "tokens": 39600
+    },
+    {
+      "ask": {
+        "id": "41dd-ask-1",
+        "kind": "error",
+        "options": [
+          "Start sentinel",
+          "Retry",
+          "Open log"
+        ],
+        "text": "Test infra is missing: no sentinel on :6380."
+      },
+      "codebase": "smart-inference",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "kimi-k2",
+        "provider": "opencode"
+      },
+      "contextPct": 62,
+      "controlled": true,
+      "cost": 0.31,
+      "id": "41dd",
+      "linesTotal": 22,
+      "model": "kimi-k2",
+      "part": "cache",
+      "prompt": "make the response cache survive a redis primary failover",
+      "provider": "opencode",
+      "since": 1792593540000,
+      "state": "error",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "opencode kimi-k2 · smart-inference · session 41dd"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"cache\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"cache\" maps to cache/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "70 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"cache/**\""
+        },
+        {
+          "kind": "output",
+          "text": "28 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "make the response cache survive a redis primary failover"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"cache\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "cache/redis_pool.go"
+        },
+        {
+          "kind": "output",
+          "text": "290 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"cache\" cache"
+        },
+        {
+          "kind": "output",
+          "text": "8 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "cache/failover_test.go"
+        },
+        {
+          "kind": "output",
+          "text": "110 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "cache/redis_pool.go"
+        },
+        {
+          "kind": "added",
+          "text": "opts.MaxRetries = 3"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "go test ./cache -run Failover"
+        },
+        {
+          "kind": "error",
+          "text": "--- FAIL: TestFailover (5.02s)"
+        },
+        {
+          "kind": "error",
+          "text": "    dial tcp 127.0.0.1:6380: connect: connection refused"
+        },
+        {
+          "kind": "agent",
+          "text": "The test needs a sentinel on :6380. It does not run."
+        }
+      ],
+      "title": "Redis failover",
+      "tokens": 37200
+    },
+    {
+      "codebase": "smart-inference",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 77,
+      "controlled": true,
+      "cost": 2.2,
+      "id": "90c4",
+      "linesTotal": 20,
+      "model": "opus-5.5",
+      "part": "router",
+      "prompt": "route by task class with a fallback chain per provider",
+      "provider": "claude",
+      "since": 1792592520000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "90c4-eval-runner",
+          "name": "eval-runner",
+          "state": "working",
+          "task": "run the 312 routing prompts"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · smart-inference · session 90c4"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"router\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"router\" maps to router/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "74 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"router/**\""
+        },
+        {
+          "kind": "output",
+          "text": "12 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "route by task class with a fallback chain per provider"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"router\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "router/table.go"
+        },
+        {
+          "kind": "output",
+          "text": "238 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"router\" router"
+        },
+        {
+          "kind": "output",
+          "text": "7 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "router/classify.go"
+        },
+        {
+          "kind": "output",
+          "text": "82 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "router/table.go"
+        },
+        {
+          "kind": "added",
+          "text": "{Class: \"refactor\", Chain: []string{\"opus\", \"gpt-5.2\", \"gemini-3\"}},"
+        },
+        {
+          "kind": "subagent",
+          "label": "eval-runner",
+          "text": "312 prompts, 94.1% routed as expected"
+        },
+        {
+          "kind": "agent",
+          "text": "Most misroutes are short questions. I add a length feature."
+        }
+      ],
+      "task": "t6",
+      "title": "Model routing table",
+      "tokens": 264000
+    },
+    {
+      "codebase": "smart-inference",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "gpt-5.2-codex",
+        "provider": "codex"
+      },
+      "contextPct": 62,
+      "controlled": true,
+      "cost": 0.47,
+      "id": "93e8",
+      "linesTotal": 20,
+      "model": "gpt-5.2-codex",
+      "part": "metering",
+      "prompt": "meter tokens per org and push them to billing every minute",
+      "provider": "codex",
+      "since": 1792593240000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "codex gpt-5.2-codex · smart-inference · session 93e8"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"metering\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"metering\" maps to metering/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "84 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"metering/**\""
+        },
+        {
+          "kind": "output",
+          "text": "12 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "meter tokens per org and push them to billing every minute"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"metering\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "metering/counter.go"
+        },
+        {
+          "kind": "output",
+          "text": "248 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"metering\" metering"
+        },
+        {
+          "kind": "output",
+          "text": "4 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "metering/push.go"
+        },
+        {
+          "kind": "output",
+          "text": "92 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "metering/push.go"
+        },
+        {
+          "kind": "added",
+          "text": "ticker := time.NewTicker(time.Minute)"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "go test ./metering"
+        },
+        {
+          "kind": "output",
+          "text": "ok  metering  0.84s"
+        }
+      ],
+      "title": "Token metering",
+      "tokens": 56400
+    },
+    {
+      "codebase": "kronk",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "sonnet-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 51,
+      "controlled": true,
+      "cost": 0.51,
+      "id": "k1b7",
+      "linesTotal": 20,
+      "model": "sonnet-5.5",
+      "part": "mcp",
+      "prompt": "long git ops over MCP time out. make the timeouts per tool",
+      "provider": "claude",
+      "since": 1792593120000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · kronk · session k1b7"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"mcp\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"mcp\" maps to kronk/mcp/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "80 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"kronk/mcp/**\""
+        },
+        {
+          "kind": "output",
+          "text": "8 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "long git ops over MCP time out. make the timeouts per tool"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"mcp\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "kronk/mcp/server.rs"
+        },
+        {
+          "kind": "output",
+          "text": "380 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"mcp\" kronk/mcp"
+        },
+        {
+          "kind": "output",
+          "text": "9 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "kronk/mcp/tools.rs"
+        },
+        {
+          "kind": "output",
+          "text": "240 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "kronk/mcp/tools.rs"
+        },
+        {
+          "kind": "added",
+          "text": "\"git.clone\" => Duration::from_secs(120),"
+        },
+        {
+          "kind": "added",
+          "text": "_ => Duration::from_secs(30),"
+        },
+        {
+          "kind": "agent",
+          "text": "Clone gets 120 s. All other tools keep 30 s."
+        }
+      ],
+      "title": "MCP tool timeouts",
+      "tokens": 61200
+    },
+    {
+      "codebase": "kronk",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 66,
+      "controlled": true,
+      "cost": 2.88,
+      "id": "k4c2",
+      "linesTotal": 21,
+      "model": "opus-5.5",
+      "part": "runner",
+      "prompt": "add a seccomp profile to the runner sandbox",
+      "provider": "claude",
+      "since": 1792592040000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "k4c2-fuzzer",
+          "name": "fuzzer",
+          "state": "working",
+          "task": "fuzz the sandbox with 2,000 syscalls"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · kronk · session k4c2"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"runner\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"runner\" maps to kronk/runner/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "73 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"kronk/runner/**\""
+        },
+        {
+          "kind": "output",
+          "text": "21 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "add a seccomp profile to the runner sandbox"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"runner\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "kronk/runner/sandbox.rs"
+        },
+        {
+          "kind": "output",
+          "text": "321 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"runner\" kronk/runner"
+        },
+        {
+          "kind": "output",
+          "text": "7 matches in 3 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "kronk/runner/seccomp.json"
+        },
+        {
+          "kind": "output",
+          "text": "229 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "kronk/runner/seccomp.json"
+        },
+        {
+          "kind": "added",
+          "text": "{ \"names\": [\"ptrace\", \"mount\"], \"action\": \"SCMP_ACT_ERRNO\" }"
+        },
+        {
+          "kind": "subagent",
+          "label": "fuzzer",
+          "text": "2,000 syscalls, 0 escapes"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "cargo test -p runner sandbox"
+        },
+        {
+          "kind": "output",
+          "text": "test result: ok. 17 passed; 0 failed"
+        }
+      ],
+      "task": "t12",
+      "title": "Runner sandbox seccomp",
+      "tokens": 345600
+    },
+    {
+      "codebase": "slaide",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "opus-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 51,
+      "controlled": true,
+      "cost": 1.66,
+      "id": "s3d1",
+      "linesTotal": 21,
+      "model": "opus-5.5",
+      "part": "render",
+      "prompt": "export charts as native pptx charts, not as images",
+      "provider": "claude",
+      "since": 1792592760000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "s3d1-fixture-maker",
+          "name": "fixture-maker",
+          "state": "done",
+          "task": "make bar, line and pie test decks"
+        },
+        {
+          "id": "s3d1-validator",
+          "name": "validator",
+          "state": "working",
+          "task": "open each deck in LibreOffice"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · slaide · session s3d1"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"render\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"render\" maps to slaide/export/pptx/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "64 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"slaide/export/pptx/**\""
+        },
+        {
+          "kind": "output",
+          "text": "12 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "export charts as native pptx charts, not as images"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"render\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "slaide/export/pptx/chart.py"
+        },
+        {
+          "kind": "output",
+          "text": "268 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"render\" slaide/export/pptx"
+        },
+        {
+          "kind": "output",
+          "text": "7 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "slaide/export/pptx/xml.py"
+        },
+        {
+          "kind": "output",
+          "text": "112 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "slaide/export/pptx/chart.py"
+        },
+        {
+          "kind": "added",
+          "text": "ser = c_ser(idx=i, tx=name, val=num_ref(sheet, col))"
+        },
+        {
+          "kind": "subagent",
+          "label": "fixture-maker",
+          "text": "bar, line and pie decks"
+        },
+        {
+          "kind": "subagent",
+          "label": "validator",
+          "text": "opens the decks in LibreOffice"
+        },
+        {
+          "kind": "agent",
+          "text": "Bar and line export as native charts. Pie is next."
+        }
+      ],
+      "task": "t7",
+      "title": "PPTX chart export",
+      "tokens": 199200
+    },
+    {
+      "codebase": "slaide",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "kimi-k2",
+        "provider": "opencode"
+      },
+      "contextPct": 60,
+      "controlled": true,
+      "cost": 0.29,
+      "id": "s7a0",
+      "linesTotal": 16,
+      "model": "kimi-k2",
+      "part": "editor",
+      "prompt": "group text edits into one undo step per word",
+      "provider": "opencode",
+      "since": 1792592520000,
+      "state": "idle",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "opencode kimi-k2 · slaide · session s7a0"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"editor\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"editor\" maps to web/editor/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "96 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"web/editor/**\""
+        },
+        {
+          "kind": "output",
+          "text": "14 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "group text edits into one undo step per word"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"editor\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "web/editor/history.ts"
+        },
+        {
+          "kind": "output",
+          "text": "332 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "web/editor/history.ts"
+        },
+        {
+          "kind": "added",
+          "text": "if (isWordBoundary(prev, next)) this.commit()"
+        },
+        {
+          "kind": "agent",
+          "text": "Undo groups by word now. The task is complete."
+        },
+        {
+          "kind": "meta",
+          "text": "— idle —"
+        }
+      ],
+      "title": "Undo stack",
+      "tokens": 34800
+    },
+    {
+      "codebase": "slaide",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "gpt-5.2",
+        "provider": "codex"
+      },
+      "contextPct": 55,
+      "controlled": true,
+      "cost": 0.34,
+      "id": "s9e2",
+      "linesTotal": 20,
+      "model": "gpt-5.2",
+      "part": "export",
+      "prompt": "embed the deck fonts in the pdf export",
+      "provider": "codex",
+      "since": 1792593180000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "codex gpt-5.2 · slaide · session s9e2"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"export\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"export\" maps to slaide/export/pdf/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "91 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"slaide/export/pdf/**\""
+        },
+        {
+          "kind": "output",
+          "text": "19 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "embed the deck fonts in the pdf export"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"export\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "slaide/export/pdf/fonts.py"
+        },
+        {
+          "kind": "output",
+          "text": "227 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"export\" slaide/export/pdf"
+        },
+        {
+          "kind": "output",
+          "text": "11 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "slaide/export/pdf/writer.py"
+        },
+        {
+          "kind": "output",
+          "text": "183 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "slaide/export/pdf/fonts.py"
+        },
+        {
+          "kind": "added",
+          "text": "subset = font.subset(used_glyphs(deck))"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "pytest tests/export -k fonts"
+        },
+        {
+          "kind": "output",
+          "text": "5 passed in 2.10s"
+        }
+      ],
+      "title": "Embed fonts in PDF export",
+      "tokens": 40800
+    },
+    {
+      "codebase": "aivory-hugo",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "3-flash",
+        "provider": "gemini"
+      },
+      "contextPct": 77,
+      "controlled": true,
+      "cost": 0.37,
+      "id": "h8f3",
+      "linesTotal": 20,
+      "model": "3-flash",
+      "part": "i18n",
+      "prompt": "translate the new docs pages to german",
+      "provider": "gemini",
+      "since": 1792592820000,
+      "state": "working",
+      "subagents": [
+        {
+          "id": "h8f3-glossary-check",
+          "name": "glossary-check",
+          "state": "working",
+          "task": "compare the new terms with the glossary"
+        }
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-flash · aivory-hugo · session h8f3"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"i18n\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"i18n\" maps to i18n/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "99 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"i18n/**\""
+        },
+        {
+          "kind": "output",
+          "text": "27 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "translate the new docs pages to german"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"i18n\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "i18n/de.toml"
+        },
+        {
+          "kind": "output",
+          "text": "243 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"i18n\" i18n"
+        },
+        {
+          "kind": "output",
+          "text": "10 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "content/de/docs/war-room.md"
+        },
+        {
+          "kind": "output",
+          "text": "87 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "content/de/docs/war-room.md"
+        },
+        {
+          "kind": "added",
+          "text": "title = \"Kommandozentrale\""
+        },
+        {
+          "kind": "subagent",
+          "label": "glossary-check",
+          "text": "4 terms differ from the glossary"
+        },
+        {
+          "kind": "agent",
+          "text": "I align the 4 terms with the glossary."
+        }
+      ],
+      "title": "German translations",
+      "tokens": 44400
+    },
+    {
+      "codebase": "mobile",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "sonnet-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 40,
+      "controlled": true,
+      "cost": 0.62,
+      "id": "m6b4",
+      "linesTotal": 20,
+      "model": "sonnet-5.5",
+      "part": "sync",
+      "prompt": "queue answers offline and send them on reconnect",
+      "provider": "claude",
+      "since": 1792593060000,
+      "state": "working",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · mobile · session m6b4"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"sync\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"sync\" maps to app/sync/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "63 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"app/sync/**\""
+        },
+        {
+          "kind": "output",
+          "text": "31 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "queue answers offline and send them on reconnect"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"sync\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "app/sync/Queue.kt"
+        },
+        {
+          "kind": "output",
+          "text": "391 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"sync\" app/sync"
+        },
+        {
+          "kind": "output",
+          "text": "5 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "app/sync/Net.kt"
+        },
+        {
+          "kind": "output",
+          "text": "139 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "app/sync/Queue.kt"
+        },
+        {
+          "kind": "added",
+          "text": "suspend fun flush() = pending.forEach { send(it) }"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "./gradlew testDebug --tests \"*Queue*\""
+        },
+        {
+          "kind": "output",
+          "text": "BUILD SUCCESSFUL in 38s"
+        }
+      ],
+      "title": "Offline answer queue",
+      "tokens": 74400
+    },
+    {
+      "codebase": "docs",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "3-flash",
+        "provider": "gemini"
+      },
+      "contextPct": 62,
+      "controlled": true,
+      "cost": 0.21,
+      "id": "o2c4",
+      "linesTotal": 20,
+      "model": "3-flash",
+      "part": "guides",
+      "prompt": "write the getting started guide for the war room",
+      "provider": "gemini",
+      "since": 1792591800000,
+      "state": "parked",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-flash · docs · session o2c4"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"guides\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"guides\" maps to guides/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "71 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"guides/**\""
+        },
+        {
+          "kind": "output",
+          "text": "9 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "write the getting started guide for the war room"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"guides\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guides/start.md"
+        },
+        {
+          "kind": "output",
+          "text": "127 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"guides\" guides"
+        },
+        {
+          "kind": "output",
+          "text": "4 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guides/war-room.md"
+        },
+        {
+          "kind": "output",
+          "text": "243 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "guides/war-room.md"
+        },
+        {
+          "kind": "added",
+          "text": "## Answer an agent"
+        },
+        {
+          "kind": "added",
+          "text": "Hover a pane. The input folds up from the bottom."
+        },
+        {
+          "kind": "agent",
+          "text": "Next: one screenshot for each step."
+        }
+      ],
+      "title": "War room guide",
+      "tokens": 25200
+    },
+    {
+      "codebase": "infra",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "haiku-5.5",
+        "provider": "claude"
+      },
+      "contextPct": 42,
+      "controlled": true,
+      "cost": 0.18,
+      "id": "i0a8",
+      "linesTotal": 12,
+      "model": "haiku-5.5",
+      "part": "ci",
+      "prompt": "cache cargo builds in ci",
+      "provider": "claude",
+      "since": 1792591200000,
+      "state": "done",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude haiku-5.5 · infra · session i0a8"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ci\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ci\" maps to .github/workflows/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "99 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\".github/workflows/**\""
+        },
+        {
+          "kind": "output",
+          "text": "17 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "cache cargo builds in ci"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ci\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": ".github/workflows/ci.yml"
+        },
+        {
+          "kind": "output",
+          "text": "163 lines"
+        }
+      ],
+      "task": "t14",
+      "title": "Cache cargo builds in CI",
+      "tokens": 21600
+    },
+    {
+      "codebase": "infra",
+      "composer": {
+        "effort": "high",
+        "mode": "edit",
+        "model": "gpt-5.2-codex",
+        "provider": "codex"
+      },
+      "contextPct": 38,
+      "controlled": true,
+      "cost": 0.35,
+      "id": "i3f2",
+      "linesTotal": 12,
+      "model": "gpt-5.2-codex",
+      "part": "k8s",
+      "prompt": "resize the node pool",
+      "provider": "codex",
+      "since": 1792590300000,
+      "state": "parked",
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "codex gpt-5.2-codex · infra · session i3f2"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"k8s\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"k8s\" maps to k8s/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "74 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"k8s/**\""
+        },
+        {
+          "kind": "output",
+          "text": "32 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "resize the node pool"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"k8s\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "k8s/pool.yaml"
+        },
+        {
+          "kind": "output",
+          "text": "158 lines"
+        }
+      ],
+      "title": "Node pool resize",
+      "tokens": 42000
+    }
+  ],
+  "usage": [
+    {
+      "label": "5 h window",
+      "pct": 62,
+      "provider": "claude",
+      "resetsAt": 1792601520000,
+      "used": 1860000
+    },
+    {
+      "label": "Week",
+      "pct": 41,
+      "provider": "claude",
+      "resetsAt": 1792877400000,
+      "used": 12300000
+    },
+    {
+      "label": "5 h window",
+      "pct": 31,
+      "provider": "codex",
+      "resetsAt": 1792596420000,
+      "used": 620000
+    },
+    {
+      "label": "Week",
+      "pct": 22,
+      "provider": "codex",
+      "resetsAt": 1793030100000,
+      "used": 4400000
+    },
+    {
+      "label": "Daily quota",
+      "pct": 18,
+      "provider": "gemini",
+      "resetsAt": 1792627200000
+    },
+    {
+      "label": "Monthly budget $60",
+      "pct": 30,
+      "provider": "gemini",
+      "resetsAt": 1794148800000
+    }
+  ]
+}

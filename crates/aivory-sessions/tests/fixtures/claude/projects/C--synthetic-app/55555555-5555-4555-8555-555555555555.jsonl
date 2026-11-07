@@ -1,0 +1,5 @@
+{"type":"user","cwd":"C:\\synthetic\\app\\sub","gitBranch":"main","isSidechain":false,"sessionId":"55555555-5555-4555-8555-555555555555","timestamp":"2026-01-03T10:00:00.000Z","version":"2.0.0-test","message":{"role":"user","content":[{"type":"text","text":"Synthetic prompt without any title record"}]}}
+{"type":"assistant","sessionId":"55555555-5555-4555-8555-555555555555","timestamp":"2026-01-03T10:00:01.000Z","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"x"}]}}
+{"type":"future-record-type","unknown":{"nested":true},"sessionId":"55555555-5555-4555-8555-555555555555"}
+not json at all
+{"type":"custom-title","customTitle":"Synthetic custom title","sessionId":"55555555-5555-4555-8555-555555555555"}

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile · Focus</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+.phn *{box-sizing:border-box}
+:where(.phn) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phn{width:390px;height:844px;position:relative;overflow:hidden;background:#F6F7F9;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;color:#1A1A2E;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.rbw{flex:none;height:3px;background:linear-gradient(90deg,#F59E0B 0%,#F97316 15%,#EF4444 30%,#7C3AED 50%,#6B8AFF 65%,#51B5BF 80%,#059669 100%)}
+.top{flex:none;display:flex;align-items:flex-end;gap:12px;padding:28px 20px 14px}
+.top h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.sub{font-size:13px;color:#5A6578;margin-top:6px}
+.vb{width:44px;height:44px;border-radius:999px;background:#1A1A2E;color:#FFFFFF!important;display:grid;place-items:center;flex:none;text-decoration:none;box-shadow:0 6px 16px rgba(13,13,14,.2)}
+.conn{margin-left:auto;display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:#FFFFFF;font-family:'JetBrains Mono',monospace;font-size:11px;color:#4A5568;box-shadow:0 1px 2px rgba(13,13,14,.06)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:#1A1A2E;flex:none}
+.dot.q{background:#F97316}.dot.e{background:#DC2626}.dot.r{background:#16A34A}.dot.ok{background:#16A34A}
+.scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:2px 16px 96px;display:flex;flex-direction:column;gap:12px}
+.scroll::-webkit-scrollbar{display:none}
+.hint{font-size:12px;color:#5A6578;padding:0 4px;display:flex;justify-content:space-between}
+.card{background:#FFFFFF;border-radius:16px;box-shadow:0 1px 2px rgba(13,13,14,.04),0 8px 24px rgba(13,13,14,.06);padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.scroll > *{flex-shrink:0}
+.c1{display:flex;align-items:center;gap:8px}
+.kd{padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600}
+.kd.q{background:#FFF1E6;color:#C2410C}.kd.e{background:#FDECEC;color:#B91C1C}.kd.r{background:#EAF7EE;color:#15803D}
+.age{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A6578}
+.ct{font-size:16px;font-weight:600;line-height:1.3}
+.cw{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5A6578;margin-top:-6px}
+.term{background:#F6F7F9;border-radius:10px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;color:#1A1A2E;white-space:pre-wrap;word-break:break-word}
+.term .d{color:#5A6578}.term .p{color:#15803D}.term .m{color:#B91C1C}.term .s{color:#6D28D9}
+.ask{font-size:14px;line-height:1.45;font-weight:500}
+.ask.cmd{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;background:#FFFBF4;border:1px solid #F1D9B5;border-radius:10px;padding:9px 11px}
+.acts{display:flex;gap:8px}
+.btn{flex:1;height:44px;border-radius:12px;border:1px solid #C9CCD6!important;background:#FFFFFF!important;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:#1A1A2E!important}
+.btn.pri{background:#3574F0!important;border-color:#3574F0!important;color:#FFFFFF!important}
+.btn.sm{flex:none;width:44px}
+.done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:#EAF7EE;color:#15803D;font-size:13.5px;font-weight:500}
+.done button{margin-left:auto;font-size:13px;color:#15803D!important;text-decoration:underline}
+.fab{position:absolute;right:18px;bottom:96px;width:60px;height:60px;border-radius:999px;background:#1A1A2E;color:#FFFFFF!important;display:grid;place-items:center;box-shadow:0 10px 24px rgba(13,13,14,.25);text-decoration:none}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:80px;padding:8px 6px 22px;background:#FFFFFF;border-top:1px solid rgba(13,13,14,.08);display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.tb{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;color:#5A6578!important;text-decoration:none;min-height:48px}
+.tb.on{color:#1A1A2E!important;font-weight:600}
+.tb .bd{position:absolute;top:2px;left:calc(50% + 4px);min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#F97316;color:#FFFFFF;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+</style>
+</helmet>
+<div class="phn">
+<div class="rbw" aria-hidden="true"></div>
+<div class="top">
+<div><h1>Focus</h1><div class="sub">{{openCount}} need you · 14 working · 3 idle</div></div>
+<span class="conn"><i class="dot ok"></i>3 daemons</span>
+<a class="vb" href="Voice.dc.html" aria-label="New task by voice"><svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.75" y="1.5" width="4.5" height="8" rx="2.25"></rect><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"></path></svg></a>
+</div>
+
+<div class="scroll">
+<div class="hint"><span>Swipe right to answer · left to snooze</span><span class="mono">oldest 6 min</span></div>
+<sc-for list="{{cards}}" as="c" hint-placeholder-count="4">
+<sc-if value="{{c.isDone}}" hint-placeholder-val="{{false}}"><div class="done"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg>{{c.doneText}}<button onClick="{{c.undo}}">Undo</button></div></sc-if>
+<sc-if value="{{c.isOpen}}" hint-placeholder-val="{{true}}">
+<article class="card {{c.kc}}">
+<div class="c1"><span class="kd {{c.kc}}">{{c.kl}}</span><span class="mono" style="font-size: 11.5px; color: #4A5568">{{c.ag}}</span><span class="age">{{c.age}}</span></div>
+<div class="ct">{{c.t}}</div>
+<div class="cw">{{c.where}}</div>
+<div class="term"><sc-for list="{{c.lines}}" as="l"><div class="{{l.c}}">{{l.t}}</div></sc-for></div>
+<div class="ask {{c.askCls}}">{{c.ask}}</div>
+<div class="acts">
+<a class="btn sm" href="Stream.dc.html" aria-label="Open the session"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 3h4v4M13 3L7.5 8.5M12 10v3H3V4h3"></path></svg></a>
+<sc-for list="{{c.opts}}" as="o"><button class="btn {{o.cls}}" onClick="{{o.pick}}">{{o.t}}</button></sc-for>
+<sc-if value="{{c.hasLink}}" hint-placeholder-val="{{false}}"><a class="btn pri" href="{{c.href}}">{{c.linkText}}</a></sc-if>
+</div>
+</article>
+</sc-if>
+</sc-for>
+</div>
+
+
+<nav class="tabbar" aria-label="Tabs">
+<a class="tb on" href="Focus.dc.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.5"></circle><circle cx="8" cy="8" r="2"></circle></svg>Focus<sc-if value="{{hasOpen}}" hint-placeholder-val="{{true}}"><span class="bd">{{openCount}}</span></sc-if></a>
+<a class="tb" href="Sessions.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>Sessions</a>
+<button class="tb"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"></path></svg>Tasks</button>
+<a class="tb" href="Diff.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4"></path></svg>Code</a>
+<a class="tb" href="Me.dc.html"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8"></circle><path d="M2.5 14c.8-2.6 3-4 5.5-4s4.7 1.4 5.5 4"></path></svg>Me</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+const CARDS = [
+  { id: '7f3a', k: 'q', kl: 'Permission', t: 'Stripe webhook retries', where: 'billing / payment', ag: 'claude · opus', age: '6 min', lines: [['s', '↳ migrator  wrote 0042_webhook_attempts.sql'], ['', 'The retry table needs a new column.'], ['', 'I want to apply the migration to staging.']], ask: 'sqlx migrate run --database-url $STAGING_DB', askCls: 'cmd', link: ['Approval.dc.html', 'Review'], opts: [['Deny', 'denied']] },
+  { id: 'c218', k: 'q', kl: 'Plan', t: 'Virtualize the session grid', where: 'aivory-code / ui', ag: 'codex · gpt-5.2', age: '3 min', lines: [['d', 'grid_render/40  18.6 ms'], ['', '1. Keep a row index'], ['', '2. Lay out only visible rows'], ['', '3. Cache shaped text · 4. Bench < 4 ms']], ask: 'Approve the 4-step plan?', askCls: '', opts: [['Edit', 'edit'], ['Approve', 'approved']] },
+  { id: '9b0e', k: 'q', kl: 'Question', t: 'OWASP rule pack v2', where: 'aivory-guard / rules', ag: 'gemini · 3-pro', age: '2 min', lines: [['s', '↳ rule-tester  38 of 41 fixtures pass'], ['', 'Three fixtures only match with the'], ['', 'legacy regex engine.']], ask: 'Keep the legacy regex rules as a fallback, or drop them in v2?', askCls: '', opts: [['Drop them', 'answered'], ['Keep', 'answered']] },
+  { id: '41dd', k: 'e', kl: 'Error', t: 'Redis failover', where: 'smart-inference / cache', ag: 'opencode · kimi-k2', age: '1 min', lines: [['m', '--- FAIL: TestFailover (5.02s)'], ['m', 'dial tcp 127.0.0.1:6380: refused'], ['', 'The test needs a sentinel on :6380.']], ask: 'Test infra is missing: no sentinel on :6380.', askCls: '', opts: [['Retry', 'retried'], ['Start sentinel', 'fixed']] },
+  { id: 'a7e2', k: 'r', kl: 'Review', t: 'Ledger compaction', where: 'aivory-code / ledger', ag: 'claude · sonnet', age: '12 min', lines: [['p', '+142  −38  in 3 files'], ['d', 'tests 31/31 ✓   Guard ✓'], ['', 'Tombstones older than 7 days drop on merge.']], ask: 'Ready for your review.', askCls: '', link: ['Diff.dc.html', 'Review the diff'], opts: [] }
+];
+
+class Component extends DCLogic {
+  state = { done: {} };
+
+  renderVals() {
+    const st = this.state;
+    const open = CARDS.filter(c => !st.done[c.id]);
+    return {
+      openCount: open.length, hasOpen: open.length > 0,
+      cards: CARDS.map(c => {
+        const d = st.done[c.id];
+        return {
+          isDone: !!d, isOpen: !d, doneText: c.t + ' · ' + (d || ''), undo: () => { const n = { ...this.state.done }; delete n[c.id]; this.setState({ done: n }); },
+          kc: c.k, kl: c.kl, t: c.t, where: c.where, ag: c.ag, age: c.age, ask: c.ask, askCls: c.askCls,
+          lines: c.lines.map(([cl, t]) => ({ c: cl, t })),
+          opts: c.opts.map(([t, res], i) => ({ t, cls: !c.link && i === c.opts.length - 1 ? 'pri' : '', pick: () => this.setState({ done: { ...this.state.done, [c.id]: res } }) })),
+          hasLink: !!c.link, href: c.link ? c.link[0] : '', linkText: c.link ? c.link[1] : ''
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

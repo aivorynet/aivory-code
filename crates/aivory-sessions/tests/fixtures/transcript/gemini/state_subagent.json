@@ -1,0 +1,32 @@
+{
+ "sessionId": "gem-s",
+ "projectHash": "h",
+ "startTime": "2026-03-01T10:00:00.000Z",
+ "lastUpdated": "2026-03-01T10:00:09.000Z",
+ "messages": [
+  {
+   "id": "u1",
+   "timestamp": "2026-03-01T10:00:01.000Z",
+   "type": "user",
+   "content": "Do it"
+  },
+  {
+   "id": "g1",
+   "timestamp": "2026-03-01T10:00:02.000Z",
+   "type": "gemini",
+   "content": "",
+   "model": "gemini-test-1",
+   "toolCalls": [
+    {
+     "id": "p1",
+     "name": "codebase_investigator",
+     "args": {
+      "objective": "Map the code"
+     },
+     "status": "executing",
+     "timestamp": "2026-03-01T10:00:00.000Z"
+    }
+   ]
+  }
+ ]
+}

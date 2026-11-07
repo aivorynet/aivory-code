@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "catalog": 1,
+  "description": "Generated from crates/aivory-protocol; do not edit.",
+  "layout": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "A layout file: a component tree below `root`. The tree has a fixed grammar that the\nvalidator checks (ADR 0024 section 3), so the schema keeps `root` open.",
+    "properties": {
+      "$schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "root": true
+    },
+    "required": [
+      "root"
+    ],
+    "title": "AIVory theme layout (layouts/*/*.json)",
+    "type": "object"
+  },
+  "manifest": {
+    "$defs": {
+      "Author": {
+        "additionalProperties": false,
+        "description": "The author of a theme.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "DisplayClass": {
+        "description": "A display class of a layout set.",
+        "enum": [
+          "desktop",
+          "phone",
+          "fold",
+          "watch"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`theme.toml`.",
+    "properties": {
+      "author": {
+        "$ref": "#/$defs/Author"
+      },
+      "catalog": {
+        "description": "The component catalog version that the theme needs.",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "description": {
+        "default": "",
+        "type": "string"
+      },
+      "displays": {
+        "description": "`desktop` is required.",
+        "items": {
+          "$ref": "#/$defs/DisplayClass"
+        },
+        "type": "array"
+      },
+      "id": {
+        "description": "Lowercase `[a-z0-9-]`, 3 to 40 characters.",
+        "type": "string"
+      },
+      "license": {
+        "description": "An SPDX expression for the theme files.",
+        "type": "string"
+      },
+      "min_app": {
+        "description": "The lowest app version (SemVer).",
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "tokens": {
+        "default": [
+          "tokens.toml"
+        ],
+        "description": "The token files in order; a later file overrides keys of an earlier file.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "version": {
+        "description": "SemVer, equal to the Git tag without the `v`.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "version",
+      "author",
+      "license",
+      "min_app",
+      "catalog",
+      "displays"
+    ],
+    "title": "AIVory theme manifest (theme.toml)",
+    "type": "object"
+  },
+  "title": "AIVory theme package",
+  "tokens": {
+    "$defs": {
+      "Colors": {
+        "additionalProperties": false,
+        "description": "Colors as `#rrggbb` or `#rrggbbaa`.",
+        "properties": {
+          "accent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "analysis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "muted": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StateColors"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "surface": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "Effects": {
+        "additionalProperties": false,
+        "description": "Effect strengths, each with a fixed range (see the validator).",
+        "properties": {
+          "blur": {
+            "description": "0 to 40 px.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "glass_alpha": {
+            "description": "0 to 1.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "glow": {
+            "description": "0 to 1.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "scanlines": {
+            "description": "0 to 1.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "Fonts": {
+        "additionalProperties": false,
+        "description": "A family is a bundled font file (`assets/fonts/...`) or `sans`, `serif`, `mono`.",
+        "properties": {
+          "mono": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ui": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "Motion": {
+        "additionalProperties": false,
+        "description": "Durations in ms and an easing name.",
+        "properties": {
+          "durations": {
+            "additionalProperties": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "default": {},
+            "type": "object"
+          },
+          "easing": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "StateColors": {
+        "additionalProperties": false,
+        "description": "One color for each session state.",
+        "properties": {
+          "done": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "needsYou": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parked": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "working": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "TypeSizes": {
+        "additionalProperties": false,
+        "description": "The five text sizes in px.",
+        "properties": {
+          "lg": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "md": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sm": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "xl": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "xs": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "`tokens.toml`. The table `type` holds the text sizes.",
+    "properties": {
+      "colors": {
+        "$ref": "#/$defs/Colors",
+        "default": {
+          "accent": null,
+          "analysis": null,
+          "bg": null,
+          "muted": null,
+          "state": null,
+          "surface": null,
+          "text": null
+        }
+      },
+      "effects": {
+        "$ref": "#/$defs/Effects",
+        "default": {
+          "blur": null,
+          "glass_alpha": null,
+          "glow": null,
+          "scanlines": null
+        }
+      },
+      "fonts": {
+        "$ref": "#/$defs/Fonts",
+        "default": {
+          "mono": null,
+          "ui": null
+        }
+      },
+      "motion": {
+        "$ref": "#/$defs/Motion",
+        "default": {
+          "durations": {},
+          "easing": null
+        }
+      },
+      "radii": {
+        "additionalProperties": {
+          "format": "double",
+          "type": "number"
+        },
+        "default": {},
+        "type": "object"
+      },
+      "space": {
+        "additionalProperties": {
+          "format": "double",
+          "type": "number"
+        },
+        "default": {},
+        "type": "object"
+      },
+      "type": {
+        "$ref": "#/$defs/TypeSizes",
+        "default": {
+          "lg": null,
+          "md": null,
+          "sm": null,
+          "xl": null,
+          "xs": null
+        }
+      }
+    },
+    "title": "AIVory theme tokens (tokens.toml)",
+    "type": "object"
+  }
+}

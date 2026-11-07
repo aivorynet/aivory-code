@@ -1,0 +1,200 @@
+{
+  "files": [
+    {
+      "added": 38,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -1,12 +1,46 @@"
+        },
+        {
+          "kind": "context",
+          "new": 1,
+          "old": 1,
+          "text": "use crate::session::Codebase;"
+        },
+        {
+          "kind": "added",
+          "new": 2,
+          "text": "use std::collections::HashMap;"
+        },
+        {
+          "kind": "context",
+          "new": 3,
+          "old": 2,
+          "text": ""
+        },
+        {
+          "kind": "added",
+          "new": 4,
+          "text": "pub struct Budget {"
+        },
+        {
+          "kind": "added",
+          "new": 5,
+          "text": "    pub max_children: u8,      // default 4"
+        },
+        {
+          "kind": "added",
+          "new": 6,
+          "text": "    pub max_per_codebase: u8, // default 12"
+        },
+        {
+          "kind": "added",
+          "new": 7,
+          "text": "    running: HashMap<Codebase, u8>,"
+        },
+        {
+          "kind": "added",
+          "new": 8,
+          "text": "}"
+        },
+        {
+          "kind": "context",
+          "new": 9,
+          "old": 3,
+          "text": ""
+        },
+        {
+          "kind": "removed",
+          "old": 4,
+          "text": "pub fn budget_ok() -> bool { true }"
+        },
+        {
+          "kind": "added",
+          "new": 10,
+          "text": "impl Budget {"
+        },
+        {
+          "kind": "added",
+          "new": 11,
+          "text": "    pub fn check(&self, cb: &Codebase) -> Result<(), BudgetError> {"
+        },
+        {
+          "kind": "added",
+          "new": 12,
+          "text": "        let n = self.running.get(cb).copied().unwrap_or(0);"
+        },
+        {
+          "kind": "added",
+          "new": 13,
+          "text": "        if n >= self.max_per_codebase { return Err(BudgetError::Codebase(n)); }"
+        },
+        {
+          "kind": "added",
+          "new": 14,
+          "text": "        Ok(())"
+        },
+        {
+          "kind": "added",
+          "new": 15,
+          "text": "    }"
+        },
+        {
+          "kind": "added",
+          "new": 16,
+          "text": "}"
+        }
+      ],
+      "path": "crates/orch/src/budget.rs",
+      "removed": 4
+    },
+    {
+      "added": 21,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -88,9 +88,24 @@ impl Orchestrator"
+        },
+        {
+          "kind": "context",
+          "new": 88,
+          "old": 88,
+          "text": "    pub fn spawn_child(&mut self, cfg: ChildCfg) -> Result<SessionId> {"
+        },
+        {
+          "kind": "removed",
+          "old": 89,
+          "text": "        let child = Session::spawn(cfg)?;"
+        },
+        {
+          "kind": "added",
+          "new": 89,
+          "text": "        self.budget.check(&cfg.codebase)?;"
+        },
+        {
+          "kind": "added",
+          "new": 90,
+          "text": "        let child = Session::spawn(cfg)?;"
+        },
+        {
+          "kind": "context",
+          "new": 91,
+          "old": 90,
+          "text": "        self.children.push(child.id);"
+        }
+      ],
+      "path": "crates/orch/src/spawn.rs",
+      "removed": 6
+    },
+    {
+      "added": 96,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -0,0 +1,96 @@"
+        },
+        {
+          "kind": "added",
+          "new": 1,
+          "text": "#[test]"
+        },
+        {
+          "kind": "added",
+          "new": 2,
+          "text": "fn rejects_the_13th_session_in_a_codebase() {"
+        },
+        {
+          "kind": "added",
+          "new": 3,
+          "text": "    let b = Budget::new(4, 12);"
+        },
+        {
+          "kind": "added",
+          "new": 4,
+          "text": "    assert!(b.with_running(\"code\", 12).check(&\"code\".into()).is_err());"
+        },
+        {
+          "kind": "added",
+          "new": 5,
+          "text": "}"
+        }
+      ],
+      "path": "tests/budget_exceeds.rs",
+      "removed": 0
+    },
+    {
+      "added": 1,
+      "lines": [
+        {
+          "kind": "hunk",
+          "text": "@@ -3,6 +3,7 @@"
+        },
+        {
+          "kind": "context",
+          "new": 3,
+          "old": 3,
+          "text": "pub mod spawn;"
+        },
+        {
+          "kind": "added",
+          "new": 4,
+          "text": "pub mod budget;"
+        }
+      ],
+      "path": "crates/orch/src/lib.rs",
+      "removed": 0
+    }
+  ],
+  "session": "a01c"
+}

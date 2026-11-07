@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "col": 20,
+      "len": 5,
+      "line": 11,
+      "path": "crates/orch/src/spawn.rs",
+      "preview": "self.budget.check(cb)?;"
+    }
+  ],
+  "name": "check",
+  "page": 1,
+  "perPage": 20,
+  "source": "index",
+  "total": 1
+}

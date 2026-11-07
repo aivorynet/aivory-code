@@ -1,0 +1,47 @@
+[package]
+name = "aivory-diag"
+description = "AIVory Code diagnostics: LSP pool, rule packs, linters, SARIF pipeline per turn"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aivory-syntax = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# MIT or CC0 or Apache-2.0. The fingerprints of the findings. Same version as `aivory-syntax`.
+blake3 = "1"
+# MIT. The ast-grep rule engine. It uses tree-sitter 0.27, the same version as `aivory-syntax`,
+# so one tree-sitter links.
+ast-grep-core = "0.51"
+ast-grep-config = "0.51"
+# MIT. The LSP data types (Hover, Location, WorkspaceEdit, ...). No client code.
+lsp-types = "0.97"
+# MIT. The memory of the language server processes. Same version as the other crates in the lock.
+sysinfo = { version = "0.31", default-features = false, features = ["system"] }
+# The grammars for the ast-grep rules. The versions equal the versions of `aivory-syntax`.
+tree-sitter-c = "0.24"
+tree-sitter-c-sharp = "0.23"
+tree-sitter-cpp = "0.23"
+tree-sitter-go = "0.25"
+tree-sitter-java = "0.23"
+tree-sitter-javascript = "0.25"
+tree-sitter-python = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-typescript = "0.23"
+
+[dev-dependencies]
+# MIT or Apache-2.0. Scratch repos for the tests.
+tempfile = "3"
+
+# A fake language server for the pool tests. It speaks LSP over stdio.
+[[bin]]
+name = "fake-lsp"
+path = "tests/support/fake_lsp.rs"
+test = false
+
+[lints]
+workspace = true

@@ -1,0 +1,763 @@
+{
+  "done": [],
+  "items": [
+    {
+      "agents": [
+        {
+          "model": "opus-5.5",
+          "provider": "claude"
+        }
+      ],
+      "ask": "7f3a-ask-1",
+      "codebase": "billing",
+      "contextPct": 66,
+      "cost": 2.41,
+      "files": [
+        "src/payment/webhook.rs",
+        "src/payment/retry.rs"
+      ],
+      "id": "in-7f3a",
+      "kind": "permission",
+      "options": [
+        "Allow",
+        "Always allow",
+        "Deny"
+      ],
+      "part": "payment",
+      "preview": "sqlx migrate run --database-url $STAGING_DB",
+      "prompt": "add retry with exponential backoff to the stripe webhook handler",
+      "session": "7f3a",
+      "since": 1792593240000,
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude opus-5.5 · billing · session 7f3a"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"payment\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"payment\" maps to src/payment/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "83 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"src/payment/**\""
+        },
+        {
+          "kind": "output",
+          "text": "11 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "add retry with exponential backoff to the stripe webhook handler"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"payment\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "src/payment/webhook.rs"
+        },
+        {
+          "kind": "output",
+          "text": "211 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"payment\" src/payment"
+        },
+        {
+          "kind": "output",
+          "text": "3 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "src/payment/retry.rs"
+        },
+        {
+          "kind": "output",
+          "text": "79 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "src/payment/retry.rs"
+        },
+        {
+          "kind": "added",
+          "text": "let delay = BASE_MS * 2u64.pow(attempt).min(30_000);"
+        },
+        {
+          "kind": "removed",
+          "text": "thread::sleep(Duration::from_secs(1));"
+        },
+        {
+          "kind": "subagent",
+          "label": "test-writer",
+          "text": "4 cases for retry::backoff  ✓"
+        },
+        {
+          "kind": "subagent",
+          "label": "migrator",
+          "text": "wrote 0042_webhook_attempts.sql"
+        },
+        {
+          "kind": "agent",
+          "text": "The retry table needs a new column. I want to apply the migration to staging."
+        }
+      ],
+      "text": "sqlx migrate run --database-url $STAGING_DB",
+      "title": "Stripe webhook retries"
+    },
+    {
+      "agents": [
+        {
+          "model": "gpt-5.2-codex",
+          "provider": "codex"
+        }
+      ],
+      "ask": "c218-ask-1",
+      "codebase": "aivory-code",
+      "contextPct": 31,
+      "cost": 0.88,
+      "files": [
+        "crates/ui/src/grid.rs",
+        "crates/ui/src/tile.rs"
+      ],
+      "id": "in-c218",
+      "kind": "plan",
+      "options": [
+        "Approve",
+        "Edit plan",
+        "Reject"
+      ],
+      "part": "ui",
+      "preview": "Virtualize the grid in 4 steps. Target: under 4 ms per frame.",
+      "prompt": "the session grid lags with 40 tiles. virtualize it",
+      "session": "c218",
+      "since": 1792593420000,
+      "steps": [
+        "Measure tile rows and keep a row index",
+        "Lay out only the rows in the viewport, plus one",
+        "Cache shaped text per session line",
+        "Bench again. Target: under 4 ms"
+      ],
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "codex gpt-5.2-codex · aivory-code · session c218"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ui\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ui\" maps to crates/ui/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "83 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/ui/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "31 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "the session grid lags with 40 tiles. virtualize it"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ui\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ui/src/grid.rs"
+        },
+        {
+          "kind": "output",
+          "text": "131 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"ui\" crates/ui/src"
+        },
+        {
+          "kind": "output",
+          "text": "8 matches in 5 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ui/src/tile.rs"
+        },
+        {
+          "kind": "output",
+          "text": "159 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "cargo bench -p ui grid_render"
+        },
+        {
+          "kind": "output",
+          "text": "grid_render/40  time: [18.2 ms 18.6 ms 19.1 ms]"
+        },
+        {
+          "kind": "agent",
+          "text": "40 tiles cost 18 ms per frame. Most of it is text layout of hidden rows."
+        },
+        {
+          "kind": "agent",
+          "text": "The plan is ready."
+        }
+      ],
+      "text": "Virtualize the grid in 4 steps.",
+      "title": "Virtualize the session grid"
+    },
+    {
+      "agents": [
+        {
+          "model": "3-pro",
+          "provider": "gemini"
+        }
+      ],
+      "ask": "9b0e-ask-1",
+      "codebase": "aivory-guard",
+      "contextPct": 64,
+      "cost": 0.52,
+      "files": [
+        "rules/owasp/a03_injection.yaml",
+        "guard/rules/loader.py"
+      ],
+      "id": "in-9b0e",
+      "kind": "question",
+      "options": [
+        "Keep as fallback",
+        "Drop them"
+      ],
+      "part": "rules",
+      "preview": "Keep the legacy regex rules as a fallback, or drop them in v2?",
+      "prompt": "port the OWASP top-10 rules to the v2 rule format",
+      "session": "9b0e",
+      "since": 1792593480000,
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "gemini 3-pro · aivory-guard · session 9b0e"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"rules\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"rules\" maps to rules/owasp/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "88 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"rules/owasp/**\""
+        },
+        {
+          "kind": "output",
+          "text": "36 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "port the OWASP top-10 rules to the v2 rule format"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"rules\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "rules/owasp/a03_injection.yaml"
+        },
+        {
+          "kind": "output",
+          "text": "316 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"rules\" rules/owasp"
+        },
+        {
+          "kind": "output",
+          "text": "4 matches in 2 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "guard/rules/loader.py"
+        },
+        {
+          "kind": "output",
+          "text": "224 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Write",
+          "text": "rules/v2/a03_injection.toml"
+        },
+        {
+          "kind": "added",
+          "text": "[[match]] pattern = \"cursor.execute(f-string)\""
+        },
+        {
+          "kind": "subagent",
+          "label": "rule-tester",
+          "text": "38 of 41 fixtures pass"
+        },
+        {
+          "kind": "agent",
+          "text": "Three fixtures only match with the legacy regex engine."
+        }
+      ],
+      "text": "Keep the legacy regex rules as a fallback, or drop them in v2?",
+      "title": "OWASP rule pack v2"
+    },
+    {
+      "agents": [
+        {
+          "model": "kimi-k2",
+          "provider": "opencode"
+        }
+      ],
+      "ask": "41dd-ask-1",
+      "codebase": "smart-inference",
+      "contextPct": 62,
+      "cost": 0.31,
+      "files": [
+        "cache/redis_pool.go",
+        "cache/failover_test.go"
+      ],
+      "id": "in-41dd",
+      "kind": "error",
+      "options": [
+        "Start sentinel",
+        "Retry",
+        "Open log"
+      ],
+      "part": "cache",
+      "preview": "dial tcp 127.0.0.1:6380: connect: connection refused",
+      "prompt": "make the response cache survive a redis primary failover",
+      "session": "41dd",
+      "since": 1792593540000,
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "opencode kimi-k2 · smart-inference · session 41dd"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"cache\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"cache\" maps to cache/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "70 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"cache/**\""
+        },
+        {
+          "kind": "output",
+          "text": "28 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "make the response cache survive a redis primary failover"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"cache\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "cache/redis_pool.go"
+        },
+        {
+          "kind": "output",
+          "text": "290 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"cache\" cache"
+        },
+        {
+          "kind": "output",
+          "text": "8 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "cache/failover_test.go"
+        },
+        {
+          "kind": "output",
+          "text": "110 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "cache/redis_pool.go"
+        },
+        {
+          "kind": "added",
+          "text": "opts.MaxRetries = 3"
+        },
+        {
+          "kind": "tool",
+          "label": "Bash",
+          "text": "go test ./cache -run Failover"
+        },
+        {
+          "kind": "error",
+          "text": "--- FAIL: TestFailover (5.02s)"
+        },
+        {
+          "kind": "error",
+          "text": "    dial tcp 127.0.0.1:6380: connect: connection refused"
+        },
+        {
+          "kind": "agent",
+          "text": "The test needs a sentinel on :6380. It does not run."
+        }
+      ],
+      "text": "Test infra is missing: no sentinel on :6380.",
+      "title": "Redis failover"
+    },
+    {
+      "agents": [
+        {
+          "model": "sonnet-5.5",
+          "provider": "claude"
+        }
+      ],
+      "codebase": "aivory-code",
+      "contextPct": 51,
+      "cost": 0.74,
+      "files": [
+        "crates/ledger/src/segment.rs",
+        "crates/ledger/src/compact.rs"
+      ],
+      "gates": [
+        {
+          "label": "tests 31/31",
+          "state": "ok"
+        },
+        {
+          "label": "Guard clean",
+          "state": "ok"
+        },
+        {
+          "label": "review open",
+          "state": "pending"
+        }
+      ],
+      "id": "in-a7e2",
+      "kind": "review",
+      "options": [
+        "Approve and merge",
+        "Request changes",
+        "Open the diff"
+      ],
+      "part": "ledger",
+      "preview": "Done. 3 files, +142 −38. Tests and Guard pass.",
+      "prompt": "compact ledger segments older than 7 days",
+      "session": "a7e2",
+      "since": 1792592880000,
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude sonnet-5.5 · aivory-code · session a7e2"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ledger\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ledger\" maps to crates/ledger/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "98 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/ledger/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "16 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "compact ledger segments older than 7 days"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ledger\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ledger/src/segment.rs"
+        },
+        {
+          "kind": "output",
+          "text": "126 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Grep",
+          "text": "\"ledger\" crates/ledger/src"
+        },
+        {
+          "kind": "output",
+          "text": "5 matches in 4 files"
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ledger/src/compact.rs"
+        },
+        {
+          "kind": "output",
+          "text": "154 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "crates/ledger/src/compact.rs"
+        },
+        {
+          "kind": "added",
+          "text": "fn merge(a: &Segment, b: &Segment) -> Segment {"
+        },
+        {
+          "kind": "added",
+          "text": "    let mut out = Segment::with_capacity(a.len() + b.len());"
+        },
+        {
+          "kind": "added",
+          "text": "    out.extend(a.newest_per_key(b));"
+        },
+        {
+          "kind": "agent",
+          "text": "Merge keeps the newest entry per key. Next: tombstones."
+        }
+      ],
+      "text": "The session is done: 3 files changed, +142 −38. Review the diff before the merge.",
+      "title": "Ledger compaction"
+    },
+    {
+      "agents": [
+        {
+          "model": "haiku-5.5",
+          "provider": "claude"
+        },
+        {
+          "model": "gpt-5.2-codex",
+          "provider": "codex"
+        }
+      ],
+      "codebase": "aivory-code",
+      "contextPct": 40,
+      "cost": 0.97,
+      "files": [
+        "crates/ui/src/tile.rs"
+      ],
+      "id": "in-b5c9",
+      "kind": "conflict",
+      "options": [
+        "Ping both",
+        "Pause the skeleton session",
+        "Queue the merge"
+      ],
+      "part": "ui",
+      "preview": "Tile skeleton states and Virtualize the grid change Tile::render.",
+      "prompt": "add skeleton states for tiles while a session attaches",
+      "session": "b5c9",
+      "sides": [
+        {
+          "lines": [
+            {
+              "kind": "added",
+              "text": "TileState::Attaching => self.skeleton(cx),"
+            },
+            {
+              "kind": "output",
+              "text": "  render() line 88"
+            }
+          ],
+          "title": "Tile skeleton states · claude"
+        },
+        {
+          "lines": [
+            {
+              "kind": "added",
+              "text": "if !self.visible(row) { return Empty; }"
+            },
+            {
+              "kind": "output",
+              "text": "  render() line 86"
+            }
+          ],
+          "title": "Virtualize the session grid · codex"
+        }
+      ],
+      "since": 1792593480000,
+      "tail": [
+        {
+          "kind": "meta",
+          "text": "claude haiku-5.5 · aivory-code · session b5c9"
+        },
+        {
+          "kind": "user",
+          "text": "read .aivory/map.toml and stay inside part \"ui\""
+        },
+        {
+          "kind": "agent",
+          "text": "Part \"ui\" maps to crates/ui/src/. I keep my edits inside it."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "README.md"
+        },
+        {
+          "kind": "output",
+          "text": "88 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Glob",
+          "text": "\"crates/ui/src/**\""
+        },
+        {
+          "kind": "output",
+          "text": "36 files"
+        },
+        {
+          "kind": "agent",
+          "text": "I know the layout of the part. Ready for the task."
+        },
+        {
+          "kind": "user",
+          "text": "add skeleton states for tiles while a session attaches"
+        },
+        {
+          "kind": "agent",
+          "text": "I start with the code in part \"ui\"."
+        },
+        {
+          "kind": "tool",
+          "label": "Read",
+          "text": "crates/ui/src/tile.rs"
+        },
+        {
+          "kind": "output",
+          "text": "316 lines"
+        },
+        {
+          "kind": "tool",
+          "label": "Edit",
+          "text": "crates/ui/src/tile.rs"
+        },
+        {
+          "kind": "added",
+          "text": "TileState::Attaching => self.skeleton(cx),"
+        },
+        {
+          "kind": "meta",
+          "text": "— aivoryd: trial merge with session c218 fails —"
+        }
+      ],
+      "text": "The trial merge fails in 2 hunks of Tile::render.",
+      "title": "Both edit crates/ui/src/tile.rs"
+    }
+  ]
+}

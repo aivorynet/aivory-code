@@ -1,0 +1,45 @@
+{
+  "events": [
+    {
+      "author": "Dana Lee",
+      "id": "3f2a91c0d4b8",
+      "summary": "Add the orchestrator skeleton",
+      "time": 1792334400000,
+      "type": "commit"
+    },
+    {
+      "added": 16,
+      "cost": 0.71,
+      "model": "opus-5.5",
+      "n": 1,
+      "prompt": "cap subagent fan-out per session and per codebase",
+      "removed": 1,
+      "session": "a01c",
+      "time": 1792592520000,
+      "type": "turn"
+    },
+    {
+      "added": 9,
+      "cost": 0.88,
+      "model": "opus-5.5",
+      "n": 2,
+      "prompt": "check the limit before a child starts",
+      "removed": 0,
+      "session": "a01c",
+      "time": 1792592940000,
+      "type": "turn"
+    },
+    {
+      "added": 5,
+      "cost": 0.42,
+      "model": "opus-5.5",
+      "n": 3,
+      "prompt": "return a typed error when the limit is hit",
+      "removed": 0,
+      "session": "a01c",
+      "time": 1792593360000,
+      "type": "turn"
+    }
+  ],
+  "path": "crates/orch/src/budget.rs"
+}

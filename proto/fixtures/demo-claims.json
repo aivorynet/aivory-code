@@ -1,0 +1,94 @@
+{
+  "claims": [
+    {
+      "codebase": "billing",
+      "key": "path:billing/db/schema.rs",
+      "leaseS": 541,
+      "path": "billing/db/schema.rs",
+      "session": "8d07",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "path:billing/db/schema.rs",
+      "leaseS": 318,
+      "path": "billing/db/schema.rs",
+      "session": "m2e5",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "path:src/payment/charge.rs",
+      "leaseS": 505,
+      "path": "src/payment/charge.rs",
+      "session": "7f3a",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "path:src/payment/charge.rs",
+      "leaseS": 420,
+      "path": "src/payment/charge.rs",
+      "session": "k9d4",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "sym:rust:billing::Invoice::total",
+      "leaseS": 380,
+      "path": "src/billing/invoice.rs",
+      "range": {
+        "from": 40,
+        "to": 52
+      },
+      "session": "8a22",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "sym:rust:billing::Invoice::total",
+      "leaseS": 505,
+      "path": "src/billing/invoice.rs",
+      "session": "7f3a",
+      "state": "intent"
+    },
+    {
+      "codebase": "billing",
+      "key": "sym:rust:billing::Money::round",
+      "leaseS": 380,
+      "path": "src/billing/money.rs",
+      "range": {
+        "from": 12,
+        "to": 30
+      },
+      "session": "8a22",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "sym:rust:billing::Money::round",
+      "leaseS": 318,
+      "path": "src/billing/money.rs",
+      "range": {
+        "from": 12,
+        "to": 30
+      },
+      "session": "m2e5",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "test:payment::charge::tests::pays_once",
+      "leaseS": 505,
+      "session": "7f3a",
+      "state": "editing"
+    },
+    {
+      "codebase": "billing",
+      "key": "test:payment::charge::tests::pays_once",
+      "leaseS": 420,
+      "session": "k9d4",
+      "state": "editing"
+    }
+  ]
+}

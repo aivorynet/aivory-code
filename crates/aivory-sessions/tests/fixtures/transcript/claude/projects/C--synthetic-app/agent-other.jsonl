@@ -1,0 +1,1 @@
+{"type":"user","uuid":"u-cccc-1","timestamp":"2026-03-01T10:00:05.000Z","sessionId":"cccccccc-0000-4000-8000-000000000003","cwd":"C:\\synthetic\\app","gitBranch":"main","isSidechain":true,"version":"2.1.0-test","agentId":"other","message":{"role":"user","content":"Task of another session"}}
