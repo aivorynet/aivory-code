@@ -49,8 +49,8 @@ workspace = true
 # Installer config for `cargo-packager` (MIT/Apache-2.0). See docs/release.md.
 [package.metadata.packager]
 product-name = "AIVory Code"
-identifier = "com.ilscipio.aivory.code"
-publisher = "Ilscipio"
+identifier = "net.aivory.code"
+publisher = "Aivory, Inc."
 description = "AIVory Code: the war room for coding agents"
 license-file = "../../LICENSE"
 out-dir = "../../dist"
