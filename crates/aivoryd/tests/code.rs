@@ -607,11 +607,11 @@ fn the_agent_tools_answer_in_the_compact_format() {
     assert!(text.contains("src/lib.rs:1"));
     assert!(text.contains("pub fn helper(x: u32) -> u32"));
 
-    let (text, _) = tool(port, &token, "symbols", json!({"query": "pa"}));
-    assert!(
-        text.contains("src/lib.rs:13") && text.contains("pub fn parse"),
-        "{text}"
-    );
+    // The index can still apply the last turn on a slow runner: ask until it answers.
+    wait_until("symbols finds parse", || {
+        let (text, _) = tool(port, &token, "symbols", json!({"query": "pa"}));
+        text.contains("src/lib.rs:13") && text.contains("pub fn parse")
+    });
 
     let (text, _) = tool(port, &token, "outline", json!({"path": "src/lib.rs"}));
     assert!(
