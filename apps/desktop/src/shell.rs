@@ -518,7 +518,6 @@ impl Shell {
                     this.go(back, cx);
                 }
                 NightSessionEvent::Switch(id) => this.screen = Screen::Session(id.clone()),
-                NightSessionEvent::Focus(id) => this.open_focus(id, cx),
                 NightSessionEvent::OpenFile { session, path } => {
                     this.open_session_file(session, path, cx)
                 }

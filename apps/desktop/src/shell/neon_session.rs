@@ -37,8 +37,6 @@ pub(super) enum NightSessionEvent {
     Back,
     /// Show another session.
     Switch(String),
-    /// The Focus view of the session.
-    Focus(String),
     /// Open a file of the session in the code lens.
     OpenFile { session: String, path: String },
 }
@@ -447,7 +445,6 @@ impl Render for NightSession {
 
         // ---- middle: the title, the chat, the decision, the composer ----------------------
         let id = p.id.clone();
-        let focus = p.id.clone();
         let title = div()
             .flex_none()
             .flex()
@@ -481,13 +478,6 @@ impl Render for NightSession {
                     .child(
                         button("nc-back", "◂ War room", CYAN, false)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(NightSessionEvent::Back))),
-                    )
-                    .child(
-                        button("nc-focus", "Focus", CYAN, false).on_click(cx.listener(
-                            move |_, _, _, cx| {
-                                cx.emit(NightSessionEvent::Focus(focus.clone()));
-                            },
-                        )),
                     ),
             );
 

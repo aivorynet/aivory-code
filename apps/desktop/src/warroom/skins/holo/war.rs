@@ -397,16 +397,45 @@ impl WarRoomScreen {
         let syn = self.holo.syn.get(&list, &books, g.cw, g.ch, g.s);
         let cam = self.holo.orbit.cam();
         // A session that starts to work, waits or fails fires once; nothing moves otherwise.
+        let demo = self.model.read(cx).demo;
         {
             let st = &mut self.holo;
             for c in &list {
-                let before = st.seen.insert(c.id.clone(), c.state);
-                let event = matches!(
-                    c.state,
-                    SessionState::Working | SessionState::NeedsYou | SessionState::Error
-                );
-                if before.is_some_and(|b| b != c.state) && event {
+                // A firing: a new state (works, waits, error), or new output from a working
+                // session, at most once per 8 s per session.
+                let before = st.seen.get(&c.id).copied();
+                let last = before.map_or(f32::MIN, |b| b.2);
+                let changed = before.is_some_and(|b| b.0 != c.state)
+                    && matches!(
+                        c.state,
+                        SessionState::Working | SessionState::NeedsYou | SessionState::Error
+                    );
+                let output = before.is_some_and(|b| c.tokens > b.1)
+                    && c.state == SessionState::Working
+                    && t - last > 8.;
+                let fired = changed || output;
+                if fired {
                     st.fires.push((c.id.clone(), t));
+                }
+                st.seen.insert(
+                    c.id.clone(),
+                    (c.state, c.tokens, if fired { t } else { last }),
+                );
+            }
+            // The demo has no live output: one working session fires every 6 s in turn.
+            if demo {
+                let working: Vec<&String> = list
+                    .iter()
+                    .filter(|c| c.state == SessionState::Working)
+                    .map(|c| &c.id)
+                    .collect();
+                let slot = (t / 6.).floor();
+                if let Some(id) = working.get(slot as usize % working.len().max(1))
+                    && let Some(seen) = st.seen.get_mut(*id)
+                    && seen.2 < slot * 6.
+                {
+                    seen.2 = t;
+                    st.fires.push(((*id).clone(), t));
                 }
             }
             st.fires.retain(|(_, start)| t - start < synapse::FIRE_TIME);
@@ -1040,7 +1069,7 @@ impl WarRoomScreen {
                     ),
             );
         }
-        let (open_id, focus_id) = (pane.id.clone(), pane.id.clone());
+        let open_id = pane.id.clone();
         panel("Selected", false)
             .flex_1()
             .min_h(px(0.))
@@ -1084,22 +1113,14 @@ impl WarRoomScreen {
                             .child(mono(format!("{}%", pane.context_pct), PA)),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .justify_between()
-                    .child(
-                        link("holo-sel-open", "Open session ›", PK).on_click(cx.listener(
-                            move |this, _, _, cx| {
-                                this.holo.open = Some(open_id.clone());
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .child(link("holo-sel-focus", "Focus ›", MUTED).on_click(
-                        cx.listener(move |this, _, _, cx| this.skin_focus(&focus_id, cx)),
-                    )),
-            )
+            .child(div().flex().justify_between().child(
+                link("holo-sel-open", "Open session ›", PK).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.holo.open = Some(open_id.clone());
+                        cx.notify();
+                    },
+                )),
+            ))
     }
 }
 

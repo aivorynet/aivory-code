@@ -20,19 +20,38 @@ use gpui::{
 
 use crate::holo_kit::{PA, PAGE, PK, ink};
 
-/// The length of the effect.
+/// The length of the open step (the pen's materialize).
 pub(super) const OPEN_TIME: f32 = 1.05;
+/// The length of the close step: the old screen folds back into a slit first.
+const CLOSE_TIME: f32 = 0.4;
 
 #[derive(Default)]
 enum State {
     #[default]
     Idle,
-    /// A screen change: the picture comes at the next frame.
-    Capture,
+    /// A screen change: the picture of the old screen is taken and stays on screen, still.
+    Capture { old: Option<Arc<RenderImage>> },
+    /// The frame that draws the new screen off screen for its picture: no cover.
+    Shoot { old: Option<Arc<RenderImage>> },
     Play {
-        image: Arc<RenderImage>,
+        old: Option<Arc<RenderImage>>,
+        new: Arc<RenderImage>,
         start: Instant,
     },
+}
+
+impl State {
+    /// Give the pictures of this state back to the renderer.
+    fn drop_images(self, window: &mut Window) {
+        let (old, new) = match self {
+            State::Capture { old } | State::Shoot { old } => (old, None),
+            State::Play { old, new, .. } => (old, Some(new)),
+            State::Idle => (None, None),
+        };
+        for image in old.into_iter().chain(new) {
+            let _ = window.drop_image(image);
+        }
+    }
 }
 
 /// The open effect of one window.
@@ -89,6 +108,18 @@ pub(super) fn keyframe(age: f32) -> (f32, f32, f32, f32) {
     (sx, sy, opacity, glow)
 }
 
+/// The close step at `f` (0 to 1): the old screen folds into a bright slit, faster and
+/// faster, and fades in the last part. Same values as `keyframe`.
+pub(super) fn close_frame(f: f32) -> (f32, f32, f32, f32) {
+    let f = f.clamp(0., 1.);
+    let e = f * f;
+    let sy = 1. - 0.97 * e;
+    let sx = 1. - 0.3 * f.powi(3);
+    let opacity = 1. - ((f - 0.8) / 0.2).clamp(0., 1.);
+    let glow = 1. + 3. * e;
+    (sx, sy, opacity, glow)
+}
+
 /// Cut `area` (window pixels) out of the frame picture and turn it into an image GPUI draws.
 fn picture(window: &mut Window, area: Bounds<Pixels>) -> Option<Arc<RenderImage>> {
     let full = window.render_to_image().ok()?;
@@ -125,23 +156,49 @@ impl OpenFx {
         if first {
             return;
         }
-        if let State::Play { image, .. } = std::mem::take(&mut self.state) {
-            let _ = window.drop_image(image);
-        }
-        self.state = State::Capture;
+        // The last frame on screen still shows the old screen (or the effect in progress):
+        // that picture closes first.
+        let old = self.area.get().and_then(|a| picture(window, a));
+        std::mem::take(&mut self.state).drop_images(window);
+        self.state = State::Capture { old };
         let area = self.area.clone();
         let weak = cx.entity().downgrade();
+        // At the next frame: draw the new screen without a cover (not shown), take its
+        // picture, then play. The frame on screen meanwhile keeps the still old picture.
         window.on_next_frame(move |window, cx: &mut App| {
-            let image = area.get().and_then(|a| picture(window, a));
+            let shoot = weak
+                .update(cx, |v, _| {
+                    let fx = back(v);
+                    match std::mem::take(&mut fx.state) {
+                        State::Capture { old } => {
+                            fx.state = State::Shoot { old };
+                            true
+                        }
+                        other => {
+                            fx.state = other;
+                            false
+                        }
+                    }
+                })
+                .unwrap_or(false);
+            if !shoot {
+                return;
+            }
+            window.draw(cx).clear(cx);
+            let new = area.get().and_then(|a| picture(window, a));
             let _ = weak.update(cx, |v, cx| {
                 let fx = back(v);
-                if matches!(fx.state, State::Capture) {
-                    fx.state = match image {
-                        Some(image) => State::Play {
-                            image,
+                if let State::Shoot { old } = std::mem::take(&mut fx.state) {
+                    fx.state = match new {
+                        Some(new) => State::Play {
+                            old,
+                            new,
                             start: Instant::now(),
                         },
-                        None => State::Idle,
+                        None => {
+                            State::Shoot { old }.drop_images(window);
+                            State::Idle
+                        }
                     };
                 }
                 cx.notify();
@@ -163,16 +220,24 @@ impl OpenFx {
             .min_h(px(0.))
             .child(content)
             .child(probe);
+        if let State::Capture { old: Some(old) } = &self.state {
+            // Until the new picture exists, the old screen stays as it was.
+            root = root.child(cover(old.clone(), keyframe(OPEN_TIME)));
+        }
         let play = match &self.state {
-            State::Play { image, start } => Some((image.clone(), start.elapsed().as_secs_f32())),
+            State::Play { old, new, start } => {
+                Some((old.clone(), new.clone(), start.elapsed().as_secs_f32()))
+            }
             _ => None,
         };
-        if let Some((image, age)) = play {
-            if age >= OPEN_TIME {
-                let _ = window.drop_image(image);
-                self.state = State::Idle;
+        if let Some((old, new, age)) = play {
+            let close = if old.is_some() { CLOSE_TIME } else { 0. };
+            if age >= close + OPEN_TIME {
+                std::mem::take(&mut self.state).drop_images(window);
+            } else if let Some(old) = old.filter(|_| age < close) {
+                root = root.child(cover(old, close_frame(age / close)));
             } else {
-                root = root.child(cover(image, age));
+                root = root.child(cover(new, keyframe(age - close)));
             }
         }
         root.into_any_element()
@@ -180,8 +245,8 @@ impl OpenFx {
 }
 
 /// The picture at `age`: the page under it, the scaled picture, the white wash, the edges.
-fn cover(image: Arc<RenderImage>, age: f32) -> impl IntoElement {
-    let (sx, sy, opacity, glow) = keyframe(age);
+fn cover(image: Arc<RenderImage>, frame: (f32, f32, f32, f32)) -> impl IntoElement {
+    let (sx, sy, opacity, glow) = frame;
     div()
         .absolute()
         .top_0()
@@ -236,5 +301,9 @@ mod tests {
         assert!((sx - 1.).abs() < 1e-3 && (sy - 1.).abs() < 1e-3);
         assert!((op - 1.).abs() < 1e-3 && (glow - 1.).abs() < 1e-3);
         assert!(ease(0.).abs() < 1e-3 && (ease(1.) - 1.).abs() < 1e-3);
+        // The close starts at full size and ends as a dim slit.
+        assert_eq!(close_frame(0.), (1., 1., 1., 1.));
+        let (_, sy, op, _) = close_frame(1.);
+        assert!((sy - 0.03).abs() < 1e-3 && op < 1e-3);
     }
 }

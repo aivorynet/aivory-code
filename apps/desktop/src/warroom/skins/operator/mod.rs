@@ -69,6 +69,19 @@ pub(in crate::warroom) struct OperatorState {
     active_at: Option<Instant>,
     /// The screenshot hooks `AIVORY_MX_PICK=<n>` and `AIVORY_MX_HOVER=<n>` were read.
     hooks_read: bool,
+    /// A scroll bar drag in progress; the whole wall follows the mouse until the button is up.
+    drag: Option<Drag>,
+    /// The bounds of the center console scroll track, kept for the mouse.
+    center_track: Rc<Cell<Bounds<Pixels>>>,
+}
+
+/// A scroll bar drag.
+#[derive(Clone, Copy)]
+enum Drag {
+    /// The page bar at the bottom.
+    Pages,
+    /// The thumb of the center console: the mouse y and the scroll offset at the start.
+    Center { from_y: f32, from_off: f32 },
 }
 
 /// The agents for the screens: the ones that work now (the busiest first), then the other
@@ -214,7 +227,9 @@ impl WarRoomScreen {
             self.operator.hover = Some((p.id.clone(), Instant::now()));
         }
         let active = self.operator.active.clone();
-        let bar = self.operator_scroll(busy.len(), page, pages, cx);
+        let bar = self
+            .operator_scroll(busy.len(), page, pages, cx)
+            .into_any_element();
         let first = page * PER_PAGE;
         let lines: Vec<(LineFrom, u32, bool)> = busy
             .iter()
@@ -241,6 +256,7 @@ impl WarRoomScreen {
             .child(state_lines(lines, PER_PAGE, WIDE, GAP, t));
 
         div()
+            .id("mx-wall")
             .size_full()
             .flex()
             .flex_col()
@@ -249,6 +265,27 @@ impl WarRoomScreen {
             .pt(px(10.))
             .pb(px(10.))
             .bg(rgb(PAGE))
+            // A scroll bar drag goes on wherever the mouse goes, until the button is up.
+            .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
+                let Some(drag) = this.operator.drag else {
+                    return;
+                };
+                if e.pressed_button != Some(MouseButton::Left) {
+                    this.operator.drag = None;
+                    return;
+                }
+                match drag {
+                    Drag::Pages => this.operator_seek(e.position.x, pages, cx),
+                    Drag::Center { from_y, from_off } => {
+                        this.operator_center_drag(f32::from(e.position.y) - from_y, from_off);
+                        cx.notify();
+                    }
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| this.operator.drag = None),
+            )
             .font_family(FONT)
             .text_size(ui::ts(T_ENTRY))
             .child(top)
@@ -637,7 +674,14 @@ impl WarRoomScreen {
             }
             _ => tokenize(&tail),
         };
-        if std::mem::take(&mut self.operator.to_bottom) {
+        // Go to the newest line once the console itself shows (not during the reveal).
+        if self.operator.to_bottom
+            && self
+                .operator
+                .active_at
+                .is_none_or(|at| at.elapsed().as_secs_f32() >= 0.9)
+        {
+            self.operator.to_bottom = false;
             self.operator.center_scroll.scroll_to_bottom();
         }
         // The reveal: for 0.9 s after the pick the rain of the agent turns into its console.
@@ -652,17 +696,22 @@ impl WarRoomScreen {
         let (tint, _) = state_color(pane.state);
         let source = display_lines(pane, 24).join(" ");
         let arrive_el = arrive.map(|p| {
-            div().absolute().inset_0().bottom(px(30.)).child(reveal(
-                &source,
-                tail.clone(),
-                activity(pane),
-                p,
-                t,
-                hash_str(&pane.id),
-                tint,
-                MX_BODY,
-                PAD,
-            ))
+            div()
+                .absolute()
+                .inset_0()
+                .top(px(40.))
+                .bottom(px(30.))
+                .child(reveal(
+                    &source,
+                    tail.clone(),
+                    activity(pane),
+                    p,
+                    t,
+                    hash_str(&pane.id),
+                    tint,
+                    MX_BODY,
+                    PAD,
+                ))
         });
         let body = div()
             .absolute()
@@ -676,47 +725,61 @@ impl WarRoomScreen {
                     .track_scroll(&self.operator.center_scroll)
                     .pl(px(PAD))
                     .pr(px(PAD + 8.))
-                    .pt(px(PAD))
-                    .pb(px(PAD))
+                    .pt(px(PAD + 40.))
+                    .pb(px(PAD + 56.))
                     .bg(hca(0x010A03, 200))
                     .text_size(ui::ts(MX_BODY))
                     .line_height(relative(1.55))
                     .child(stream.into_text()),
             )
-            .child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .right_0()
-                    .bottom(px(30.))
-                    .child(
-                        gpui_base::Scrollbar::vertical(&self.operator.center_scroll)
-                            .mode(gpui_base::ScrollbarMode::Always),
-                    ),
-            );
-        let open = div()
-            .id("mx-center-open")
+            .child(self.operator_center_bar(cx));
+        // The bar on top: readable buttons that show on hover (and stay while you type).
+        // They jump to the next screen; the chat line below is always open.
+        let open_id = id.clone();
+        let button = |key: &'static str, label: &'static str, main: bool| {
+            div()
+                .id(key)
+                .h(px(26.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .border_1()
+                .border_color(hca(if main { GREEN } else { GREEN_DIM }, 220))
+                .bg(hca(if main { 0x0C3A1C } else { 0x021006 }, 245))
+                .text_size(ui::ts(MX_TITLE))
+                .text_color(rgb(GREEN_HI))
+                .hover(|s| s.bg(hca(0x125A2A, 250)).border_color(rgb(GREEN)))
+                .child(label)
+        };
+        let bar = div()
+            .id("mx-center-bar")
             .absolute()
-            .top(px(8.))
-            .right(px(22.))
-            .px(px(8.))
-            .py(px(2.))
-            .cursor_pointer()
-            .text_size(ui::ts(MX_SMALL))
-            .text_color(rgb(GREEN_MID))
-            .bg(hca(0x010A03, 230))
-            .hover(|s| s.text_color(rgb(GREEN_HI)))
-            .on_click(cx.listener(move |_, _, _, cx| {
-                cx.emit(WarRoomEvent::OpenSession(id.clone()));
-            }))
-            .child("open session ↗");
-        // The prompt overlay: its hover area is fixed; the bar slides in over the foot of the
-        // transcript and never changes the size of the screen.
-        let folded = !typing;
+            .top_0()
+            .left_0()
+            .right_0()
+            .h(px(40.))
+            .px(px(PAD))
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .bg(hca(0x010A03, 240))
+            .border_b_1()
+            .border_color(hca(GREEN_DIM, 200))
+            .opacity(if typing { 1. } else { 0. })
+            .group_hover("mx-center", |s| s.opacity(1.))
+            .child(div().flex_1())
+            .child(
+                button("mx-bar-open", "Open session ›", false).on_click(cx.listener(
+                    move |_, _, _, cx| {
+                        cx.emit(WarRoomEvent::OpenSession(open_id.clone()));
+                    },
+                )),
+            );
+        // The chat line: always open while an agent is on the center screen. It lies over the
+        // foot of the transcript and never changes the size of the screen.
         let overlay = div()
             .id("mx-chat")
-            .group("mx-chat")
             .absolute()
             .left(px(0.))
             .right(px(0.))
@@ -725,28 +788,22 @@ impl WarRoomScreen {
             .child(
                 div()
                     .absolute()
-                    .left(px(PAD))
-                    .bottom(px(5.))
-                    .text_size(ui::ts(T_LABEL))
-                    .text_color(rgb(GREEN_DIM))
-                    .child("▲ write to this session"),
-            )
-            .child(
-                div()
-                    .absolute()
                     .left(px(14.))
                     .right(px(14.))
                     .h(px(46.))
-                    .bottom(px(if folded { -52. } else { 10. }))
-                    .group_hover("mx-chat", |s| s.bottom(px(10.)))
+                    .bottom(px(10.))
+                    // A clear band: a bright line on top, a darker field, a frame.
+                    .border_1()
+                    .border_t_2()
+                    .border_color(hca(if typing { GREEN_HI } else { GREEN }, 230))
                     .px(px(14.))
                     .flex()
                     .items_center()
                     .gap(px(10.))
-                    .bg(hca(0x010A03, 245))
+                    .bg(hca(0x03200E, 250))
                     .text_size(ui::ts(T_ENTRY))
-                    .text_color(rgb(GREEN_MID))
-                    .child("you>")
+                    .text_color(rgb(GREEN))
+                    .child("chat>")
                     .child(
                         div()
                             .flex_1()
@@ -773,9 +830,10 @@ impl WarRoomScreen {
             .min_h(px(0.))
             .child(
                 glass(false)
+                    .group("mx-center")
                     .when(arrive.is_none(), |d| d.child(body))
                     .children(arrive_el)
-                    .child(open)
+                    .child(bar)
                     .child(overlay)
                     .child(glaze(false)),
             )
@@ -908,14 +966,10 @@ impl WarRoomScreen {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                            this.operator.drag = Some(Drag::Pages);
                             this.operator_seek(e.position.x, pages, cx);
                         }),
                     )
-                    .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                        if e.pressed_button == Some(MouseButton::Left) {
-                            this.operator_seek(e.position.x, pages, cx);
-                        }
-                    }))
                     .child(
                         div()
                             .relative()
@@ -937,6 +991,8 @@ impl WarRoomScreen {
                     .child(
                         canvas(move |bounds, _, _| track.set(bounds), |_, _, _, _| ())
                             .absolute()
+                            .top_0()
+                            .left_0()
                             .size_full(),
                     ),
             )
@@ -947,6 +1003,88 @@ impl WarRoomScreen {
                 })),
             )
             .child(format!("working now {first}–{last} of {n}"))
+    }
+
+    /// The scroll geometry of the center console: (max offset, thumb share, thumb top share).
+    fn operator_center_geo(&self) -> (f32, f32, f32) {
+        let s = &self.operator.center_scroll;
+        let max = f32::from(s.max_offset().y).max(0.);
+        let view = f32::from(s.bounds().size.height).max(1.);
+        let share = (view / (view + max)).clamp(0.08, 1.);
+        let at = if max > 0. {
+            (-f32::from(s.offset().y) / max).clamp(0., 1.)
+        } else {
+            0.
+        };
+        (max, share, at * (1. - share))
+    }
+
+    /// Drag the center thumb by `dy` pixels from a start offset.
+    fn operator_center_drag(&mut self, dy: f32, from_off: f32) {
+        let (max, share, _) = self.operator_center_geo();
+        let track = f32::from(self.operator.center_track.get().size.height);
+        let room = (track * (1. - share)).max(1.);
+        let off = (from_off - dy * max / room).clamp(-max, 0.);
+        self.operator
+            .center_scroll
+            .set_offset(gpui::point(px(0.), px(off)));
+    }
+
+    /// The vertical scroll bar of the center console: a clear track and a thumb that you can
+    /// drag; a click on the track jumps there.
+    fn operator_center_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let (max, share, top) = self.operator_center_geo();
+        let probe = self.operator.center_track.clone();
+        let track = self.operator.center_track.clone();
+        let scroll = self.operator.center_scroll.clone();
+        div()
+            .id("mx-center-track")
+            .absolute()
+            .top(px(46.))
+            .bottom(px(36.))
+            .right(px(4.))
+            .w(px(10.))
+            .bg(hca(0x0B2414, 230))
+            .border_1()
+            .border_color(hca(GREEN_DIM, 200))
+            .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                    let b = track.get();
+                    let h = f32::from(b.size.height).max(1.);
+                    let y = (f32::from(e.position.y) - f32::from(b.origin.y)) / h;
+                    let (max, share, top) = this.operator_center_geo();
+                    // Off the thumb: jump so that the thumb centres on the click.
+                    if y < top || y > top + share {
+                        let at = ((y - share / 2.) / (1. - share).max(0.01)).clamp(0., 1.);
+                        scroll.set_offset(gpui::point(px(0.), px(-at * max)));
+                    }
+                    this.operator.drag = Some(Drag::Center {
+                        from_y: f32::from(e.position.y),
+                        from_off: f32::from(scroll.offset().y),
+                    });
+                    cx.stop_propagation();
+                    cx.notify();
+                }),
+            )
+            .child(
+                canvas(move |b, _, _| probe.set(b), |_, _, _, _| ())
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .left(px(1.))
+                    .right(px(1.))
+                    .top(relative(if max > 0. { top } else { 0. }))
+                    .h(relative(if max > 0. { share } else { 1. }))
+                    .bg(rgb(GREEN_MID))
+                    .hover(|s| s.bg(rgb(GREEN))),
+            )
     }
 
     /// A click or a drag on the track: go to the page at that x position.

@@ -57,7 +57,8 @@ pub(in crate::warroom) struct HudState {
     /// The synapse layout of the Holo war room.
     pub(super) syn: super::holo::SynapseCache,
     /// The last state of each session, and the firings it caused (id, start time).
-    pub(super) seen: HashMap<String, SessionState>,
+    /// Per session: the state, the tokens, and the time of its last firing.
+    pub(super) seen: HashMap<String, (SessionState, u64, f32)>,
     pub(super) fires: Vec<(String, f32)>,
     /// The mouse control of the Holo synapse camera.
     pub(super) orbit: super::holo::Orbit,

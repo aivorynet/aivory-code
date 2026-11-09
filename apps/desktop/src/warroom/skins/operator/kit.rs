@@ -551,6 +551,13 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32, tint: u32)
         .filter(|&i| chars[i] != ' ' && (i == 0 || chars[i - 1] == ' '))
         .map(|i| i as u32)
         .collect();
+    // The state shows in the whole stream (owner 2026-11-09): a working agent rains a bluer
+    // green, an idle one rains dim; waits and errors keep the green with their tinted heads.
+    let (body, dim) = match tint {
+        ST_WORK => (0x48D8E6, dim),
+        ST_IDLE => (0x2C8A50, dim * 0.5),
+        _ => (0x3DF07A, dim),
+    };
     canvas(
         |_, _, _| (),
         move |bounds, _, window, cx| {
@@ -599,7 +606,7 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32, tint: u32)
                             _ if hash(seed ^ k, i).is_multiple_of(3) => {
                                 (tint, 1. - i as f32 / len as f32)
                             }
-                            _ => (0x3DF07A, 1. - i as f32 / len as f32),
+                            _ => (body, 1. - i as f32 / len as f32),
                         };
                         let alpha = ((base * dim) * 5.).round() / 5.;
                         if alpha < 0.2 {

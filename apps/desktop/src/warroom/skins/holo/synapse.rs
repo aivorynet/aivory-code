@@ -43,7 +43,7 @@ const WAVE_END: f32 = 75.;
 pub(super) const FIRE_TIME: f32 = PULSE + WAVE_END / WAVE_SPEED;
 
 /// Width classes of the tapered branches (pixels at scale 1) and fog by depth class.
-const WIDTHS: [f32; 5] = [10., 7., 4.5, 2.6, 1.3];
+const WIDTHS: [f32; 5] = [18., 12., 7.5, 4., 1.8];
 const FOG: [f32; 2] = [1., 0.55];
 /// The tube: a dark slate body and a light edge on the side of the light (top left).
 const BODY: u32 = 0x325C6E;
@@ -158,6 +158,9 @@ pub(super) struct Layout {
     dust: Vec<(V3, u8)>,
     /// The soma as a 3D mesh: the pen's bumped sphere, in pixels around (0, 0, 0).
     soma: Soma,
+    /// The brain around the neuron: a sparse shell of small neurons and their links.
+    shell: Vec<V3>,
+    shell_links: Vec<(u16, u16)>,
 }
 
 /// A point on screen with its depth (0 near to 1 far) and its perspective scale.
@@ -431,6 +434,58 @@ impl Layout {
     }
 }
 
+/// Small neurons per hemisphere of the brain shell.
+const SHELL: usize = 120;
+
+/// `n` directions spread evenly on the unit sphere (the Fibonacci spiral).
+fn fib_sphere(n: usize) -> impl Iterator<Item = V3> {
+    let golden = PI * (3. - 5f32.sqrt());
+    (0..n).map(move |i| {
+        let y = 1. - 2. * (i as f32 + 0.5) / n as f32;
+        let r = (1. - y * y).sqrt();
+        let a = golden * i as f32;
+        [a.cos() * r, y, a.sin() * r]
+    })
+}
+
+/// One hemisphere of the brain shell (`side` -1 left, 1 right): an egg with folds, flat on
+/// the inner side. Unit coordinates with y up (the camera space has y down: see `shell_point`).
+fn hemisphere(side: f32, rng: &mut Rng) -> Vec<V3> {
+    fib_sphere(SHELL)
+        .map(|d| {
+            let fold = 0.07 * (9. * d[1] + 4. * d[2]).sin() * (8. * d[2] - 3. * d[0]).cos()
+                + 0.03 * (17. * d[0] + 11. * d[1]).sin()
+                + 0.02 * (rng.next() - 0.5);
+            let r = 1. + fold;
+            let mut x = d[0] * 0.5 * r;
+            if x * side < -0.38 {
+                x = -0.38 * side + (x + 0.38 * side) * 0.25;
+            }
+            let y = d[1] * 0.62 * r * if d[1] < 0. { 0.8 } else { 1. };
+            let z = d[2] * 0.98 * r;
+            [x * (1. - 0.12 * d[2].max(0.)) + side * 0.46, y + 0.08, z]
+        })
+        .collect()
+}
+
+/// The lobe of a shell point: 0 frontal, 1 parietal, 2 temporal, 3 occipital.
+fn lobe(p: V3) -> usize {
+    if p[2] > 0.3 {
+        0
+    } else if p[2] < -0.5 {
+        3
+    } else if p[1] < -0.05 {
+        2
+    } else {
+        1
+    }
+}
+
+/// A unit shell point (y up) in the layout space (y down), scaled to `r` pixels.
+fn shell_point(p: V3, r: f32) -> V3 {
+    [p[0] * r, -p[1] * r, p[2] * r]
+}
+
 /// The pen's soma: an icosphere (three subdivisions, 1280 faces) whose points move out by
 /// `sin(2x)cos(2y)sin(2z)*0.5 + sin(5x+3y)*0.2` (pen units, radius 3.3), scaled to `r` pixels.
 fn soma_mesh(r: f32) -> Soma {
@@ -544,7 +599,9 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
         bottom: HEAD + avail + 20.,
         s,
         dust: Vec::new(),
-        soma: soma_mesh(soma_r * 1.8),
+        soma: soma_mesh(soma_r),
+        shell: Vec::new(),
+        shell_links: Vec::new(),
     };
 
     let books: Vec<&String> = books
@@ -553,14 +610,42 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
         .collect();
     let nc = books.len();
     let mut used: Vec<V3> = Vec::new();
+    // The brain shell, and the middle of each lobe (left lobes 0-3, right lobes 4-7).
+    let mut rng = Rng::new(0xB2A1);
+    let mut unit_shell: Vec<V3> = Vec::new();
+    let mut lobes = [[0f32; 3]; 8];
+    let mut counts = [0f32; 8];
+    for (h, side) in [(0, -1.), (1, 1.)] {
+        for q in hemisphere(side, &mut rng) {
+            let id = h * 4 + lobe(q);
+            lobes[id] = add(lobes[id], q);
+            counts[id] += 1.;
+            unit_shell.push(q);
+        }
+    }
+    out.shell = unit_shell.iter().map(|q| shell_point(*q, radius)).collect();
+    for i in 0..out.shell.len() {
+        let mut near: Vec<(f32, usize)> = (0..out.shell.len())
+            .filter(|&j| j != i)
+            .map(|j| (len3(sub(unit_shell[i], unit_shell[j])), j))
+            .collect();
+        near.select_nth_unstable_by(3, |a, b| a.0.total_cmp(&b.0));
+        for &(_, j) in &near[..3] {
+            let pair = (i.min(j) as u16, i.max(j) as u16);
+            if !out.shell_links.contains(&pair) {
+                out.shell_links.push(pair);
+            }
+        }
+    }
+    const ORDER: [usize; 8] = [0, 4, 1, 5, 2, 6, 3, 7];
     for (k, b) in books.iter().enumerate() {
         // Codebases around the vertical axis, a little above and below the equator.
-        let a = -0.6 * PI + k as f32 * TAU / nc as f32;
-        let el: f32 = [0.0, 0.42, -0.42][k % 3];
-        let dir = [a.cos() * el.cos(), el.sin(), a.sin() * el.cos()];
+        // The dendrite runs to the middle of its lobe, just inside the brain shell.
+        let id = ORDER[k % 8];
+        let centre = mul(lobes[id], 1. / counts[id].max(1.));
+        let dir = norm(shell_point(centre, 1.));
         used.push(dir);
-        let ring = if nc == 1 { 0.6 } else { 0.86 };
-        let junction = mul(dir, radius * ring);
+        let junction = shell_point(mul(centre, 1.1), radius);
         let mut rng = Rng::new(hash(b));
         let start = mul(dir, soma_r * 0.8);
         let main = wander(
@@ -572,7 +657,7 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
             0.35,
             Some(junction),
         );
-        let main_r = (0.4 + rng.next() * 0.3) * unit * 2.2;
+        let main_r = (0.4 + rng.next() * 0.3) * unit * 4.;
         let count = 3 + (rng.next() * 4.) as usize;
         out.sides(&mut rng, &main, count, main_r);
         let cl = out.clusters.len();
@@ -653,7 +738,7 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
         used.push(dir);
         let reach = (0.4 + rng.next() * 0.5) * radius;
         let pts = wander(&mut rng, mul(dir, soma_r * 0.8), dir, reach, 20, 0.4, None);
-        let r = (0.4 + rng.next() * 0.3) * unit * 2.;
+        let r = (0.4 + rng.next() * 0.3) * unit * 3.6;
         let count = 2 + (rng.next() * 3.) as usize;
         out.sides(&mut rng, &pts, count, r);
         out.add(pts, soma_r / unit, r, true, Kind::Filler);
@@ -751,6 +836,25 @@ pub(super) fn paint(
             _ => (1.8, 0x00AACC, 0.28),
         };
         p.dot(pr.xy, r * pr.scale, c, alpha * fog);
+    }
+
+    // The brain shell: faint links in the fog, motes on the near half.
+    let shell: Vec<Proj> = l.shell.iter().map(|q| at(*q)).collect();
+    let mut far = Vec::new();
+    let mut near = Vec::new();
+    for &(a, b) in &l.shell_links {
+        let (pa, pb) = (shell[a as usize], shell[b as usize]);
+        let seg = [pa.xy[0], pa.xy[1], pb.xy[0], pb.xy[1]];
+        if (pa.depth + pb.depth) / 2. > 0.55 {
+            far.push(seg);
+        } else {
+            near.push(seg);
+        }
+    }
+    p.strokes(&far, TEAL, 1., 0.14);
+    p.strokes(&near, TEAL, 1.1, 0.32);
+    for q in shell.iter().filter(|q| q.depth < 0.55) {
+        p.dot(q.xy, 1.4 * q.scale, TEAL, 0.5);
     }
 
     // Project the tree once: the points of every branch on screen.

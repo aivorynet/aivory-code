@@ -2390,6 +2390,8 @@ struct Scanner {
     native_baselined: HashSet<String>,
     /// The pinned codebases (`repos/add`): root -> codebase id.
     pins: Vec<PinnedRepo>,
+    /// Claude sessions that the CLI itself marks `busy` or `shell` (live process).
+    busy: HashSet<String>,
 }
 
 impl Scanner {
@@ -2408,6 +2410,7 @@ impl Scanner {
             native_turns: HashMap::new(),
             native_baselined: HashSet::new(),
             pins: Vec::new(),
+            busy: HashSet::new(),
         }
     }
 
@@ -2605,6 +2608,12 @@ impl Scanner {
             .filter(|s| !owned.contains(&s.id))
             .cloned()
             .collect();
+        self.busy = summaries
+            .iter()
+            .find(|s| s.provider == Provider::Claude)
+            .and_then(|s| s.path.ancestors().nth(3))
+            .map(|home| busy_claude(home, process_alive))
+            .unwrap_or_default();
         let mut panes = Vec::with_capacity(summaries.len());
         let mut files = HashMap::new();
         let mut cwds = HashMap::new();
@@ -2792,6 +2801,13 @@ impl Scanner {
         {
             derived.state = SessionState::Working;
             derived.ask = None;
+        }
+        // The CLI marks a session `busy` while a turn, a background task, or a shell runs. The
+        // transcript is quiet then (long thinking, a long tool, a monitor), so it reads idle.
+        if matches!(derived.state, SessionState::Idle | SessionState::Parked)
+            && self.busy.contains(&s.id)
+        {
+            derived.state = SessionState::Working;
         }
         let cwd = s.cwd.as_deref().map(PathBuf::from);
         let root = cwd.as_deref().map(repo_root);
@@ -3280,6 +3296,47 @@ fn permission_mode(mode: Mode) -> &'static str {
     }
 }
 
+/// Ids of the Claude sessions with a live process that marks itself `busy` or `shell` in
+/// `<home>/sessions/<pid>.json`. Only the status fields are read, never the transcript.
+fn busy_claude(home: &Path, alive: impl Fn(u32) -> bool) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let Ok(dir) = std::fs::read_dir(home.join("sessions")) else {
+        return out;
+    };
+    for e in dir.filter_map(Result::ok) {
+        let path = e.path();
+        if path.extension().is_none_or(|x| x != "json") {
+            continue;
+        }
+        let Some(v) = std::fs::read(&path)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+        else {
+            continue;
+        };
+        let busy = matches!(v["status"].as_str(), Some("busy" | "shell"));
+        let interactive = v["kind"].as_str() == Some("interactive");
+        let pid = v["pid"].as_u64().and_then(|p| u32::try_from(p).ok());
+        if let (true, true, Some(pid), Some(id)) = (busy, interactive, pid, v["sessionId"].as_str())
+            && alive(pid)
+        {
+            out.insert(id.to_string());
+        }
+    }
+    out
+}
+
+fn process_alive(pid: u32) -> bool {
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut sys = System::new();
+    let pid = Pid::from_u32(pid);
+    sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), ProcessRefreshKind::new());
+    sys.process(pid).is_some_and(|p| {
+        let name = p.name().to_string_lossy().to_lowercase();
+        name.contains("claude") || name.contains("node")
+    })
+}
+
 /// True when the newest `permissionMode` of a Claude transcript lets the tools run without a
 /// question (`auto`, `bypassPermissions`). Reads the file, keeps no content.
 ///
@@ -3700,6 +3757,29 @@ mod tests {
         assert!(answer_message(AskKind::Permission, Some("Allow"), None).contains("permission"));
         assert!(answer_message(AskKind::Permission, Some("Deny"), None).starts_with("No"));
         assert!(answer_message(AskKind::Plan, Some("Edit plan"), Some("use B")).contains("use B"));
+    }
+
+    #[test]
+    fn busy_status_of_live_processes_is_read() {
+        let dir = std::env::temp_dir().join(format!("aivory-busy-{}", std::process::id()));
+        let sessions = dir.join("sessions");
+        std::fs::create_dir_all(&sessions).unwrap();
+        let w = |pid: u32, id: &str, status: &str, kind: &str| {
+            let j = format!(
+                r#"{{"pid":{pid},"sessionId":"{id}","status":"{status}","kind":"{kind}"}}"#
+            );
+            std::fs::write(sessions.join(format!("{pid}.json")), j).unwrap();
+        };
+        w(1, "busy-live", "busy", "interactive");
+        w(2, "shell-live", "shell", "interactive");
+        w(3, "idle-live", "idle", "interactive");
+        w(4, "busy-dead", "busy", "interactive");
+        w(5, "busy-bg", "busy", "bg");
+        let got = busy_claude(&dir, |pid| pid != 4);
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut got: Vec<_> = got.into_iter().collect();
+        got.sort();
+        assert_eq!(got, ["busy-live", "shell-live"]);
     }
 
     #[test]

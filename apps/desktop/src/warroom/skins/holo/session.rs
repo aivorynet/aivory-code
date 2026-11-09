@@ -320,7 +320,7 @@ impl WarRoomScreen {
             meta.push_str(&format!(" · turn {turn}"));
         }
         meta.push_str(&format!(" · {} m", pane.minutes(war.now)));
-        let (park_id, focus_id) = (pane.id.clone(), pane.id.clone());
+        let park_id = pane.id.clone();
         let head = div()
             .flex_none()
             .flex()
@@ -348,18 +348,11 @@ impl WarRoomScreen {
                                 format!("{}/{}", pane.codebase, pane.title)
                             }),
                     )
-                    .child(
-                        div()
-                            .flex_none()
-                            .flex()
-                            .gap(px(18.))
-                            .child(link("holo-focus", "Focus ›", PK).on_click(
-                                cx.listener(move |this, _, _, cx| this.skin_focus(&focus_id, cx)),
-                            ))
-                            .child(link("holo-park", "Park", MUTED).on_click(cx.listener(
-                                move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx),
-                            ))),
-                    ),
+                    .child(div().flex_none().flex().gap(px(18.)).child(
+                        link("holo-park", "Park", MUTED).on_click(cx.listener(
+                            move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx),
+                        )),
+                    )),
             )
             .child(mono(meta, 0x5F95B8, S_SMALL - 1.))
             .child(
