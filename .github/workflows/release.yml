@@ -63,6 +63,12 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Stable installer name (winget points at it)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          f=$(ls dist/*-setup.exe | head -1)
+          mv "$f" dist/aivory-code-windows-x64-setup.exe
       - name: Portable archive
         shell: bash
         run: |
@@ -84,14 +90,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: Render the winget manifests and the Homebrew formula
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          bash scripts/render-packages.sh "$version" dist packages
+          (cd packages && zip -r ../dist/aivory-code-packages.zip winget homebrew)
+          cp packages/SHA256SUMS.txt dist/
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
           body: |
             Windows is the supported platform. The macOS and Linux builds are a preview.
-            The Windows build has no code signature yet, so SmartScreen shows a warning.
+            The builds have no code signature yet. Install with `winget install Aivory.AivoryCode`
+            or `brew install aivorynet/tap/aivory-code` to avoid the SmartScreen and Gatekeeper prompts.

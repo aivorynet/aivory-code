@@ -1,5 +1,21 @@
 # AIVory Code
 
+<p align="center">
+  <b>One screen for all your coding agents.</b><br>
+  Claude Code, Codex CLI and Gemini CLI side by side: who works, who waits for you, who is stuck.
+</p>
+
+<p align="center">
+  <img src="docs/images/looks.jpg" alt="AIVory Code in its eight looks: Minimal, Bridge, Operator, Holo, Neon, Navigator, Tactical and Command" width="100%">
+</p>
+
+<p align="center">
+  <a href="#install"><b>Install</b></a> ·
+  <a href="#write-your-own-look">Write your own look</a> ·
+  <a href="docs/roadmap.md">Roadmap</a> ·
+  <a href="https://github.com/aivorynet/aivory-code/issues">Issues</a>
+</p>
+
 AIVory Code is a local-first control room for coding agents. It shows the sessions of Claude Code,
 Codex CLI, and Gemini CLI on one screen. You see which agent works, which agent waits for an
 answer, and which agent has an error. You answer from the desktop app or from your phone.
@@ -9,8 +25,30 @@ already have. The desktop app and the phone app are clients of this daemon.
 
 Status: first public version. See [docs/roadmap.md](docs/roadmap.md).
 Windows 11 is the supported platform. The macOS and Linux builds are a preview: they build in CI,
-but nobody has tested them yet. The Windows build has no code signature yet, so SmartScreen
-shows a warning at the first start.
+but nobody has tested them yet.
+
+## Install
+
+**Windows** (winget):
+
+```powershell
+winget install Aivory.AivoryCode
+```
+
+**macOS and Linux** (Homebrew):
+
+```sh
+brew install aivorynet/tap/aivory-code
+```
+
+Both install `aivory` (the desktop app) and `aivoryd` (the daemon). Start the app with `aivory`.
+
+The builds have no code signature yet. The package managers avoid the warnings: winget installs
+without the SmartScreen prompt, and Homebrew formulas do not get the macOS quarantine flag.
+If you download the installer or the archive from the
+[releases page](https://github.com/aivorynet/aivory-code/releases) yourself, Windows SmartScreen
+shows a warning at the first start ("More info" > "Run anyway"). On macOS, right-click the app
+and select "Open".
 
 <p align="center">
   AIVory Code is free and open source. If it saves you time, I'd love a <a href="https://buy.stripe.com/5kQbJ3csm21Xfz64DhdjO00">coffee</a> or a <a href="https://github.com/aivorynet/aivory-code">star</a>.<br>

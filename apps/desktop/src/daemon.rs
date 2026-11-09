@@ -54,6 +54,45 @@ pub fn start_demo() -> anyhow::Result<Endpoint> {
     Ok(endpoint)
 }
 
+/// Start `aivoryd serve --iroh` from the app folder when no daemon answers on the endpoint.
+/// The installers place `aivoryd` next to `aivory` and register no service, so the app starts
+/// it. `--iroh` lets a phone pair from Settings > Devices (iroh accepts only paired devices).
+/// Runs on its own thread; the feed thread connects when the daemon is up.
+pub fn ensure_daemon(name: String, endpoint: Endpoint) {
+    thread::spawn(move || {
+        if call::<method::DaemonInfoMethod>(&endpoint, &Empty {}).is_ok() {
+            return;
+        }
+        if let Err(e) = spawn_daemon(&name) {
+            eprintln!("aivory: cannot start aivoryd: {e:#}");
+        }
+    });
+}
+
+fn spawn_daemon(name: &str) -> anyhow::Result<()> {
+    let exe = std::env::current_exe()?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("the app has no folder"))?;
+    let daemon = dir.join(format!("aivoryd{}", std::env::consts::EXE_SUFFIX));
+    if !daemon.exists() {
+        anyhow::bail!("{} is missing", daemon.display());
+    }
+    let mut cmd = std::process::Command::new(&daemon);
+    cmd.args(["serve", "--iroh", "--endpoint", name])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW | DETACHED_PROCESS: no console, and the daemon outlives the app.
+        cmd.creation_flags(0x0800_0000 | 0x0000_0008);
+    }
+    cmd.spawn()?;
+    Ok(())
+}
+
 /// Call one method on its own short connection. Blocking: run it on the background executor.
 pub fn call<M: Method>(endpoint: &Endpoint, params: &M::Params) -> anyhow::Result<M::Result> {
     let params = serde_json::to_value(params)?;

@@ -7,6 +7,8 @@
 //! from the shell (`shell/holo.rs`), so this look paints no page of its own.
 
 mod session;
+mod synapse;
+pub(super) use synapse::{Cache as SynapseCache, Orbit};
 mod war;
 
 use std::time::Instant;

@@ -353,22 +353,31 @@ impl WarRoomScreen {
 
         let sel_session = card_session.or_else(|| live.first().copied());
         let t = scene.t;
+        // A window type can show in another slot; build each type for its slot.
+        let panels = &self.navigator.panels;
+        panels.cur_slot_set("fsn");
         let fsn = self.nav_fsn(war, (pick.as_ref(), &queue, scene.clone(), t), cx);
+        panels.cur_slot_set("locks");
         let locks = self.nav_locks(war, cx);
+        panels.cur_slot_set("power");
         let power = self.nav_power(war, cx);
+        panels.cur_slot_set("sel");
         let selected = self.nav_selected(war, sel_session, t, cx);
+        panels.cur_slot_set("osview");
         let osview = self.nav_osview(war, now, cx);
+        panels.cur_slot_set("log");
         let log = self.nav_log(war, t, cx);
+        panels.cur_slot_clear();
         let dialog = self.nav_dialog(war, &queue, cx);
 
         let look_menu = self.nav_look_menu(cx);
         let mut wins = vec![
-            ("fsn", fsn),
-            ("locks", locks),
-            ("power", power),
-            ("osview", osview),
-            ("log", log),
-            ("sel", selected),
+            (panels.slot_of_kind("fsn"), fsn),
+            (panels.slot_of_kind("locks"), locks),
+            (panels.slot_of_kind("power"), power),
+            (panels.slot_of_kind("osview"), osview),
+            (panels.slot_of_kind("log"), log),
+            (panels.slot_of_kind("sel"), selected),
         ];
         // A maximized window goes on top.
         wins.sort_by_key(|(k, _)| self.navigator.panels.state_of(k) == WinState::Max);

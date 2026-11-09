@@ -93,7 +93,12 @@ fn main() -> ExitCode {
     } else {
         Endpoint::new(&cli.endpoint).map_err(anyhow::Error::from)
     } {
-        Ok(endpoint) => endpoint,
+        Ok(endpoint) => {
+            if !cli.demo {
+                daemon::ensure_daemon(cli.endpoint.clone(), endpoint.clone());
+            }
+            endpoint
+        }
         Err(e) => {
             eprintln!("aivory: {e:#}");
             return ExitCode::FAILURE;

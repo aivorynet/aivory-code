@@ -22,9 +22,10 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap.workspace = true
 futures = "0.3"
-gpui = { package = "gpui-pre", version = "0.3.9" }
+# test-support: the Holo open effect takes a picture of a frame (Window::render_to_image).
+gpui = { package = "gpui-pre", version = "0.3.9", features = ["test-support"] }
 gpui-base = "0.8.0"
-gpui_platform = { package = "gpui-pre-platform", version = "0.3.9" }
+gpui_platform = { package = "gpui-pre-platform", version = "0.3.9", features = ["test-support"] }
 qrcode = { version = "0.14", default-features = false }
 serde_json.workspace = true
 xcap = { version = "0.9", default-features = false }

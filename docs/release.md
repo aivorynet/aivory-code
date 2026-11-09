@@ -7,10 +7,35 @@
 
 `ci.yml` runs on each push to `main` and on each PR: fmt, clippy `-D warnings`, tests, `cargo deny`.
 
+## Package managers (winget, Homebrew)
+The builds have no code signature. winget and Homebrew formulas avoid the SmartScreen and
+Gatekeeper prompts, so the README tells users to install through them.
+
+The release job runs `scripts/render-packages.sh`. It fills the templates in `packaging/` with
+the version and the SHA-256 of the release files, and attaches `aivory-code-packages.zip` and
+`SHA256SUMS.txt` to the release. The Windows installer gets the fixed name
+`aivory-code-windows-x64-setup.exe`, because the winget manifest points at it.
+
+First setup, once:
+1. Create the public repo `aivorynet/homebrew-tap` with a folder `Formula/`.
+2. Fork `microsoft/winget-pkgs`.
+
+Each release:
+1. Download `aivory-code-packages.zip` from the release.
+2. Homebrew: copy `homebrew/Formula/aivory-code.rb` to `aivorynet/homebrew-tap`, commit, push.
+   Test: `brew install aivorynet/tap/aivory-code`.
+3. winget: copy `winget/manifests/...` into the fork, check it with
+   `winget validate --manifest <folder>`, test it with `winget install --manifest <folder>`,
+   and open a PR to `microsoft/winget-pkgs`. Microsoft reviews the first version by hand.
+   Later versions can use `wingetcreate update Aivory.AivoryCode --version <v> --urls <url> --submit`.
+
+Use a formula, not a cask, for Homebrew. Homebrew sets the quarantine flag on cask downloads,
+and Gatekeeper then blocks an app that is not notarized.
+
 ## Artifacts
 | OS | Files |
 |---|---|
-| Windows x64 | `aivory-windows-x64.zip`, NSIS `*-setup.exe` |
+| Windows x64 | `aivory-windows-x64.zip`, NSIS `aivory-code-windows-x64-setup.exe` |
 | macOS arm64, x64 | `*.dmg` (unsigned), tar.gz |
 | Linux x64 | `.deb`, `.AppImage`, tar.gz |
 

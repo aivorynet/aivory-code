@@ -89,6 +89,9 @@ pub struct Display {
     /// `display.look` clears it. The field serializes as `null`, so `set_key` finds it.
     #[serde(default)]
     pub custom_theme: Option<String>,
+    /// The maximize button of the window opens a borderless full screen. F11 goes back.
+    #[serde(default)]
+    pub maximize_full_screen: bool,
 }
 
 impl Display {
@@ -121,6 +124,7 @@ impl Default for Display {
             ui_scale: Self::default_ui_scale(),
             look: Look::Minimal,
             custom_theme: None,
+            maximize_full_screen: false,
         }
     }
 }

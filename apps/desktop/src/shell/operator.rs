@@ -8,7 +8,8 @@ use std::time::Instant;
 use aivory_protocol::{LineKind, Pane, SessionState};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Context, DispatchPhase, Div, KeyDownEvent, Window, canvas, div, px, relative, rgb,
+    Anchor, AnyElement, Context, DispatchPhase, Div, KeyDownEvent, Window, anchored, canvas,
+    deferred, div, point, px, relative, rgb,
 };
 use gpui_base::input::{InputEvent, InputState};
 
@@ -67,7 +68,7 @@ impl Shell {
             div()
                 .id(id)
                 .cursor_pointer()
-                .text_size(ui::ts(13.))
+                .text_size(ui::ts(MX_BODY))
                 .text_color(rgb(if on { GREEN_HI } else { GREEN_MID }))
                 .hover(|h| h.text_color(rgb(GREEN_HI)))
                 .on_click(cx.listener(move |this, _, _, cx| {
@@ -85,7 +86,7 @@ impl Shell {
             .gap(px(26.))
             .child(
                 div()
-                    .text_size(ui::ts(14.))
+                    .text_size(ui::ts(MX_TITLE))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(rgb(GREEN_HI))
                     .child("AIVORY//OPERATOR"),
@@ -103,7 +104,7 @@ impl Shell {
         if let Screen::Session(id) = &self.screen {
             top = top.child(
                 div()
-                    .text_size(ui::ts(13.))
+                    .text_size(ui::ts(MX_BODY))
                     .text_color(rgb(GREEN_HI))
                     .child(format!(
                         "session {}",
@@ -119,7 +120,7 @@ impl Shell {
         if let Some(crumb) = crumb {
             top = top.child(
                 div()
-                    .text_size(ui::ts(13.))
+                    .text_size(ui::ts(MX_BODY))
                     .text_color(rgb(GREEN_HI))
                     .child(crumb),
             );
@@ -128,13 +129,13 @@ impl Shell {
             .child(div().flex_1())
             .child(
                 div()
-                    .text_size(ui::ts(12.5))
+                    .text_size(ui::ts(MX_BODY))
                     .text_color(rgb(GREEN_MID))
                     .child(format!("{live} agents · {idle} idle")),
             )
             .child(
                 div()
-                    .text_size(ui::ts(12.5))
+                    .text_size(ui::ts(MX_BODY))
                     .text_color(rgb(BLUE))
                     .child(format!("{asks} decisions")),
             )
@@ -191,7 +192,7 @@ impl Shell {
             .flex_col()
             .bg(rgb(PAGE))
             .font_family(FONT)
-            .text_size(ui::ts(12.))
+            .text_size(ui::ts(MX_BODY))
             .text_color(rgb(GREEN))
             .child(top)
             .child(div().relative().flex_1().min_h(px(0.)).child(content))
@@ -375,8 +376,12 @@ impl Shell {
         let text = |id: String, label: &'static str, on: bool| {
             div()
                 .id(eid(id))
+                .flex_none()
+                .flex()
+                .items_center()
+                .whitespace_nowrap()
                 .cursor_pointer()
-                .text_size(ui::ts(12.5))
+                .text_size(ui::ts(MX_BODY))
                 .text_color(rgb(if on { GREEN_HI } else { GREEN_MID }))
                 .hover(|h| h.text_color(rgb(GREEN_HI)))
                 .child(label)
@@ -395,9 +400,24 @@ impl Shell {
             .into_any_element();
         }
         let current = crate::theme::tk().look;
-        let mut row = div().flex().items_center().gap(px(14.));
+        let mut list = div()
+            .id("mx-look-list")
+            .occlude()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .px(px(12.))
+            .py(px(8.))
+            .min_w(px(120.))
+            .bg(rgb(PAGE))
+            .border_1()
+            .border_color(rgb(GREEN_DIM))
+            .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+                this.look_menu = false;
+                cx.notify();
+            }));
         for (look, name) in LOOKS {
-            row = row.child(
+            list = list.child(
                 text(format!("mx-look-{name}"), name, look == current).on_click(cx.listener(
                     move |this, _, _, cx| {
                         this.look_menu = false;
@@ -406,13 +426,27 @@ impl Shell {
                 )),
             );
         }
-        row.child(
-            text("mx-look-x".into(), "×", false).on_click(cx.listener(|this, _, _, cx| {
-                this.look_menu = false;
-                cx.notify();
-            })),
-        )
-        .into_any_element()
+        div()
+            .relative()
+            .child(
+                text("mx-look".into(), crate::look::name(current), true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.look_menu = false;
+                        cx.notify();
+                    }))
+                    .child(" ▾"),
+            )
+            .child(
+                deferred(
+                    anchored()
+                        .anchor(Anchor::TopLeft)
+                        .offset(point(px(0.), px(22.)))
+                        .snap_to_window_with_margin(px(8.))
+                        .child(list),
+                )
+                .with_priority(3),
+            )
+            .into_any_element()
     }
 
     /// J and K: the next or the previous live session.

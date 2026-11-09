@@ -1998,6 +1998,11 @@
           "$ref": "#/$defs/Look",
           "default": "minimal"
         },
+        "maximizeFullScreen": {
+          "default": false,
+          "description": "The maximize button of the window opens a borderless full screen. F11 goes back.",
+          "type": "boolean"
+        },
         "perRow": {
           "description": "Panes per row: 1, 2, 3, 4, 8, 9 or 16. `None` is Auto (fits the window width).",
           "format": "uint8",

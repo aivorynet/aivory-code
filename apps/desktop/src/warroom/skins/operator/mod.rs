@@ -7,11 +7,16 @@
 
 pub(crate) mod kit;
 
+use std::cell::Cell;
+use std::rc::Rc;
 use std::time::Instant;
 
 use aivory_protocol::{AskKind, Pane, SessionState, WarRoom};
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Div, Entity, Subscription, Window, div, px, relative, rgb};
+use gpui::{
+    AnyElement, Bounds, Context, Div, Entity, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels,
+    ScrollWheelEvent, Subscription, Window, canvas, div, px, relative, rgb,
+};
 use gpui_base::input::{InputEvent, InputState};
 
 use self::kit::*;
@@ -42,6 +47,8 @@ pub(in crate::warroom) struct OperatorState {
     opt: usize,
     /// The page of agent screens.
     page: usize,
+    /// The bounds of the scroll track, kept for the mouse.
+    track: Rc<Cell<Bounds<Pixels>>>,
     /// The prompt line of the center screen, and the event subscription of its Enter key.
     steer: Option<Entity<InputState>>,
     steer_sub: Option<Subscription>,
@@ -51,6 +58,17 @@ pub(in crate::warroom) struct OperatorState {
     typing: bool,
     /// Give the keyboard back to the wall in the next frame.
     blur: bool,
+    /// The agent on the center screen. The owner picks it on the bottom row; none = no signal.
+    active: Option<String>,
+    /// The agent screen under the mouse and the start of its reveal.
+    hover: Option<(String, Instant)>,
+    /// The scroll of the center console, and "go to the newest line in the next frame".
+    center_scroll: gpui::ScrollHandle,
+    to_bottom: bool,
+    /// When the agent came to the center screen: the reveal of the console runs from it.
+    active_at: Option<Instant>,
+    /// The screenshot hooks `AIVORY_MX_PICK=<n>` and `AIVORY_MX_HOVER=<n>` were read.
+    hooks_read: bool,
 }
 
 /// The agents for the screens: the ones that work now (the busiest first), then the other
@@ -103,10 +121,16 @@ impl WarRoomScreen {
         }
         let opt = self.operator.opt;
         let page = self.operator.page;
-        // The agent behind the decision, else the busiest agent, else the first one.
-        let focus = current
-            .or_else(|| busy.first().copied())
-            .or_else(|| all.first().copied());
+        // The center screen shows only the agent that the owner picked on the bottom row.
+        let focus = self
+            .operator
+            .active
+            .as_ref()
+            .and_then(|id| all.iter().copied().find(|p| &p.id == id));
+        if focus.is_none() {
+            self.operator.active = None;
+        }
+        let waits = focus.is_some_and(|f| queue.iter().any(|q| q.id == f.id));
         let steer = self.operator_steer(window, cx);
         self.operator.focus_id = focus.map(|p| p.id.clone());
         let typing = gpui::Focusable::focus_handle(&steer, cx).is_focused(window);
@@ -130,7 +154,7 @@ impl WarRoomScreen {
             .min_w(px(0.))
             .flex()
             .flex_col()
-            .child(self.operator_focus(focus, current.is_some(), &all, &steer, typing, t, cx));
+            .child(self.operator_focus(focus, waits, &all, &steer, typing, t, cx));
         let right = div()
             .flex_none()
             .w(px(WIDE))
@@ -158,7 +182,13 @@ impl WarRoomScreen {
             .child(center)
             .child(right);
 
-        let mut row = div().flex_none().h(px(290.)).flex().gap(px(GAP));
+        let mut row = div()
+            .id("mx-row")
+            .flex_none()
+            .h(px(250.))
+            .flex()
+            .gap(px(GAP))
+            .on_scroll_wheel(cx.listener(Self::operator_wheel));
         for slot in 0..PER_PAGE {
             let idx = page * PER_PAGE + slot;
             row = row.child(match busy.get(idx) {
@@ -166,7 +196,49 @@ impl WarRoomScreen {
                 None => operator_dark(idx, busy.is_empty() && slot == 0),
             });
         }
+        // Screenshot hooks: put agent n on the center, or show the reveal of agent n.
+        if !self.operator.hooks_read {
+            self.operator.hooks_read = true;
+            let hook = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<usize>().ok());
+            if let Some(p) = hook("AIVORY_MX_PICK").and_then(|n| busy.get(n)) {
+                self.operator.active = Some(p.id.clone());
+                self.operator.active_at = Some(Instant::now());
+            }
+        }
+        if let Some(p) = std::env::var("AIVORY_MX_HOVER")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .and_then(|n| busy.get(n))
+            && self.operator.hover.as_ref().is_none_or(|(h, _)| h != &p.id)
+        {
+            self.operator.hover = Some((p.id.clone(), Instant::now()));
+        }
+        let active = self.operator.active.clone();
         let bar = self.operator_scroll(busy.len(), page, pages, cx);
+        let first = page * PER_PAGE;
+        let lines: Vec<(LineFrom, u32, bool)> = busy
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let from = if i < first {
+                    LineFrom::Left
+                } else if i < first + PER_PAGE {
+                    LineFrom::Slot(i - first)
+                } else {
+                    LineFrom::Right
+                };
+                (
+                    from,
+                    state_color(p.state).0,
+                    active.as_deref() == Some(p.id.as_str()),
+                )
+            })
+            .collect();
+        let strip = div()
+            .flex_none()
+            .h(px(16.))
+            .relative()
+            .child(state_lines(lines, PER_PAGE, WIDE, GAP, t));
 
         div()
             .size_full()
@@ -180,6 +252,7 @@ impl WarRoomScreen {
             .font_family(FONT)
             .text_size(ui::ts(T_ENTRY))
             .child(top)
+            .child(strip)
             .child(row)
             .child(bar)
             .into_any_element()
@@ -269,7 +342,7 @@ impl WarRoomScreen {
                     div()
                         .text_size(ui::ts(T_SECTION))
                         .text_color(rgb(BLUE_HI))
-                        .child("INCOMING · 0"),
+                        .child("Incoming · 0"),
                 )
                 .child(
                     div()
@@ -297,7 +370,7 @@ impl WarRoomScreen {
                     .text_size(ui::ts(T_SECTION))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(rgb(BLUE_HI))
-                    .child(format!("INCOMING · {} / {}", at + 1, total)),
+                    .child(format!("Incoming {} of {}", at + 1, total)),
             )
             .child(div().relative().size(px(24.)).child(radar(t)));
         let mut top = div()
@@ -367,7 +440,7 @@ impl WarRoomScreen {
                         this.skin_answer(&session, &ask_id, &text, cx);
                     }))
                     .child(if on { "▶" } else { " " })
-                    .child(format!("{}  {}", i + 1, option.to_uppercase())),
+                    .child(format!("{}  {}", i + 1, option)),
             );
         }
         let open = pane.id.clone();
@@ -387,7 +460,7 @@ impl WarRoomScreen {
                     cx.emit(WarRoomEvent::OpenSession(open.clone()));
                 }))
                 .child(" ")
-                .child("W  WRITE AN ANSWER…"),
+                .child("W  Write an answer…"),
         );
         let body = body.child(head).child(top).child(menu);
         bezel(BLUE_RING)
@@ -422,7 +495,7 @@ impl WarRoomScreen {
                 div()
                     .text_size(ui::ts(T_SECTION))
                     .text_color(rgb(BLUE_HI))
-                    .child("QUEUE"),
+                    .child("Queue"),
             );
         let mut shown = 0;
         for (i, pane) in queue.iter().enumerate() {
@@ -513,16 +586,42 @@ impl WarRoomScreen {
         cx: &mut Context<Self>,
     ) -> Div {
         let Some(pane) = pane else {
-            return bezel(GREEN_MID)
+            return bezel(GREEN_DIM)
                 .flex_1()
                 .min_h(px(0.))
                 .child(screen(
                     false,
-                    div()
-                        .absolute()
-                        .inset_0()
-                        .p(px(PAD))
-                        .child("No agent runs."),
+                    div().absolute().inset_0().child(interference(t)).child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(10.))
+                            .child(
+                                div()
+                                    .px(px(18.))
+                                    .py(px(8.))
+                                    .bg(hca(0x010603, 220))
+                                    .border_1()
+                                    .border_color(hca(GREEN_DIM, 160))
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6.))
+                                    .text_size(ui::ts(MX_TITLE))
+                                    .text_color(rgb(GREEN))
+                                    .flex_col()
+                                    .child("No signal")
+                                    .child(
+                                        div()
+                                            .text_size(ui::ts(MX_SMALL))
+                                            .text_color(rgb(GREEN_MID))
+                                            .child("Pick an agent below to watch it here"),
+                                    ),
+                            ),
+                    ),
                 ))
                 .child(foot("-", FOOT, vec![], 30.));
         };
@@ -531,25 +630,87 @@ impl WarRoomScreen {
             .position(|p| p.id == pane.id)
             .map_or(1, |i| i + 1);
         let id = pane.id.clone();
-        let tail = display_lines(pane, 24);
+        let tail = display_lines(pane, 400);
         let stream = match tail.split_last() {
             Some((newest, old)) if pane.state == SessionState::Working => {
                 decoded(&pane.id, old, newest, hash_str(&pane.id), t)
             }
             _ => tokenize(&tail),
         };
+        if std::mem::take(&mut self.operator.to_bottom) {
+            self.operator.center_scroll.scroll_to_bottom();
+        }
+        // The reveal: for 0.9 s after the pick the rain of the agent turns into its console.
+        let arrive = self
+            .operator
+            .active_at
+            .map(|at| at.elapsed().as_secs_f32() / 0.9)
+            .filter(|p| *p < 1.);
+        if arrive.is_some() {
+            cx.notify();
+        }
+        let (tint, _) = state_color(pane.state);
+        let source = display_lines(pane, 24).join(" ");
+        let arrive_el = arrive.map(|p| {
+            div().absolute().inset_0().bottom(px(30.)).child(reveal(
+                &source,
+                tail.clone(),
+                activity(pane),
+                p,
+                t,
+                hash_str(&pane.id),
+                tint,
+                MX_BODY,
+                PAD,
+            ))
+        });
         let body = div()
             .absolute()
             .inset_0()
-            .px(px(PAD))
-            .pt(px(PAD))
-            .pb(px(PAD + 30.))
-            .flex()
-            .flex_col()
-            .overflow_hidden()
-            .text_size(ui::ts(T_ENTRY))
-            .line_height(relative(1.5))
-            .child(div().flex_none().child(stream.into_text()));
+            .pb(px(30.))
+            .child(
+                div()
+                    .id("mx-center-scroll")
+                    .size_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&self.operator.center_scroll)
+                    .pl(px(PAD))
+                    .pr(px(PAD + 8.))
+                    .pt(px(PAD))
+                    .pb(px(PAD))
+                    .bg(hca(0x010A03, 200))
+                    .text_size(ui::ts(MX_BODY))
+                    .line_height(relative(1.55))
+                    .child(stream.into_text()),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .bottom(px(30.))
+                    .child(
+                        gpui_base::Scrollbar::vertical(&self.operator.center_scroll)
+                            .mode(gpui_base::ScrollbarMode::Always),
+                    ),
+            );
+        let open = div()
+            .id("mx-center-open")
+            .absolute()
+            .top(px(8.))
+            .right(px(22.))
+            .px(px(8.))
+            .py(px(2.))
+            .cursor_pointer()
+            .text_size(ui::ts(MX_SMALL))
+            .text_color(rgb(GREEN_MID))
+            .bg(hca(0x010A03, 230))
+            .hover(|s| s.text_color(rgb(GREEN_HI)))
+            .on_click(cx.listener(move |_, _, _, cx| {
+                cx.emit(WarRoomEvent::OpenSession(id.clone()));
+            }))
+            .child("open session ↗");
         // The prompt overlay: its hover area is fixed; the bar slides in over the foot of the
         // transcript and never changes the size of the screen.
         let folded = !typing;
@@ -612,17 +773,9 @@ impl WarRoomScreen {
             .min_h(px(0.))
             .child(
                 glass(false)
-                    .child(
-                        div()
-                            .id("mx-focus")
-                            .absolute()
-                            .inset_0()
-                            .cursor_pointer()
-                            .on_click(cx.listener(move |_, _, _, cx| {
-                                cx.emit(WarRoomEvent::OpenSession(id.clone()));
-                            }))
-                            .child(body),
-                    )
+                    .when(arrive.is_none(), |d| d.child(body))
+                    .children(arrive_el)
+                    .child(open)
                     .child(overlay)
                     .child(glaze(false)),
             )
@@ -635,38 +788,38 @@ impl WarRoomScreen {
         let id = pane.id.clone();
         let source = display_lines(pane, 24).join(" ");
         let seed = hash_str(&pane.id);
-        let body = rain(&source, activity(pane), 0.6, t, seed);
-        // The newest steps in front of the rain: written text, it never changes.
-        let mut steps = div()
-            .absolute()
-            .left(px(0.))
-            .right(px(0.))
-            .bottom(px(0.))
-            .px(px(16.))
-            .py(px(10.))
-            .flex()
-            .flex_col()
-            .gap(px(4.))
-            .bg(hca(0x010A03, 226))
-            .text_size(ui::ts(T_LABEL + 1.))
-            .line_height(relative(1.35))
-            .child(
-                div()
-                    .text_size(ui::ts(T_LABEL))
-                    .text_color(rgb(GREEN_PATH))
-                    .child(format!("{} · {}", pane.codebase, pane.provider)),
-            );
-        for line in step_lines(pane, 3) {
-            steps = steps.child(
-                div()
-                    .flex_none()
-                    .max_h(px(2. * 16.5))
-                    .overflow_hidden()
-                    .text_color(rgb(GREEN_HI))
-                    .child(line),
-            );
+        let act = activity(pane);
+        let (tint, word) = state_color(pane.state);
+        // Hover: the rain turns into the console output in 0.7 s.
+        let reveal_p = self
+            .operator
+            .hover
+            .as_ref()
+            .filter(|(h, _)| h == &pane.id)
+            .map(|(_, at)| (at.elapsed().as_secs_f32() / 0.7).min(1.))
+            // The agent on the center screen keeps its console open on its own screen too.
+            .or_else(|| (self.operator.active.as_deref() == Some(pane.id.as_str())).then_some(1.));
+        let body = match reveal_p {
+            Some(p) => reveal(
+                &source,
+                display_lines(pane, 40),
+                act,
+                p,
+                t,
+                seed,
+                tint,
+                MX_SMALL,
+                12.,
+            ),
+            None => rain(&source, act, 0.6, t, seed, tint),
+        };
+        let on_center = self.operator.active.as_deref() == Some(pane.id.as_str());
+        let hover_id = pane.id.clone();
+        let mut parts = vec![(name(pane), 0xB9C4BB), (format!("· {word}"), tint)];
+        if on_center {
+            parts.push(("· on center".to_string(), GREEN));
         }
-        bezel(GREEN_MID)
+        bezel(if on_center { GREEN } else { GREEN_MID })
             .flex_1()
             .min_w(px(0.))
             .child(screen(
@@ -676,18 +829,30 @@ impl WarRoomScreen {
                     .absolute()
                     .inset_0()
                     .cursor_pointer()
-                    .on_click(cx.listener(move |_, _, _, cx| {
-                        cx.emit(WarRoomEvent::OpenSession(id.clone()));
+                    .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                        if *on {
+                            this.operator.hover = Some((hover_id.clone(), Instant::now()));
+                        } else if this
+                            .operator
+                            .hover
+                            .as_ref()
+                            .is_some_and(|(h, _)| h == &hover_id)
+                        {
+                            this.operator.hover = None;
+                        }
+                        cx.notify();
                     }))
-                    .child(body)
-                    .child(steps),
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.operator.active.as_deref() != Some(id.as_str()) {
+                            this.operator.active_at = Some(Instant::now());
+                        }
+                        this.operator.active = Some(id.clone());
+                        this.operator.to_bottom = true;
+                        cx.notify();
+                    }))
+                    .child(body),
             ))
-            .child(foot(
-                &(idx + 1).to_string(),
-                GREEN,
-                vec![(name(pane), 0xB9C4BB), ("· working".to_string(), FOOT)],
-                30.,
-            ))
+            .child(foot(&(idx + 1).to_string(), tint, parts, 30.))
     }
 
     /// The scroll bar under the agent screens.
@@ -697,25 +862,34 @@ impl WarRoomScreen {
         page: usize,
         pages: usize,
         cx: &mut Context<Self>,
-    ) -> Div {
+    ) -> impl IntoElement {
         let first = (page * PER_PAGE + 1).min(n);
         let last = ((page + 1) * PER_PAGE).min(n);
         let button = |id: &'static str, glyph: &'static str| {
             div()
                 .id(id)
+                .flex_none()
+                .w(px(24.))
+                .h(px(16.))
+                .flex()
+                .items_center()
+                .justify_center()
                 .cursor_pointer()
                 .text_color(rgb(GREEN_MID))
                 .hover(|h| h.text_color(rgb(GREEN_HI)))
                 .child(glyph)
         };
+        let track = self.operator.track.clone();
         div()
+            .id("mx-bar")
             .flex_none()
-            .h(px(16.))
+            .h(px(18.))
             .flex()
             .items_center()
-            .gap(px(10.))
+            .gap(px(6.))
             .text_size(ui::ts(T_LABEL))
             .text_color(rgb(GREEN_MID))
+            .on_scroll_wheel(cx.listener(Self::operator_wheel))
             .child(
                 button("mx-prev", "◂").on_click(cx.listener(|this, _, _, cx| {
                     this.operator.page = this.operator.page.saturating_sub(1);
@@ -724,20 +898,46 @@ impl WarRoomScreen {
             )
             .child(
                 div()
+                    .id("mx-track")
                     .relative()
                     .flex_1()
-                    .h(px(6.))
-                    .bg(rgb(0x0B2414))
-                    .border_1()
-                    .border_color(rgb(0x124A25))
+                    .h(px(18.))
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                            this.operator_seek(e.position.x, pages, cx);
+                        }),
+                    )
+                    .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
+                        if e.pressed_button == Some(MouseButton::Left) {
+                            this.operator_seek(e.position.x, pages, cx);
+                        }
+                    }))
                     .child(
                         div()
-                            .absolute()
-                            .top(px(-1.))
-                            .left(relative(page as f32 / pages as f32))
-                            .w(relative(1. / pages as f32))
+                            .relative()
+                            .w_full()
                             .h(px(6.))
-                            .bg(rgb(GREEN_MID)),
+                            .bg(rgb(0x0B2414))
+                            .border_1()
+                            .border_color(rgb(0x124A25))
+                            .child(
+                                div()
+                                    .absolute()
+                                    .top(px(-1.))
+                                    .left(relative(page as f32 / pages as f32))
+                                    .w(relative(1. / pages as f32))
+                                    .h(px(6.))
+                                    .bg(rgb(GREEN_MID)),
+                            ),
+                    )
+                    .child(
+                        canvas(move |bounds, _, _| track.set(bounds), |_, _, _, _| ())
+                            .absolute()
+                            .size_full(),
                     ),
             )
             .child(
@@ -747,6 +947,42 @@ impl WarRoomScreen {
                 })),
             )
             .child(format!("working now {first}–{last} of {n}"))
+    }
+
+    /// A click or a drag on the track: go to the page at that x position.
+    fn operator_seek(&mut self, x: Pixels, pages: usize, cx: &mut Context<Self>) {
+        let b = self.operator.track.get();
+        let w = f32::from(b.size.width);
+        if w <= 0. {
+            return;
+        }
+        let frac = ((f32::from(x) - f32::from(b.origin.x)) / w).clamp(0., 0.999);
+        let page = ((frac * pages as f32) as usize).min(pages - 1);
+        if page != self.operator.page {
+            self.operator.page = page;
+            cx.notify();
+        }
+    }
+
+    /// The mouse wheel over the screens or the bar turns the pages.
+    fn operator_wheel(&mut self, e: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(war) = self.war.clone() else {
+            return;
+        };
+        let pages = working(&live(&war)).len().div_ceil(PER_PAGE).max(1);
+        let d = e.delta.pixel_delta(px(16.));
+        let step = if d.y < px(0.) || d.x < px(0.) {
+            1
+        } else if d.y > px(0.) || d.x > px(0.) {
+            -1
+        } else {
+            return;
+        };
+        let page = (self.operator.page as isize + step).clamp(0, pages as isize - 1) as usize;
+        if page != self.operator.page {
+            self.operator.page = page;
+            cx.notify();
+        }
     }
 
     /// Keys of the wall: arrows and digits pick and answer, brackets switch the decision,
@@ -782,6 +1018,12 @@ impl WarRoomScreen {
                 };
                 self.operator.pick = Some(queue[next].id.clone());
                 self.operator.opt = 0;
+            }
+            "escape" => self.operator.active = None,
+            "o" => {
+                if let Some(id) = self.operator.active.clone() {
+                    cx.emit(WarRoomEvent::OpenSession(id));
+                }
             }
             "left" => self.operator.page = self.operator.page.saturating_sub(1),
             "right" => self.operator.page = (self.operator.page + 1).min(pages - 1),
@@ -881,7 +1123,7 @@ fn operator_fleet(war: &WarRoom, live_count: usize, t: f32) -> Div {
             div()
                 .text_size(ui::ts(T_SECTION))
                 .text_color(rgb(BLUE_HI))
-                .child("AGENTS BY STATE"),
+                .child("Agents by state"),
         )
         .child(
             div()
@@ -912,7 +1154,7 @@ fn operator_fleet(war: &WarRoom, live_count: usize, t: f32) -> Div {
                 .child(legend)
                 .child(glaze(true)),
         )
-        .child(foot("A", FOOT, vec![("fleet".into(), FOOT)], 30.))
+        .child(foot("A", FOOT, vec![("last 60 min".into(), FOOT)], 30.))
 }
 
 /// Blue: the usage windows of the providers and the spend of the live sessions.
@@ -931,7 +1173,7 @@ fn operator_budget(war: &WarRoom, all: &[&Pane], t: f32) -> Div {
             div()
                 .text_size(ui::ts(T_SECTION))
                 .text_color(rgb(BLUE_HI))
-                .child("BUDGET"),
+                .child("Budget"),
         );
     for (k, u) in war.usage.iter().take(3).enumerate() {
         let reset = u.resets_at.map_or(String::new(), |r| {

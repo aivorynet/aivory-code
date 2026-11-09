@@ -5,8 +5,8 @@ use std::time::Duration;
 use aivory_protocol::{LinkState, UsageWindow, WarRoomCounts};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Context, DispatchPhase, Entity, FontWeight, KeyDownEvent, SharedString,
-    Subscription, Task, Window, canvas, div, px, rgb, rgba, svg,
+    Anchor, AnyElement, Context, DispatchPhase, Entity, FontWeight, KeyDownEvent, SharedString,
+    Subscription, Task, Window, anchored, canvas, deferred, div, point, px, rgb, rgba, svg,
 };
 
 use crate::bridge_screens::{BridgeInbox, BridgeRepos, BridgeSettings, BridgeTasks};
@@ -35,6 +35,7 @@ mod neon_kit;
 mod neon_lens;
 mod neon_screens;
 mod neon_session;
+mod open_fx;
 mod operator;
 mod operator_focus;
 mod operator_lens;
@@ -104,6 +105,11 @@ struct BridgeScreens {
 
 pub struct Shell {
     screen: Screen,
+    /// The window was maximized or in full screen at the last frame. A change to maximized
+    /// opens the full screen when the Display setting asks for it.
+    max_or_full: bool,
+    /// Redraws the shell when the F11 hint ends.
+    hint_timer: Option<Task<()>>,
     /// Where Back of the deep dive goes: the screen that opened it.
     back: Screen,
     model: Entity<Model>,
@@ -223,6 +229,8 @@ impl Shell {
             }
         });
         Self {
+            max_or_full: false,
+            hint_timer: None,
             // `AIVORY_FOCUS=<session>` starts in the Focus view, `AIVORY_SCREEN=inbox|tasks|
             // repos|settings` on that screen (screenshot runs).
             screen: match (
@@ -813,9 +821,22 @@ impl Shell {
                 }))
                 .into_any_element();
         }
-        let mut row = div().flex().items_center().gap(px(2.));
+        let mut list = div()
+            .id("look-list")
+            .occlude()
+            .flex()
+            .flex_col()
+            .p(px(4.))
+            .bg(rgb(tk().card))
+            .border_1()
+            .border_color(rgb(tk().edge))
+            .rounded(tk().r_button)
+            .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+                this.look_menu = false;
+                cx.notify();
+            }));
         for (look, name) in crate::look::LOOKS {
-            row = row.child(
+            list = list.child(
                 chip(format!("look-{name}").into(), name, look == current).on_click(cx.listener(
                     move |this, _, _, cx| {
                         this.look_menu = false;
@@ -824,13 +845,27 @@ impl Shell {
                 )),
             );
         }
-        row.child(
-            chip("look-close".into(), "×", false).on_click(cx.listener(|this, _, _, cx| {
-                this.look_menu = false;
-                cx.notify();
-            })),
-        )
-        .into_any_element()
+        div()
+            .relative()
+            .child(
+                chip("look-switch".into(), crate::look::name(current), true).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.look_menu = false;
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                deferred(
+                    anchored()
+                        .anchor(Anchor::BottomLeft)
+                        .offset(point(px(0.), px(-4.)))
+                        .snap_to_window_with_margin(px(8.))
+                        .child(list),
+                )
+                .with_priority(3),
+            )
+            .into_any_element()
     }
 }
 
@@ -906,8 +941,7 @@ impl Shell {
         }
     }
 
-    /// N (no text field has the focus) or Ctrl+N opens the New session dialog. F11 switches
-    /// the window to full screen and back: no title bar, no window frame.
+    /// N (no text field has the focus) or Ctrl+N opens the New session dialog.
     fn new_session_keys(&self, cx: &mut Context<Self>) -> AnyElement {
         let weak = cx.entity().downgrade();
         canvas(
@@ -915,10 +949,6 @@ impl Shell {
             move |_, _, window, _| {
                 window.on_key_event(move |e: &KeyDownEvent, phase, window, cx| {
                     if phase != DispatchPhase::Bubble || e.is_held {
-                        return;
-                    }
-                    if e.keystroke.key == "f11" {
-                        window.toggle_fullscreen();
                         return;
                     }
                     // In the Command look Esc closes the window over the map.
@@ -960,12 +990,112 @@ impl Render for Shell {
         }
         let looks = self.render_looks(window, cx).into_any_element();
         let keys = self.new_session_keys(cx);
+        let full = window.is_fullscreen();
+        let max_or_full = full || window.is_maximized();
+        let (max_full, hint) = {
+            let m = self.model.read(cx);
+            (m.maximize_full_screen, m.full_screen_hint)
+        };
+        // The maximize button opens the borderless full screen. Leaving the full screen
+        // restores the maximized window, and that is no new change, so it stays.
+        if max_full && max_or_full && !self.max_or_full && !full {
+            window.toggle_fullscreen();
+        }
+        self.max_or_full = max_or_full;
+        let hint = hint.filter(|t| t.elapsed() < FULL_SCREEN_HINT);
+        if let Some(t) = hint
+            && self.hint_timer.is_none()
+        {
+            let left = FULL_SCREEN_HINT.saturating_sub(t.elapsed());
+            self.hint_timer = Some(cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(left).await;
+                let _ = this.update(cx, |this, cx| {
+                    this.hint_timer = None;
+                    cx.notify();
+                });
+            }));
+        }
+        let hint = hint.map(|_| Self::full_screen_hint());
+        let exit = full.then(Self::fullscreen_exit);
         div()
             .size_full()
             .relative()
+            // F11 on the root element: the root is on every key dispatch path, also when a
+            // text field has the focus. Capture phase, so no child can stop it.
+            .capture_key_down(|e, window, cx| {
+                if e.keystroke.key == "f11" && !e.is_held {
+                    window.toggle_fullscreen();
+                    cx.stop_propagation();
+                }
+            })
             .child(looks)
             .child(keys)
+            .children(exit)
+            .children(hint)
             .children(self.new_dialog.as_ref().map(|(d, _)| d.clone()))
+    }
+}
+
+/// How long the F11 hint stays after the owner turns on "Maximize is full screen".
+const FULL_SCREEN_HINT: Duration = Duration::from_secs(5);
+
+impl Shell {
+    /// The hint at the top: F11 leaves the full screen.
+    fn full_screen_hint() -> AnyElement {
+        div()
+            .absolute()
+            .top(px(12.))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .px(px(14.))
+                    .py(px(8.))
+                    .rounded_full()
+                    .bg(rgb(tk().ink))
+                    .text_color(rgb(tk().card))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                    .child("Maximize now opens full screen. Press F11 to go back."),
+            )
+            .into_any_element()
+    }
+
+    /// In full screen the window has no title bar. A pill at the top edge shows on hover and
+    /// switches the window back; F11 does the same.
+    fn fullscreen_exit() -> AnyElement {
+        let group = "fullscreen-exit";
+        div()
+            .id("fullscreen-exit")
+            .group(group)
+            .absolute()
+            .top_0()
+            .left_0()
+            .right_0()
+            .h(px(36.))
+            .flex()
+            .justify_center()
+            .items_start()
+            .child(
+                div()
+                    .id("fullscreen-exit-pill")
+                    .mt(px(6.))
+                    .px(px(12.))
+                    .h(px(26.))
+                    .rounded_full()
+                    .bg(rgb(tk().ink))
+                    .text_color(rgb(tk().card))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .opacity(0.)
+                    .group_hover(group, |s| s.opacity(0.92))
+                    .on_click(|_, window, _| window.toggle_fullscreen())
+                    .child("Exit full screen  F11"),
+            )
+            .into_any_element()
     }
 }
 
@@ -1011,6 +1141,9 @@ impl Shell {
             self.screen = Screen::WarRoom;
         }
         let holo = Self::holo_on();
+        if holo {
+            self.holo_cycle(cx);
+        }
         let content = match self.screen {
             Screen::WarRoom => self.war_room.clone().into_any_element(),
             Screen::Inbox => self.inbox.clone().into_any_element(),

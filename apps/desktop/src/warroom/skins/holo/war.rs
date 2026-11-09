@@ -13,6 +13,7 @@ use gpui::{AnyElement, Context, Div, SharedString, Window, canvas, div, px, rela
 
 use super::super::common::{Align, Painter, asks, clip, key_label, next_ask, part_of};
 use super::super::hud::Contact;
+use super::synapse::{self, tone};
 use crate::actions::Action;
 use crate::holo_kit::*;
 use crate::warroom::WarRoomScreen;
@@ -183,139 +184,8 @@ fn bloom_geo(w: f32, h: f32) -> Bloom {
     }
 }
 
-/// One session on the bloom.
-#[derive(Debug, Clone)]
-struct Spot {
-    a: f32,
-    len: f32,
-    tip: [f32; 2],
-    /// The width of the angle that the session owns.
-    step: f32,
-}
-
-/// One codebase on the ring.
-#[derive(Debug, Clone)]
-struct Arc {
-    a0: f32,
-    a1: f32,
-    waits: bool,
-    name: String,
-    count: usize,
-    label: [f32; 2],
-    /// The session that a click on the label opens: the first that waits, else the first.
-    target: usize,
-}
-
-#[derive(Debug, Clone, Default)]
-struct Plan {
-    spots: Vec<Spot>,
-    arcs: Vec<Arc>,
-}
-
-/// The identity: the bloom is flat.
-fn same(v: [f32; 2]) -> [f32; 2] {
-    v
-}
-
 fn at(c: [f32; 2], a: f32, r: f32) -> [f32; 2] {
     [c[0] + a.cos() * r, c[1] + a.sin() * r]
-}
-
-/// Where the sessions and the codebase arcs sit. The list is grouped by codebase.
-fn plan(list: &[Contact], books: &[String], g: &Bloom) -> Plan {
-    let n = list.len();
-    if n == 0 {
-        return Plan::default();
-    }
-    let max = list.iter().map(|c| c.tokens).max().unwrap_or(1).max(1) as f32;
-    let gap = 8f32.to_radians();
-    let books: Vec<&String> = books
-        .iter()
-        .filter(|b| list.iter().any(|c| &c.codebase == *b))
-        .collect();
-    let step = ((TAU - gap * books.len() as f32) / n as f32).max(0.01);
-    let first = list.iter().filter(|c| c.codebase == *books[0]).count();
-    let mut ang = -PI / 2. - first as f32 * step / 2.;
-    let mut out = Plan::default();
-    for b in &books {
-        let a0 = ang;
-        let mut idx = Vec::new();
-        for (i, c) in list.iter().enumerate().filter(|(_, c)| &c.codebase == *b) {
-            let a = ang + step / 2.;
-            let len = (60. + 150. * (c.tokens as f32 / max).sqrt()) * g.s;
-            out.spots.push(Spot {
-                a,
-                len,
-                tip: at(g.c, a, len),
-                step,
-            });
-            idx.push(i);
-            ang += step;
-        }
-        let a1 = ang;
-        let waits = idx.iter().any(|&i| list[i].waits());
-        out.arcs.push(Arc {
-            a0: a0 + 0.02,
-            a1: a1 - 0.02,
-            waits,
-            name: b.to_uppercase(),
-            count: idx.len(),
-            label: at(g.c, (a0 + a1) / 2., 290. * g.s),
-            target: idx
-                .iter()
-                .copied()
-                .find(|&i| list[i].waits())
-                .unwrap_or(idx[0]),
-        });
-        ang += gap;
-    }
-    out
-}
-
-/// A small deterministic random series seeded by a session id.
-struct Seed(u32);
-
-impl Seed {
-    fn new(id: &str) -> Self {
-        let mut h: u32 = 2_166_136_261;
-        for b in id.bytes() {
-            h = (h ^ u32::from(b)).wrapping_mul(16_777_619);
-        }
-        Self(h | 1)
-    }
-
-    /// The next value from 0 to 1.
-    fn next(&mut self) -> f32 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 5;
-        (self.0 % 10_000) as f32 / 10_000.
-    }
-}
-
-/// A point on the quadratic curve `p0`, `ctrl`, `p1` at `f`.
-fn bezier(p0: [f32; 2], ctrl: [f32; 2], p1: [f32; 2], f: f32) -> [f32; 2] {
-    let u = 1. - f;
-    [
-        u * u * p0[0] + 2. * u * f * ctrl[0] + f * f * p1[0],
-        u * u * p0[1] + 2. * u * f * ctrl[1] + f * f * p1[1],
-    ]
-}
-
-/// The strands of one session: curve start, control point and end, plus a short tail.
-fn strands(id: &str, c: [f32; 2], spot: &Spot, count: usize, s: f32) -> Vec<[[f32; 2]; 4]> {
-    let mut seed = Seed::new(id);
-    (0..count)
-        .map(|_| {
-            let aa = spot.a + (seed.next() - 0.5) * spot.step * 0.6;
-            let l = spot.len * (0.78 + seed.next() * 0.24);
-            let ctrl = at(c, aa + (seed.next() - 0.5) * 0.3, l * 0.5);
-            let end = at(c, aa, l);
-            let ba = aa + (seed.next() - 0.5) * 0.4;
-            let bl = (8. + seed.next() * 14.) * s;
-            [c, ctrl, end, at(end, ba, bl)]
-        })
-        .collect()
 }
 
 // ---- the picture --------------------------------------------------------------------------
@@ -323,11 +193,13 @@ fn strands(id: &str, c: [f32; 2], spot: &Spot, count: usize, s: f32) -> Vec<[[f3
 /// The data that the canvas needs.
 struct Picture {
     list: Vec<Contact>,
-    books: Vec<String>,
-    sel: Option<String>,
+    syn: std::rc::Rc<synapse::Layout>,
+    /// The firings on screen: contact index, start time.
+    fires: Vec<(usize, f32)>,
     /// Agents at work and agents that wait, one value per minute.
     activity: Vec<(u32, u32)>,
     t: f32,
+    cam: synapse::Cam,
 }
 
 impl Picture {
@@ -335,118 +207,19 @@ impl Picture {
         let (w, h) = (r[2], r[3]);
         let g = bloom_geo(w, h);
         let (ox, oy) = (r[0] + MARGIN + column(w) + GAP, r[1] + TOP);
-        let c = [ox + g.c[0], oy + g.c[1]];
+
         let s = g.s;
-        let plan = plan(&self.list, &self.books, &g);
-        let max = self.list.iter().map(|c| c.tokens).max().unwrap_or(1).max(1) as f32;
 
-        // The faint ring and the dotted ring that turns slowly.
-        p.arc(c, 252. * s, (0., TAU), 1., PK, 0.14, &same);
-        let turn = self.t / 80. * TAU;
-        let dashes = (TAU * 300. * s / 13.) as usize;
-        let segs: Vec<[f32; 4]> = (0..dashes)
-            .map(|k| {
-                let a = turn + k as f32 * TAU / dashes.max(1) as f32;
-                let (p0, p1) = (at(c, a, 300. * s), at(c, a + 3. / (300. * s), 300. * s));
-                [p0[0], p0[1], p1[0], p1[1]]
-            })
-            .collect();
-        p.strokes(&segs, PU, 1., 0.7);
-
-        // The codebase arcs.
-        for arc in &plan.arcs {
-            let color = if arc.waits { OR } else { PK };
-            p.arc(c, 262. * s, (arc.a0, arc.a1), 14., color, 0.08, &same);
-            p.arc(
-                c,
-                262. * s,
-                (arc.a0, arc.a1),
-                4.,
-                color,
-                if arc.waits { 1. } else { 0.7 },
-                &same,
-            );
-        }
-
-        // The strands. Waiting sessions are bright; the rest is dimmed.
-        for (con, spot) in self.list.iter().zip(&plan.spots) {
-            let waits = con.waits();
-            let idle = !waits && con.state != SessionState::Working;
-            let (c1, c2) = if waits {
-                (OR, 0xFFC48A)
-            } else if idle {
-                (0x2A5878, 0x22496A)
-            } else {
-                (PK, PE)
-            };
-            let picked = self.sel.as_deref() == Some(con.id.as_str());
-            let alpha = if waits {
-                0.95
-            } else if idle {
-                0.4
-            } else if picked {
-                0.9
-            } else {
-                0.55
-            };
-            let bundle = strands(&con.id, c, spot, if idle { 3 } else { 6 }, s);
-            let mut curves = Vec::new();
-            for (k, st) in bundle.iter().enumerate() {
-                let col = if k % 2 == 0 { c1 } else { c2 };
-                let mut pts: Vec<[f32; 2]> = (0..=14)
-                    .map(|j| bezier(st[0], st[1], st[2], j as f32 / 14.))
-                    .collect();
-                pts.push(st[3]);
-                if waits {
-                    p.polyline(&pts, col, 3.6, 0.1, false);
-                }
-                p.polyline(&pts, col, if k == 0 { 1.4 } else { 1. }, alpha, false);
-                curves.push(pts);
-            }
-            // The light packet runs on the strands of working sessions only. A session with
-            // more tokens sends it faster.
-            if con.state == SessionState::Working {
-                let share = con.tokens as f32 / max;
-                let period = 5. - 2.5 * share.sqrt();
-                let seed = Seed::new(&con.id).0 % 997;
-                let f = (self.t / period + seed as f32 / 997.).fract();
-                if let Some(st) = bundle.first() {
-                    let a = bezier(st[0], st[1], st[2], f);
-                    let b = bezier(st[0], st[1], st[2], (f + 0.05).min(1.));
-                    p.strokes(&[[a[0], a[1], b[0], b[1]]], 0xF2FDFF, 2.4, 0.9);
-                    p.dot(b, 2.4, 0xF2FDFF, 0.9);
-                }
-            }
-            let tip_color = if waits {
-                OR
-            } else if idle {
-                0x2A5878
-            } else {
-                PA
-            };
-            let tip = curves
-                .first()
-                .and_then(|c| c.get(14))
-                .copied()
-                .unwrap_or(spot.tip);
-            if waits || picked {
-                p.dot(tip, if waits { 8. } else { 6. }, tip_color, 0.18);
-            }
-            p.dot(tip, if waits { 4.5 } else { 2.5 }, tip_color, 1.);
-            // The lead to the ask pill.
-            if waits {
-                let o = at(c, spot.a, spot.len + 20. * s);
-                let right = spot.a.cos() >= 0.;
-                let hx = o[0] + if right { 12. } else { -12. };
-                p.polyline(&[tip, o, [hx, o[1]]], OR, 1., 0.8, false);
-            }
-        }
-
-        // The core.
-        p.dot(c, 42. * s, PK, 0.1);
-        p.dot(c, 34. * s, PK, 0.12);
-        p.dot(c, 28. * s, 0x04101F, 0.88);
-        p.arc(c, 28. * s, (0., TAU), 1.2, PK, 1., &same);
+        synapse::paint(
+            p,
+            &self.syn,
+            &self.list,
+            &self.fires,
+            self.t,
+            self.cam,
+            [ox, oy],
+            s,
+        );
 
         // The two quiet lines at the bottom: agents at work and agents that wait, per minute.
         let width = g.cw.min(580.);
@@ -621,12 +394,38 @@ impl WarRoomScreen {
             .rev()
             .map(|a| (a.active, a.waiting))
             .collect();
+        let syn = self.holo.syn.get(&list, &books, g.cw, g.ch, g.s);
+        let cam = self.holo.orbit.cam();
+        // A session that starts to work, waits or fails fires once; nothing moves otherwise.
+        {
+            let st = &mut self.holo;
+            for c in &list {
+                let before = st.seen.insert(c.id.clone(), c.state);
+                let event = matches!(
+                    c.state,
+                    SessionState::Working | SessionState::NeedsYou | SessionState::Error
+                );
+                if before.is_some_and(|b| b != c.state) && event {
+                    st.fires.push((c.id.clone(), t));
+                }
+            }
+            st.fires.retain(|(_, start)| t - start < synapse::FIRE_TIME);
+            let extra = st.fires.len().saturating_sub(3);
+            st.fires.drain(..extra);
+        }
+        let fires: Vec<(usize, f32)> = self
+            .holo
+            .fires
+            .iter()
+            .filter_map(|(id, start)| list.iter().position(|c| &c.id == id).map(|i| (i, *start)))
+            .collect();
         let picture = Picture {
             list: list.clone(),
-            books: books.clone(),
-            sel: sel_id.clone(),
+            syn: syn.clone(),
+            fires,
             activity,
             t,
+            cam,
         };
         let cache = self.holo.cache.clone();
         let bloom = canvas(
@@ -661,20 +460,61 @@ impl WarRoomScreen {
             .child(self.usage_panel(war, spend_h));
 
         // ---- center overlay -----------------------------------------------------------------
-        let plan = plan(&list, &books, &g);
-        let mut center = div().relative().flex_1().min_w(px(0.)).h_full();
+
+        // Drag turns the synapse, the wheel zooms it.
+        let mut center = div()
+            .relative()
+            .flex_1()
+            .min_w(px(0.))
+            .h_full()
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, e: &gpui::MouseDownEvent, _, _| {
+                    this.holo.orbit.drag = Some([f32::from(e.position.x), f32::from(e.position.y)]);
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, e: &gpui::MouseMoveEvent, _, cx| {
+                let Some(from) = this.holo.orbit.drag else {
+                    return;
+                };
+                if e.pressed_button != Some(gpui::MouseButton::Left) {
+                    this.holo.orbit.drag = None;
+                    return;
+                }
+                let at = [f32::from(e.position.x), f32::from(e.position.y)];
+                this.holo.orbit.turn(at[0] - from[0], at[1] - from[1]);
+                this.holo.orbit.drag = Some(at);
+                cx.notify();
+            }))
+            .on_mouse_up(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, _| {
+                    this.holo.orbit.drag = None;
+                }),
+            )
+            .on_scroll_wheel(cx.listener(|this, e: &gpui::ScrollWheelEvent, window, cx| {
+                let dy = f32::from(e.delta.pixel_delta(window.line_height()).y);
+                this.holo.orbit.wheel(-dy);
+                cx.notify();
+            }));
         center = center
             .child(
                 div()
                     .absolute()
                     .left_0()
                     .top_0()
-                    .child(th("Agent bloom").text_color(rgb(PA)))
+                    .child(th("Synapse network").text_color(rgb(PA)))
                     .child(
                         div()
                             .mt(px(4.))
-                            .child(mono("one strand bundle per session", 0x5F95B8))
-                            .child(mono("length = tokens of the session", 0x5F95B8)),
+                            .child(mono(
+                                "one region per codebase, one neuron per session",
+                                0x5F95B8,
+                            ))
+                            .child(mono(
+                                "a working session fires: pulse in, wave out",
+                                0x5F95B8,
+                            )),
                     ),
             )
             .child(
@@ -722,18 +562,39 @@ impl WarRoomScreen {
                     .child(th("No live sessions")),
             );
         }
+        let spots: Vec<[f32; 2]> = (0..syn.nodes.len()).map(|i| syn.node_at(i, cam)).collect();
         // Codebase labels open their session.
-        for (k, arc) in plan.arcs.iter().enumerate() {
-            let Some(target) = list.get(arc.target) else {
+        for (k, cl) in syn.clusters.iter().enumerate() {
+            let target = cl
+                .nodes
+                .iter()
+                .copied()
+                .find(|&n| list[syn.nodes[n].idx].waits())
+                .or(cl.nodes.first().copied());
+            let Some(target) = target.and_then(|n| list.get(syn.nodes[n].idx)) else {
                 continue;
             };
             let id = target.id.clone();
+            let waits = cl.nodes.iter().any(|&n| list[syn.nodes[n].idx].waits());
+            // The label keeps clear of the neuron circles: it moves out from the middle.
+            let mut label = syn.label_at(k, cam);
+            let (dx, dy) = (label[0] - g.c[0], label[1] - g.c[1]);
+            let d = dx.hypot(dy).max(1.);
+            for _ in 0..14 {
+                let hit = spots
+                    .iter()
+                    .any(|s| (s[0] - label[0]).abs() < 92. && (s[1] - label[1]).abs() < 26.);
+                if !hit {
+                    break;
+                }
+                label = [label[0] + dx / d * 12., label[1] + dy / d * 12.];
+            }
             center = center.child(
                 div()
                     .id(SharedString::from(format!("holo-book-{k}")))
                     .absolute()
-                    .left(px(arc.label[0] - 80.))
-                    .top(px(arc.label[1] - 12.))
+                    .left(px(label[0] - 80.))
+                    .top(px(label[1] - 12.))
                     .w(px(160.))
                     .h(px(24.))
                     .flex()
@@ -744,75 +605,81 @@ impl WarRoomScreen {
                     .font_family(LABEL)
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_size(px(S_SMALL + 1.))
-                    .text_color(ink(if arc.waits { GD } else { PA }, 0.9))
+                    .text_color(ink(if waits { GD } else { PA }, 0.9))
                     .hover(|s| s.text_color(rgb(TXT)))
-                    .child(clip(&arc.name, 16))
-                    .child(mono(arc.count.to_string(), 0x5F95B8))
+                    .child(clip(&cl.name, 16))
+                    .child(mono(cl.nodes.len().to_string(), 0x5F95B8))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.holo.open = Some(id.clone());
                         cx.notify();
                     })),
             );
         }
-        // The tips select a session; the ask pills open it.
-        for (i, (con, spot)) in list.iter().zip(&plan.spots).enumerate() {
+        // One hit area per neuron: a small tip on hover, a click selects (waits: opens).
+        for (i, node) in syn.nodes.iter().enumerate() {
+            let con = &list[node.idx];
+            let pos = syn.node_at(i, cam);
             let id = con.id.clone();
-            if con.waits() {
-                let o = at(g.c, spot.a, spot.len + 20. * g.s);
-                let right = spot.a.cos() >= 0.;
-                let hx = o[0] + if right { 16. } else { -16. };
-                let wait = clock(war.now, war.session(&con.id).map_or(war.now, |p| p.since));
-                let pill = div()
-                    .id(SharedString::from(format!("holo-ask-{i}")))
-                    .absolute()
-                    .top(px(o[1] - 13.))
-                    .h(px(26.))
-                    .px(px(10.))
-                    .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .rounded_full()
-                    .border_1()
-                    .border_color(ink(OR, 0.8))
-                    .bg(ink(0x1E0C00, 0.6))
-                    .cursor_pointer()
-                    .font_family(LABEL)
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_size(px(S_SMALL))
-                    .text_color(rgb(0xFFE0C8))
-                    .whitespace_nowrap()
-                    .hover(|s| s.bg(ink(OR, 0.3)))
-                    .child(div().size(px(7.)).rounded_full().bg(rgb(OR)))
-                    .child(format!(
-                        "{}/{}",
-                        con.codebase.to_lowercase(),
-                        clip(&con.title, 18)
-                    ))
-                    .child(mono(wait, 0xE0A37A))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.holo.open = Some(id.clone());
-                        cx.notify();
-                    }));
-                center = center.child(if right {
-                    pill.left(px(hx))
-                } else {
-                    pill.right(px(g.cw - hx))
-                });
-            } else {
-                center = center.child(
+            let waits = con.waits();
+            let group = SharedString::from(format!("holo-syn-{i}"));
+            let state = match con.state {
+                SessionState::NeedsYou => "waits for you",
+                SessionState::Error => "error",
+                SessionState::Working => "working",
+                _ => "idle",
+            };
+            let tip = div()
+                .absolute()
+                .top(px(-10.))
+                .px(px(10.))
+                .py(px(6.))
+                .rounded(px(4.))
+                .border_1()
+                .border_color(ink(tone(con.state), 0.6))
+                .bg(ink(BLACK, 0.9))
+                .opacity(0.)
+                .group_hover(group.clone(), |s| s.opacity(1.))
+                .whitespace_nowrap()
+                .flex()
+                .flex_col()
+                .child(
                     div()
-                        .id(SharedString::from(format!("holo-tip-{i}")))
-                        .absolute()
-                        .left(px(spot.tip[0] - 11.))
-                        .top(px(spot.tip[1] - 11.))
-                        .size(px(22.))
-                        .cursor_pointer()
-                        .on_click(cx.listener(move |this, _, _, cx| {
+                        .font_family(LABEL)
+                        .font_weight(gpui::FontWeight::BOLD)
+                        .text_size(px(S_SMALL))
+                        .text_color(rgb(PA))
+                        .child(con.title.clone()),
+                )
+                .child(mono(
+                    format!("{} - {}", con.codebase.to_lowercase(), state),
+                    0x7FB0CF,
+                ));
+            let tip = if pos[0] > g.cw / 2. {
+                tip.right(px(24.))
+            } else {
+                tip.left(px(24.))
+            };
+            center = center.child(
+                div()
+                    .id(SharedString::from(format!("holo-tip-{i}")))
+                    .group(group)
+                    .absolute()
+                    .left(px(pos[0] - 13.))
+                    .top(px(pos[1] - 13.))
+                    .size(px(26.))
+                    .rounded_full()
+                    .cursor_pointer()
+                    .hover(|s| s.bg(ink(PK, 0.14)))
+                    .child(tip)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if waits {
+                            this.holo.open = Some(id.clone());
+                        } else {
                             this.holo.sel = Some(id.clone());
-                            cx.notify();
-                        })),
-                );
-            }
+                        }
+                        cx.notify();
+                    })),
+            );
         }
 
         // ---- right column -------------------------------------------------------------------
@@ -1306,35 +1173,6 @@ mod tests {
             minutes: 1.,
             rate: 0.,
         }
-    }
-
-    #[test]
-    fn a_strand_keeps_its_shape() {
-        let g = bloom_geo(1440., 824.);
-        let list = vec![
-            contact("a", "x", SessionState::Working, 100),
-            contact("b", "y", SessionState::NeedsYou, 50),
-        ];
-        let books = vec!["x".to_string(), "y".to_string()];
-        let one = plan(&list, &books, &g);
-        let two = plan(&list, &books, &g);
-        assert_eq!(one.spots.len(), 2);
-        assert_eq!(one.spots[0].tip, two.spots[0].tip);
-        let s1 = strands("a", g.c, &one.spots[0], 6, g.s);
-        let s2 = strands("a", g.c, &two.spots[0], 6, g.s);
-        assert_eq!(s1, s2);
-        assert!(one.arcs[1].waits && !one.arcs[0].waits);
-    }
-
-    #[test]
-    fn the_longest_strand_belongs_to_the_most_tokens() {
-        let g = bloom_geo(1440., 824.);
-        let list = vec![
-            contact("a", "x", SessionState::Working, 100),
-            contact("b", "x", SessionState::Working, 25),
-        ];
-        let p = plan(&list, &["x".to_string()], &g);
-        assert!(p.spots[0].len > p.spots[1].len);
     }
 
     #[test]

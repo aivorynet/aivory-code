@@ -30,6 +30,10 @@ pub struct Model {
     pub snapshot: std::rc::Rc<crate::themed::data::ThemeSnapshot>,
     /// The Display background: the deep dive and the Inbox draw their console with it too.
     pub background: ConsoleBackground,
+    /// Display setting: the maximize button opens a borderless full screen.
+    pub maximize_full_screen: bool,
+    /// When the owner turned on `maximize_full_screen`: the shell shows the F11 hint for 5 s.
+    pub full_screen_hint: Option<std::time::Instant>,
     /// `--stress N`: copy live sessions until N are live (performance checks).
     pub stress: usize,
     /// `AIVORY_DEMO_SESSIONS=<n>`: the demo shows exactly n live sessions (screenshot runs).
@@ -129,6 +133,8 @@ impl Model {
             war: None,
             snapshot: Default::default(),
             background: Display::default().background,
+            maximize_full_screen: false,
+            full_screen_hint: None,
             stress,
             demo_sessions: std::env::var("AIVORY_DEMO_SESSIONS")
                 .ok()
@@ -159,6 +165,8 @@ impl Model {
             war: None,
             snapshot: Default::default(),
             background: Display::default().background,
+            maximize_full_screen: false,
+            full_screen_hint: None,
             stress: 0,
             demo_sessions: None,
             demo_dropped: Default::default(),
@@ -214,6 +222,7 @@ impl Model {
                         cx,
                     );
                     cx.refresh_windows();
+                    this.maximize_full_screen = view.settings.display.maximize_full_screen;
                     if this.background != view.settings.display.background {
                         this.background = view.settings.display.background;
                         cx.notify();

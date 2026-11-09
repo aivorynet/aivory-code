@@ -60,7 +60,7 @@ order of `serde_json::Value`. A crate build alone does not.
 
 - The data types and the JSON-RPC methods are in `crates/aivory-protocol`. Change them there first.
 - Regenerate the fixtures and the schema with `AIVORY_BLESS=1 cargo test -p aivory-protocol`.
-- The phone app keeps copies of some fixtures in `apps/mobile/assets/fixtures`.
+- The phone tests keep copies of some fixtures in `apps/mobile/test/fixtures`. The shipped phone app has no demo data.
   Copy the changed files after you regenerate them.
 
 ## Original code and licenses

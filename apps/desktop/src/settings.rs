@@ -777,6 +777,14 @@ impl SettingsScreen {
                         if crate::look::apply(&settings.display, false) {
                             cx.refresh_windows();
                         }
+                        let max_full = settings.display.maximize_full_screen;
+                        this.model.update(cx, |m, cx| {
+                            if max_full && !m.maximize_full_screen {
+                                m.full_screen_hint = Some(std::time::Instant::now());
+                            }
+                            m.maximize_full_screen = max_full;
+                            cx.notify();
+                        });
                         let endpoint = this.model.read(cx).endpoint();
                         crate::themed::sync(
                             &this.model.clone(),
@@ -1930,6 +1938,19 @@ impl SettingsScreen {
                     keys::display("uiScale"),
                     i64::from(d.ui_scale),
                     (i64::from(ui_lo), i64::from(ui_hi), 5),
+                    cx,
+                ),
+            ))
+            .child(self.row(
+                false,
+                row_label(
+                    "Maximize is full screen",
+                    "The maximize button hides the title bar and the frame. F11 goes back.",
+                ),
+                self.toggle(
+                    "dp-max-full",
+                    d.maximize_full_screen,
+                    keys::display("maximizeFullScreen"),
                     cx,
                 ),
             ))

@@ -26,6 +26,10 @@ thread_local! {
     /// The decode of the newest line per session: the hash of the line and the time its
     /// decode began. A line that was decoded once stays as it is.
     static DECODE: RefCell<HashMap<String, (u32, f32)>> = RefCell::default();
+    /// The display lines per session and size, with the tail stamp they were made from.
+    #[allow(clippy::type_complexity)]
+    static LINES: RefCell<HashMap<(String, usize), ((usize, u32), Vec<String>)>> =
+        RefCell::default();
 }
 
 /// Run `f` with a painter that uses the shared glyph cache.
@@ -39,12 +43,15 @@ fn painter(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Painter)) {
 
 pub const FONT: &str = "IBM Plex Mono";
 
-// The type scale of the look: screen title > section title > entry text > label. Entry text
-// is at most 0.8 x the section title. Only titles and big readouts are above 16 px.
-pub const T_TITLE: f32 = 26.;
-pub const T_SECTION: f32 = 16.;
-pub const T_ENTRY: f32 = 12.5;
-pub const T_LABEL: f32 = 11.;
+// The one type scale of the look (all sizes go through `ui::ts`). Use these, never a literal.
+pub const MX_DISPLAY: f32 = 16.;
+pub const MX_TITLE: f32 = 11.5;
+pub const MX_BODY: f32 = 10.5;
+pub const MX_SMALL: f32 = 9.5;
+pub const T_TITLE: f32 = MX_DISPLAY;
+pub const T_SECTION: f32 = MX_TITLE;
+pub const T_ENTRY: f32 = MX_BODY;
+pub const T_LABEL: f32 = MX_SMALL;
 /// Dim level of a screen that does not need the owner; it is 1 on hover.
 pub const DIM: f32 = 0.6;
 pub const PAGE: u32 = 0x020403;
@@ -61,6 +68,25 @@ pub const BLUE_SOFT: u32 = 0x5FA9DE;
 pub const BLUE_DIM: u32 = 0x0F3A62;
 pub const BLUE_INK: u32 = 0x03152A;
 pub const FOOT: u32 = 0x7E8A80;
+/// The state colors of the agent screens and their lines (owner 2026-11-09): gray idle,
+/// blue working, red error, yellow waits for input.
+pub const ST_IDLE: u32 = 0x8A968E;
+pub const ST_WORK: u32 = 0x5CB8FF;
+pub const ST_ERROR: u32 = 0xFF4D5E;
+pub const ST_WAIT: u32 = 0xFFD23F;
+
+/// The state color of a session, and its word for a foot.
+pub fn state_color(state: aivory_protocol::SessionState) -> (u32, &'static str) {
+    use aivory_protocol::SessionState as S;
+    match state {
+        S::Working => (ST_WORK, "working"),
+        S::NeedsYou => (ST_WAIT, "waits for you"),
+        S::Error => (ST_ERROR, "error"),
+        S::Idle => (ST_IDLE, "idle"),
+        S::Parked => (ST_IDLE, "parked"),
+        S::Done => (ST_IDLE, "done"),
+    }
+}
 
 /// An element id from a text.
 pub fn eid(text: String) -> gpui::SharedString {
@@ -252,7 +278,8 @@ pub fn dimmed(id: SharedString) -> Stateful<Div> {
 }
 
 /// The foot of a monitor: a round badge and some parts of text.
-pub fn foot(badge: &str, badge_color: u32, parts: Vec<(String, u32)>, height: f32) -> Div {
+pub fn foot(_badge: &str, badge_color: u32, parts: Vec<(String, u32)>, height: f32) -> Div {
+    // Only a thin bar in the state color: the screens are no sequence, so no number.
     let mut row = div()
         .flex_none()
         .h(px(height))
@@ -264,20 +291,7 @@ pub fn foot(badge: &str, badge_color: u32, parts: Vec<(String, u32)>, height: f3
         .whitespace_nowrap()
         .text_size(ui::ts(T_LABEL))
         .text_color(rgb(FOOT))
-        .child(
-            div()
-                .flex_none()
-                .size(px(18.))
-                .rounded_full()
-                .border_1()
-                .border_color(rgb(badge_color))
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(ui::ts(10.))
-                .text_color(rgb(badge_color))
-                .child(badge.to_string()),
-        );
+        .child(div().flex_none().w(px(3.)).h(px(12.)).bg(rgb(badge_color)));
     for (text, color) in parts {
         row = row.child(div().text_color(rgb(color)).child(text));
     }
@@ -309,6 +323,33 @@ fn colored(color: u32) -> HighlightStyle {
 /// (`console::display`), so no raw marker shows. The first line of a message carries the
 /// speaker; the other lines of it are indented.
 pub fn display_lines(pane: &Pane, n: usize) -> Vec<String> {
+    // The parse is costly and the wall asks for the same lines in every frame: keep the result
+    // per session and size until the tail changes.
+    let stamp = (
+        pane.tail.len(),
+        pane.tail.last().map_or(0, |l| hash_str(&l.text)),
+    );
+    let key = (pane.id.clone(), n);
+    if let Some(hit) = LINES.with(|c| {
+        c.borrow()
+            .get(&key)
+            .filter(|(s, _)| *s == stamp)
+            .map(|(_, v)| v.clone())
+    }) {
+        return hit;
+    }
+    let lines = parse_lines(pane, n);
+    LINES.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() > 256 {
+            c.clear();
+        }
+        c.insert(key, (stamp, lines.clone()));
+    });
+    lines
+}
+
+fn parse_lines(pane: &Pane, n: usize) -> Vec<String> {
     use crate::console::display::{DKind, last};
     last(&pane.tail, n)
         .iter()
@@ -442,24 +483,6 @@ pub fn decoded(key: &str, old: &[String], newest: &str, seed: u32, t: f32) -> St
     s
 }
 
-/// The newest `n` steps of a session as short text lines: prompts, agent prose, tool calls and
-/// errors. Tables, code and tool output are left out (`console::display::steps`).
-pub fn step_lines(pane: &Pane, n: usize) -> Vec<String> {
-    use crate::console::display::{DKind, steps};
-    steps(&pane.tail, n)
-        .iter()
-        .map(|d| {
-            let t = d.text.replace('\n', " ");
-            match d.kind {
-                DKind::You => format!("› {t}"),
-                DKind::Tool => format!("● {} {t}", d.label.as_deref().unwrap_or("")),
-                DKind::Error => format!("! {t}"),
-                _ => t,
-            }
-        })
-        .collect()
-}
-
 /// How busy a session is, 0.35 to 1: the share of work lines in its last lines. The rain of
 /// its screen falls the faster the busier it is.
 pub fn activity(pane: &Pane) -> f32 {
@@ -512,11 +535,22 @@ fn fx(blue: bool) -> AnyElement {
 /// agent (`source`), read from top to bottom, with a bright head at the bottom and a fading
 /// tail above it. Streams have their own phase and black gaps between them. `activity` sets
 /// the speed, `dim` the brightness (1 = full). A glyph never changes while its stream falls.
-pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32) -> AnyElement {
-    let mut chars: Vec<char> = source.chars().filter(|c| !c.is_whitespace()).collect();
-    if chars.is_empty() {
+pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32, tint: u32) -> AnyElement {
+    // The real console text, spaces kept: a stream shows whole words of the output, read
+    // from top to bottom; a space is a gap in the stream (owner 2026-11-09).
+    let mut chars: Vec<char> = source
+        .chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .collect();
+    if chars.iter().all(|c| *c == ' ') {
         chars = "01".chars().collect();
     }
+    // The word starts. Column k reads the k-th word on, so the columns from left to right
+    // follow the text.
+    let words: Vec<u32> = (0..chars.len())
+        .filter(|&i| chars[i] != ' ' && (i == 0 || chars[i - 1] == ' '))
+        .map(|i| i as u32)
+        .collect();
     canvas(
         |_, _, _| (),
         move |bounds, _, window, cx| {
@@ -538,7 +572,7 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32) -> AnyElem
                     let r1 = hash(seed, k);
                     let r2 = hash(seed ^ 0x55AA, k);
                     let speed = (36. + 220. * activity) * (0.8 + (r1 % 40) as f32 / 100.);
-                    let len = 22 + r2 % 22;
+                    let len = 12 + r2 % 14;
                     let tail = len as f32 * lh;
                     // One cycle: the stream falls through the screen, then a black gap.
                     let gap = h * (0.05 + (r1 >> 8) as f32 % 25. / 100.);
@@ -546,7 +580,9 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32) -> AnyElem
                     let pos = t * speed + (r2 % 1000) as f32 / 1000. * span;
                     let cycle = (pos / span) as u32;
                     let head = pos % span;
-                    let start = hash(seed ^ cycle, k) % n;
+                    // The top glyph of the stream is the first letter of a word.
+                    let word = words[((k + cycle * cols) as usize) % words.len().max(1)];
+                    let start = (word + n - 1) % n;
                     let head_row = (head / lh) as i64;
                     for i in 0..len {
                         let y = (head_row - i64::from(i)) as f32 * lh;
@@ -555,13 +591,18 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32) -> AnyElem
                         }
                         // Read downward: the head is the newest character of the piece.
                         let c = chars[((start + len - i) % n) as usize];
+                        if c == ' ' {
+                            continue;
+                        }
                         let (color, base) = match i {
-                            0 => (0xF0FFF4, 1.),
-                            1 => (0xA8FFC0, 1.),
-                            _ => (0x3DF07A, (1. - i as f32 / len as f32).powf(1.0)),
+                            0 | 1 => (tint, 1.),
+                            _ if hash(seed ^ k, i).is_multiple_of(3) => {
+                                (tint, 1. - i as f32 / len as f32)
+                            }
+                            _ => (0x3DF07A, 1. - i as f32 / len as f32),
                         };
                         let alpha = ((base * dim) * 5.).round() / 5.;
-                        if alpha <= 0.1 {
+                        if alpha < 0.2 {
                             continue;
                         }
                         let family = if c.is_ascii() { FONT } else { "DotGothic16" };
@@ -646,4 +687,340 @@ pub fn name(pane: &Pane) -> String {
         &pane.title
     };
     super::super::common::clip(n, 44)
+}
+
+/// The hover reveal of an agent screen: the rain turns into the console output of the agent.
+/// Each character cell of the newest `lines` locks in at its own moment: a wave from the top
+/// with some noise. Before its moment a cell is empty, then it flickers as a bright scrambled
+/// glyph, then it shows the real character. `p` runs from 0 to 1 (1 = all text is final);
+/// `t` drives the flicker. Under the text the rain fades out with `1 - p`.
+#[allow(clippy::too_many_arguments)]
+pub fn reveal(
+    source: &str,
+    lines: Vec<String>,
+    act: f32,
+    p: f32,
+    t: f32,
+    seed: u32,
+    tint: u32,
+    text_size: f32,
+    pad: f32,
+) -> AnyElement {
+    let rain_dim = (0.6 * (1. - p * 1.6)).max(0.);
+    let under = (rain_dim > 0.05).then(|| rain(source, act, rain_dim, t, seed, tint));
+    let text = canvas(
+        |_, _, _| (),
+        move |bounds, _, window, cx| {
+            let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
+            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
+            let size = f32::from(ui::ts(text_size));
+            let lh = (size * 1.5).round();
+            let cw = size * 0.6;
+            let cols = ((w - 2. * pad) / cw).max(1.) as usize;
+            let rows = ((h - 2. * pad) / lh).max(1.) as usize;
+            // Wrap the lines to the screen, keep the newest rows.
+            let mut wrapped: Vec<Vec<char>> = Vec::new();
+            for line in &lines {
+                let chars: Vec<char> = line.chars().collect();
+                if chars.is_empty() {
+                    wrapped.push(Vec::new());
+                }
+                for part in chars.chunks(cols) {
+                    wrapped.push(part.to_vec());
+                }
+            }
+            let skip = wrapped.len().saturating_sub(rows);
+            let shown = &wrapped[skip..];
+            let frame = (t * 30.) as u32;
+            painter(window, cx, |pt| {
+                // A dark glass under the text, so the text reads clearly.
+                pt.rect((x0, y0, w, h), 0x010A03, (p * 1.5).min(0.92));
+                for (r, row) in shown.iter().enumerate() {
+                    let y = y0 + pad + r as f32 * lh;
+                    let wave = 0.55 * r as f32 / rows as f32;
+                    if p >= 1. {
+                        let s: String = row.iter().collect();
+                        pt.text(
+                            &s,
+                            size,
+                            lh,
+                            FONT,
+                            false,
+                            GREEN_HI,
+                            1.,
+                            (x0 + pad, y),
+                            Align::Left,
+                        );
+                        continue;
+                    }
+                    for (c, ch) in row.iter().enumerate() {
+                        if ch.is_whitespace() {
+                            continue;
+                        }
+                        let th =
+                            wave + 0.4 * (hash(seed ^ r as u32, c as u32) % 1000) as f32 / 1000.;
+                        if p < th {
+                            continue;
+                        }
+                        let x = x0 + pad + c as f32 * cw;
+                        if p >= th + 0.12 {
+                            let s = ch.to_string();
+                            let family = if ch.is_ascii() { FONT } else { "DotGothic16" };
+                            pt.text(
+                                &s,
+                                size,
+                                lh,
+                                family,
+                                false,
+                                GREEN_HI,
+                                1.,
+                                (x, y),
+                                Align::Left,
+                            );
+                        } else {
+                            let g = glyph(hash(seed, frame), (r * 131 + c) as u32);
+                            let family = if g.is_ascii() { FONT } else { "DotGothic16" };
+                            pt.text(
+                                &g.to_string(),
+                                size,
+                                lh,
+                                family,
+                                false,
+                                0xF0FFF4,
+                                1.,
+                                (x, y),
+                                Align::Left,
+                            );
+                        }
+                    }
+                }
+            });
+        },
+    )
+    .absolute()
+    .inset_0();
+    div()
+        .absolute()
+        .inset_0()
+        .children(under)
+        .child(text)
+        .into_any_element()
+}
+
+/// Frames of TV snow, made once: every pixel a random gray, full contrast, like a television
+/// without an antenna (owner reference: a canvas noise pen, 2026-11-09).
+fn snow_frames() -> &'static [std::sync::Arc<gpui::RenderImage>] {
+    static FRAMES: std::sync::OnceLock<Vec<std::sync::Arc<gpui::RenderImage>>> =
+        std::sync::OnceLock::new();
+    FRAMES.get_or_init(|| {
+        const W: u32 = 480;
+        const H: u32 = 300;
+        (0..10u32)
+            .map(|f| {
+                let mut img = image::RgbaImage::new(W, H);
+                for y in 0..H {
+                    for x in 0..W {
+                        // Black and white grain: every pixel its own random gray.
+                        let r = hash(f.wrapping_mul(7919) ^ y.wrapping_mul(104_729), x);
+                        let l = (r % 256) as u8;
+                        img.put_pixel(x, y, image::Rgba([l, l, l, 255]));
+                    }
+                }
+                std::sync::Arc::new(gpui::RenderImage::new(vec![image::Frame::new(img)]))
+            })
+            .collect()
+    })
+}
+
+/// The empty center screen: no input, like a monitor that shows snow. One pre-made snow frame
+/// per draw (24 frames a second), a slow dark hum bar that rolls down, and darker edges.
+pub fn interference(t: f32) -> AnyElement {
+    let frames = snow_frames();
+    let frame = frames[(t * 24.) as usize % frames.len()].clone();
+    let shade = canvas(
+        |_, _, _| (),
+        move |bounds, _, window, cx| {
+            let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
+            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
+            let band = (t / 9.).fract() * (h + 200.) - 100.;
+            painter(window, cx, |p| {
+                // A little darker, with the faint green cast of the look.
+                p.rect((x0, y0, w, h), 0x000000, 0.35);
+                p.rect((x0, y0, w, h), GREEN_DIM, 0.10);
+                for i in 0..4 {
+                    let bh = 200. - i as f32 * 45.;
+                    p.rect((x0, y0 + band - bh / 2., w, bh), 0x000000, 0.08);
+                }
+                for i in 0..8 {
+                    let o = i as f32 * 8.;
+                    let a = 0.06;
+                    p.rect((x0 + o, y0 + o, w - 2. * o, 8.), 0x000000, a);
+                    p.rect((x0 + o, y0 + h - o - 8., w - 2. * o, 8.), 0x000000, a);
+                    p.rect((x0 + o, y0 + o + 8., 8., h - 2. * o - 16.), 0x000000, a);
+                    p.rect(
+                        (x0 + w - o - 8., y0 + o + 8., 8., h - 2. * o - 16.),
+                        0x000000,
+                        a,
+                    );
+                }
+            });
+        },
+    )
+    .absolute()
+    .inset_0();
+    div()
+        .absolute()
+        .inset_0()
+        .child(
+            gpui::img(frame)
+                .absolute()
+                .inset_0()
+                .size_full()
+                .object_fit(gpui::ObjectFit::Fill),
+        )
+        .child(shade)
+        .into_any_element()
+}
+
+/// Where the line of an agent starts: above its screen on the bottom row, or for an agent on
+/// another page at the left or the right edge of the strip (earlier pages left, later right).
+#[derive(Clone, Copy)]
+pub enum LineFrom {
+    Slot(usize),
+    Left,
+    Right,
+}
+
+/// The lines from all agents up to the center screen, in the state color of each agent. The
+/// canvas fills the thin strip between the center screen and the bottom row; `gap` is the
+/// space above and below the strip, so the lines touch both screens. `wide` is the width of
+/// a side column, `slots` the number of screens on the row. The end points spread over the
+/// foot of the center screen in the order of the agents, so lines never cross in a bundle.
+/// The line of the agent on the center screen is bright; a short light runs up each line.
+pub fn state_lines(
+    lines: Vec<(LineFrom, u32, bool)>,
+    slots: usize,
+    wide: f32,
+    gap: f32,
+    t: f32,
+) -> AnyElement {
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, cx| {
+            let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
+            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
+            let n = slots.max(1) as f32;
+            let tile_w = (w - (n - 1.) * gap) / n;
+            let (c0, c1) = (x0 + wide + gap + 24., x0 + w - wide - gap - 24.);
+            let (top, bottom) = (y0 - gap + 1., y0 + h + gap - 1.);
+            let count = lines.len().max(1) as f32;
+            let lefts = lines
+                .iter()
+                .filter(|l| matches!(l.0, LineFrom::Left))
+                .count();
+            let (mut li, mut ri) = (0usize, 0usize);
+            let mut sheath: [Vec<Vec<[f32; 2]>>; 2] = [Vec::new(), Vec::new()];
+            let mut shine: [Vec<Vec<[f32; 2]>>; 2] = [Vec::new(), Vec::new()];
+            let mut cores: Vec<(u32, bool, Vec<Polyline>)> = Vec::new();
+            let mut signal: Vec<Vec<[f32; 2]>> = Vec::new();
+            painter(window, cx, |p| {
+                for (i, (from, color, on)) in lines.iter().enumerate() {
+                    let ex = c0 + (i as f32 + 0.5) / count * (c1 - c0);
+                    // An agent on the row rises from its screen. An agent on another page
+                    // comes in from the edge of the strip as one line of a flat bundle in
+                    // the upper half of the gap, then turns up to its end point.
+                    let pts: Vec<[f32; 2]> = match from {
+                        LineFrom::Slot(s) => {
+                            let sx = x0 + *s as f32 * (tile_w + gap) + tile_w / 2.;
+                            let my = (bottom + top) / 2.;
+                            curve([sx, bottom], [sx, my], [ex, my], [ex, top])
+                        }
+                        LineFrom::Left | LineFrom::Right => {
+                            let left = matches!(from, LineFrom::Left);
+                            let (k, of) = if left {
+                                li += 1;
+                                (li, lefts)
+                            } else {
+                                ri += 1;
+                                (ri, lines.len() - lefts)
+                            };
+                            // The lane: the line that runs farthest runs lowest, so no line crosses another.
+                            let lane = if left { k - 1 } else { of - k };
+                            let band = (bottom - top) * 0.45;
+                            let y = top + 6. + band * (lane as f32 + 0.5) / of.max(1) as f32;
+                            let sx = if left { x0 } else { x0 + w };
+                            let turn = if left { ex - 14. } else { ex + 14. };
+                            let mut v = vec![[sx, y], [turn, y]];
+                            v.extend(
+                                curve([turn, y], [ex, y], [ex, y], [ex, top])
+                                    .into_iter()
+                                    .skip(1),
+                            );
+                            v
+                        }
+                    };
+                    // A cable: a dark sheath, the colored core, a thin light along its top,
+                    // and a dark plug where it meets a screen. The strokes are collected
+                    // and drawn as a few paths after the loop (owner: the wall was slow).
+                    sheath[usize::from(*on)].push(pts.clone());
+                    let ci = match cores.iter().position(|c| c.0 == *color && c.1 == *on) {
+                        Some(ci) => ci,
+                        None => {
+                            cores.push((*color, *on, Vec::new()));
+                            cores.len() - 1
+                        }
+                    };
+                    cores[ci].2.push(pts.clone());
+                    shine[usize::from(*on)].push(pts.iter().map(|q| [q[0], q[1] - 0.7]).collect());
+                    let end = pts[pts.len() - 1];
+                    p.rect((end[0] - 3., end[1], 6., 4.), 0x1A1F1B, 1.);
+                    p.rect((end[0] - 3., end[1], 6., 1.), 0x3A423C, 1.);
+                    if let LineFrom::Slot(_) = from {
+                        let st = pts[0];
+                        p.rect((st[0] - 3., st[1] - 4., 6., 4.), 0x1A1F1B, 1.);
+                    }
+                    // A signal runs up the core now and then: a short brighter stretch.
+                    let len = pts.len() as i32 - 1;
+                    let head = (t * 0.35 + i as f32 * 0.137).fract() * len as f32 * 2.;
+                    let at = head as i32;
+                    if (3..len).contains(&at) {
+                        signal.push(pts[(at - 3) as usize..=at as usize].to_vec());
+                    }
+                }
+                p.polylines(&sheath[0], 0x020402, 4., 1.);
+                p.polylines(&sheath[1], 0x020402, 5., 1.);
+                for (color, on, set) in &cores {
+                    p.polylines(
+                        set,
+                        *color,
+                        if *on { 3. } else { 2.2 },
+                        if *on { 1. } else { 0.7 },
+                    );
+                }
+                p.polylines(&shine[0], 0xFFFFFF, 0.6, 0.18);
+                p.polylines(&shine[1], 0xFFFFFF, 0.6, 0.35);
+                p.polylines(&signal, 0xFFFFFF, 1.2, 0.4);
+            });
+        },
+    )
+    .absolute()
+    .inset_0()
+    .into_any_element()
+}
+
+/// The points of one open line.
+type Polyline = Vec<[f32; 2]>;
+
+/// 17 points of a cubic curve.
+fn curve(a: [f32; 2], b: [f32; 2], c: [f32; 2], d: [f32; 2]) -> Vec<[f32; 2]> {
+    (0..=16)
+        .map(|j| {
+            let u = j as f32 / 16.;
+            let v = 1. - u;
+            let f = |i: usize| {
+                v * v * v * a[i] + 3. * v * v * u * b[i] + 3. * v * u * u * c[i] + u * u * u * d[i]
+            };
+            [f(0), f(1)]
+        })
+        .collect()
 }

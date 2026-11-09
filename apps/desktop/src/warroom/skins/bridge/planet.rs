@@ -603,12 +603,32 @@ fn along(p: &[(f32, f32)], t: f32) -> (f32, f32) {
     p[p.len() - 1]
 }
 
-fn dot_style(p: &Pane) -> (u32, u32, bool) {
-    match p.state {
-        SessionState::NeedsYou | SessionState::Error => (RED, BG, false),
-        SessionState::Working => (WHITE, BG, true),
-        _ => (BG, PE, false),
+/// Text color, dot fill and dot ring of a state counter: the same as its dots on the map
+/// ([`dot_style`]).
+fn legend_style(label: &str) -> Option<(u32, u32, u32)> {
+    let state = match label {
+        "At work" => SessionState::Working,
+        "Idle" => SessionState::Idle,
+        "Waits" => SessionState::NeedsYou,
+        _ => return None,
+    };
+    let (fill, ring) = state_dot(state);
+    // A white or red dot gives its fill to the text; a hollow idle dot gives its ring.
+    let color = if fill == BG { ring } else { fill };
+    Some((color, fill, ring))
+}
+
+fn state_dot(state: SessionState) -> (u32, u32) {
+    match state {
+        SessionState::NeedsYou | SessionState::Error => (RED, BG),
+        SessionState::Working => (WHITE, BG),
+        _ => (BG, PE),
     }
+}
+
+fn dot_style(p: &Pane) -> (u32, u32, bool) {
+    let (fill, ring) = state_dot(p.state);
+    (fill, ring, p.state == SessionState::Working)
 }
 
 /// A dot with its ping, by its middle on the picture.
@@ -1244,6 +1264,17 @@ impl WarRoomScreen {
                         h: 100.,
                     };
                     let name = if a.title.is_empty() { &a.id } else { &a.title };
+                    // A click on the dot on the map flies to the agent too.
+                    let dot_id = a.id.clone();
+                    ground = ground.child(
+                        spot(x - 20., y - 20., 40., 40.)
+                            .id(("pl-dot", k))
+                            .cursor_pointer()
+                            .on_click(cx.listener(move |t, _, _, cx| {
+                                t.planet_fly(AGENT, open, Some(dot_id.clone()), target);
+                                cx.notify();
+                            })),
+                    );
                     ground = ground.child(
                         spot(tag, tag_y, 210., 44.)
                             .id(("pl-tag", k))
@@ -1438,9 +1469,34 @@ impl WarRoomScreen {
             let mut line = div().flex().h(px(26.));
             for (k, (a, b)) in row.into_iter().enumerate() {
                 let (wa, wb) = [(104., 124.), (124., 136.), (92., 84.)][k];
+                // The state counters wear the colors of their dots on the map.
+                let legend = if k == 0 && level != AGENT {
+                    legend_style(&a)
+                } else {
+                    None
+                };
+                let label = match legend {
+                    Some((color, fill, ring)) => div()
+                        .w(px(wa))
+                        .flex()
+                        .items_center()
+                        .gap(px(6.))
+                        .child(
+                            div()
+                                .size(px(12.))
+                                .flex_none()
+                                .rounded_full()
+                                .bg(rgb(fill))
+                                .border_2()
+                                .border_color(rgb(ring)),
+                        )
+                        .child(text(18., 24., color, a)),
+                    None => div().w(px(wa)).child(text(18., 24., OR, a)),
+                };
+                let value = legend.map_or(PE, |(color, _, _)| color);
                 line = line
-                    .child(div().w(px(wa)).child(text(18., 24., OR, a)))
-                    .child(div().w(px(wb)).child(text(18., 24., PE, b)));
+                    .child(label)
+                    .child(div().w(px(wb)).child(text(18., 24., value, b)));
             }
             block = block.child(line);
         }
@@ -1514,14 +1570,10 @@ impl WarRoomScreen {
             }
             _ => {
                 if let Some(a) = cur {
-                    let (open, focus, stop) = (a.id.clone(), a.id.clone(), a.id.clone());
-                    pills.push(pill("pl-p1", 1026. + dx, 84., PE, "Open session").on_click(
-                        cx.listener(move |_, _, _, cx| {
-                            cx.emit(WarRoomEvent::OpenSession(open.clone()));
-                        }),
-                    ));
+                    // Focus is the one way into the session: "Open session" did the same.
+                    let (focus, stop) = (a.id.clone(), a.id.clone());
                     pills.push(
-                        pill("pl-p2", 1226. + dx, 84., SA, "Focus").on_click(cx.listener(
+                        pill("pl-p1", 1026. + dx, 84., SA, "Focus").on_click(cx.listener(
                             move |_, _, _, cx| {
                                 cx.emit(WarRoomEvent::Focus(focus.clone()));
                             },

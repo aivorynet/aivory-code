@@ -64,6 +64,24 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Many open polylines as one path: one draw for all of them. A path is drawn over its
+    /// whole bounding box, so a few large paths are much cheaper than many.
+    pub fn polylines(&mut self, lines: &[Vec<[f32; 2]>], rgb: u32, width: f32, alpha: f32) {
+        let mut path = PathBuilder::stroke(px(width));
+        let mut any = false;
+        for pts in lines {
+            let Some(first) = pts.first() else { continue };
+            path.move_to(point(px(first[0]), px(first[1])));
+            for q in &pts[1..] {
+                path.line_to(point(px(q[0]), px(q[1])));
+            }
+            any = true;
+        }
+        if any && let Ok(path) = path.build() {
+            self.window.paint_path(path, ink(rgb, alpha));
+        }
+    }
+
     /// The neon line: a wide faint stroke under a thin bright one.
     pub fn neon(&mut self, segs: &[[f32; 4]], rgb: u32, width: f32, alpha: f32) {
         self.strokes(segs, rgb, width * 5., alpha * 0.16);
@@ -91,6 +109,21 @@ impl<'a> Painter<'a> {
     /// Fill a convex polygon.
     pub fn polygon(&mut self, pts: &[[f32; 2]], rgb: u32, alpha: f32) {
         self.polygon_bg(pts, ink(rgb, alpha));
+    }
+
+    /// Fill many polygons of one color as one path: one draw for all of them.
+    pub fn polygons(&mut self, polys: &[[[f32; 2]; 3]], rgb: u32, alpha: f32) {
+        if polys.is_empty() {
+            return;
+        }
+        let mut path = PathBuilder::fill();
+        for tri in polys {
+            let pts: Vec<_> = tri.iter().map(|p| point(px(p[0]), px(p[1]))).collect();
+            path.add_polygon(&pts, true);
+        }
+        if let Ok(path) = path.build() {
+            self.window.paint_path(path, ink(rgb, alpha));
+        }
     }
 
     /// Fill a convex polygon with a color or a gradient.

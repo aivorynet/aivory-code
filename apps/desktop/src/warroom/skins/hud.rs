@@ -54,6 +54,13 @@ pub(in crate::warroom) struct HudState {
     /// Per session: when, the tokens then, the smoothed tokens per minute.
     rates: HashMap<String, (Instant, u64, f32)>,
     pub(super) cache: Rc<RefCell<TextCache>>,
+    /// The synapse layout of the Holo war room.
+    pub(super) syn: super::holo::SynapseCache,
+    /// The last state of each session, and the firings it caused (id, start time).
+    pub(super) seen: HashMap<String, SessionState>,
+    pub(super) fires: Vec<(String, f32)>,
+    /// The mouse control of the Holo synapse camera.
+    pub(super) orbit: super::holo::Orbit,
     pub(super) hits: Rc<RefCell<Vec<(Hit, Rect)>>>,
     /// The session in the decision panel (the longest wait when `None`).
     pub(super) pick: Option<String>,
@@ -158,6 +165,11 @@ impl WarRoomScreen {
     }
 
     /// Same as [`Self::hud_open`] without a refresh (the shell calls it while it renders).
+    /// The session view open in the Holo war room.
+    pub fn hud_open_id(&self) -> Option<String> {
+        self.holo.open.clone()
+    }
+
     pub fn hud_set_open(&mut self, id: &str) {
         self.holo.open = Some(id.to_string());
         self.tactical.open = Some(id.to_string());

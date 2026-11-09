@@ -73,6 +73,10 @@ pub(super) struct Panels {
     pub paused: Vec<String>,
     /// Minimized and maximized windows, by key, for the session.
     wins: HashMap<&'static str, WinState>,
+    /// Window types that differ from the default: slot key to the kind that the slot shows.
+    kinds: HashMap<&'static str, &'static str>,
+    /// The slot that the window being built sits in (a window kind can show in another slot).
+    cur_slot: std::cell::Cell<Option<&'static str>>,
     /// The window whose window menu is open.
     pub win_menu: Option<&'static str>,
     /// How far the dialog moved from the window center, and the last mouse point of a drag.
@@ -100,7 +104,58 @@ pub(super) enum WinState {
     Closed,
 }
 
+/// The window types: key and title. A slot shows one type; the default is its own key.
+pub(super) const KINDS: [(&str, &str); 6] = [
+    ("fsn", "fsn — 3D view"),
+    ("locks", "Permission locks"),
+    ("power", "Power"),
+    ("osview", "osview"),
+    ("log", "aivoryd log"),
+    ("sel", "Selected session"),
+];
+
 impl Panels {
+    /// The type that a slot shows.
+    pub fn kind_of(&self, slot: &str) -> &'static str {
+        self.kinds
+            .get(slot)
+            .copied()
+            .or_else(|| KINDS.iter().map(|k| k.0).find(|k| *k == slot))
+            .unwrap_or("fsn")
+    }
+
+    /// The slot that shows a type.
+    pub fn slot_of_kind(&self, kind: &str) -> &'static str {
+        KINDS
+            .iter()
+            .map(|k| k.0)
+            .find(|s| self.kind_of(s) == kind)
+            .unwrap_or("fsn")
+    }
+
+    /// Show `kind` in `slot`; the slot that showed `kind` takes the old type of `slot`.
+    fn set_kind(&mut self, slot: &'static str, kind: &'static str) {
+        let old = self.kind_of(slot);
+        let other = self.slot_of_kind(kind);
+        self.kinds.insert(other, old);
+        self.kinds.insert(slot, kind);
+        self.kinds.retain(|s, k| s != k);
+    }
+
+    /// Build the next window for the slot that shows type `kind`.
+    pub fn cur_slot_set(&self, kind: &str) {
+        self.cur_slot.set(Some(self.slot_of_kind(kind)));
+    }
+
+    pub fn cur_slot_clear(&self) {
+        self.cur_slot.set(None);
+    }
+
+    /// At least one window shows a changed type.
+    pub fn types_changed(&self) -> bool {
+        !self.kinds.is_empty()
+    }
+
     pub fn state_of(&self, key: &str) -> WinState {
         self.wins.get(key).copied().unwrap_or_default()
     }
@@ -525,6 +580,7 @@ impl WarRoomScreen {
         title: impl Into<SharedString>,
         body: Div,
     ) -> Div {
+        let key = self.navigator.panels.cur_slot.get().unwrap_or(key);
         let st = self.navigator.panels.state_of(key);
         let menu: Click = Rc::new(cx.listener(move |this: &mut Self, _: &ClickEvent, _, cx| {
             let p = &mut this.navigator.panels;
@@ -588,7 +644,13 @@ impl WarRoomScreen {
             ("sel", "Selected session"),
         ]
         .into_iter()
-        .map(|(k, t)| (k, t, p.state_of(k) != WinState::Closed))
+        .map(|(k, t)| {
+            let t = KINDS
+                .iter()
+                .find(|x| x.0 == p.kind_of(k))
+                .map_or(t, |x| x.1);
+            (k, t, p.state_of(k) != WinState::Closed)
+        })
         .collect();
         list.push(("dialog", "Decision dialog", p.dialog_open));
         list
@@ -617,7 +679,7 @@ impl WarRoomScreen {
         (n, self.navigator.panels.dialog_open)
     }
 
-    /// The window menu of the title-bar box: Restore, Minimize, Maximize.
+    /// The window menu of the title-bar box: Restore, Minimize, Maximize, Close, and the type.
     pub(super) fn nav_win_menu(&self, cx: &mut gpui::Context<Self>) -> Option<Div> {
         let key = self.navigator.panels.win_menu?;
         if key == "dlg" {
@@ -655,12 +717,36 @@ impl WarRoomScreen {
                     })),
             );
         }
+        let cur = self.navigator.panels.kind_of(key);
+        list = list.child(div().h(px(1.)).my(px(2.)).bg(rgb(OUTLINE)));
+        for (kind, title) in KINDS {
+            list = list.child(
+                div()
+                    .id(SharedString::from(format!("nav-wt-{kind}")))
+                    .h(px(22.))
+                    .px(px(10.))
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .text_size(ui::ts(T_SMALL))
+                    .hover(|h| h.bg(rgb(BTN_HOT)))
+                    .child(format!(
+                        "{} {title}",
+                        if kind == cur { "\u{2022}" } else { " " }
+                    ))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.navigator.panels.set_kind(key, kind);
+                        this.navigator.panels.win_menu = None;
+                        cx.notify();
+                    })),
+            );
+        }
         Some(
             div()
                 .absolute()
                 .left(relative((x + 6.) / REF_W))
                 .top(relative((y + 22.) / REF_H))
-                .w(px(120.))
+                .w(px(170.))
                 .occlude()
                 .border_1()
                 .border_color(rgb(OUTLINE))
@@ -893,7 +979,31 @@ impl WarRoomScreen {
                     .on_click(cx.listener(move |this, _, _, cx| this.nav_power_toggle(i, cx))),
             );
         }
-        self.win(cx, "power", "Power", row)
+        let mut body = div().flex().flex_col().child(row);
+        if self.navigator.panels.types_changed() {
+            body = body.child(
+                div().flex().px(px(12.)).pb(px(8.)).child(bevel(
+                    true,
+                    div()
+                        .id("nav-reset-windows")
+                        .h(px(24.))
+                        .px(px(12.))
+                        .flex()
+                        .items_center()
+                        .cursor_pointer()
+                        .bg(rgb(BTN))
+                        .hover(|h| h.bg(rgb(BTN_HOT)))
+                        .text_size(ui::ts(T_SMALL))
+                        .font_weight(FontWeight::BOLD)
+                        .child("Reset windows")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.navigator.panels.kinds.clear();
+                            cx.notify();
+                        })),
+                )),
+            );
+        }
+        self.win(cx, "power", "Power", body)
     }
 
     /// A press on a power switch.

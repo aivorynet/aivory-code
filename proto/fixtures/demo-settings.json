@@ -178,6 +178,7 @@
       "font": "JetBrains Mono",
       "fontSize": 14,
       "look": "minimal",
+      "maximizeFullScreen": false,
       "perRow": null,
       "theme": "light",
       "uiScale": 115

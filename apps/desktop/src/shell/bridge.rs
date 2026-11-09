@@ -370,14 +370,26 @@ impl Shell {
         })
     }
 
-    /// The row of looks above the look button.
+    /// The list of looks at the look button.
     fn bridge_look_menu(&self, y: f32, cx: &mut Context<Self>) -> AnyElement {
+        // A list of pills: it drops down from the top, and it rises from the bottom bar.
+        let n = crate::look::LOOKS.len() as f32;
+        let h = n * 28. + (n - 1.) * 6.;
+        let top = if y > 500. { y - h - 6. } else { y + 6. };
         let mut row = div()
+            .id("lc-look-list")
             .absolute()
             .right(px(16.))
-            .top(px(y))
+            .top(px(top))
+            .occlude()
             .flex()
-            .gap(px(6.));
+            .flex_col()
+            .items_end()
+            .gap(px(6.))
+            .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+                this.look_menu = false;
+                cx.notify();
+            }));
         for (look, name) in crate::look::LOOKS {
             let c = if look == crate::theme::tk().look {
                 GD

@@ -35,9 +35,29 @@ pub(super) struct HoloScreens {
     full_settings: bool,
     /// The start of the slow rings.
     started: Option<Instant>,
+    /// The open effect of a new screen.
+    fx: super::open_fx::OpenFx,
+    /// The step of `AIVORY_HOLO_CYCLE`.
+    cycle: usize,
 }
 
 impl Shell {
+    /// `AIVORY_HOLO_CYCLE=1`: the screen changes every 2.5 s (off-screen shots of the open
+    /// effect). It runs before the content of the frame is made.
+    pub(super) fn holo_cycle(&mut self, cx: &mut Context<Self>) {
+        if std::env::var_os("AIVORY_HOLO_CYCLE").is_none() {
+            return;
+        }
+        let now = Instant::now();
+        let t = (now - *self.holo_screens.started.get_or_insert(now)).as_secs_f32();
+        let step = (t / 2.5) as usize;
+        if step != self.holo_screens.cycle {
+            self.holo_screens.cycle = step;
+            self.screen = [Screen::WarRoom, Screen::Inbox, Screen::Repos][step % 3].clone();
+            cx.notify();
+        }
+    }
+
     /// True when the Holo look is on.
     pub(super) fn holo_on() -> bool {
         tk().look == Look::Holo
@@ -243,6 +263,13 @@ impl Shell {
         crate::ui::animate(window, cx);
         let bar = self.holo_bar(cx);
         let menu = self.holo_look_menu(cx);
+        // A new screen, or a session view in the war room, opens with the pen's effect.
+        let open = self.war_room.read(cx).hud_open_id();
+        let key = format!("{:?}|{:?}", self.screen, open);
+        let mut fx = std::mem::take(&mut self.holo_screens.fx);
+        fx.screen(key, window, cx, |s: &mut Shell| &mut s.holo_screens.fx);
+        let area = fx.wrap(content, window);
+        self.holo_screens.fx = fx;
         div()
             .size_full()
             .relative()
@@ -255,7 +282,7 @@ impl Shell {
             .text_color(rgb(TXT))
             .child(backdrop(t))
             .child(bar)
-            .child(div().relative().flex_1().min_h(px(0.)).child(content))
+            .child(area)
             .children(menu)
             .children(toasts)
     }
