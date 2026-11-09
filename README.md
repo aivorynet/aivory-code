@@ -57,7 +57,6 @@ features). Make your own and share it:
 | `crates/aivory-link` | Remote link to the phone: iroh endpoint, device keys, sealed push payloads | Rust |
 | `crates/aivoryd` | The daemon and its command line | Rust |
 | `apps/desktop` | The desktop app (GPUI), binary `aivory` | Rust |
-| `apps/mobile` | The phone app | Dart (Flutter) |
 | `proto/` | JSON fixtures and the JSON Schema of the protocol | JSON |
 | `docs/` | Design, decision records (ADR), roadmap | Markdown |
 
@@ -66,7 +65,7 @@ These folders hold only a README. They are placeholders for later work: `grammar
 
 ## Build and run
 
-Install Rust 1.88 or newer. Install Flutter for the phone app. The first desktop build takes
+Install Rust 1.88 or newer. The first desktop build takes
 several minutes.
 
 Run the desktop app on the demo data. No agent and no daemon are needed:
@@ -83,13 +82,6 @@ cargo run -p aivory-desktop
 ```
 
 Add `--scope <folder>` to `serve` to show only the sessions below one folder.
-
-Run the phone app. It uses the demo data. The link to the daemon is not finished yet.
-
-```
-cd apps/mobile
-flutter run -d windows
-```
 
 Run the stress check (40 live panes, frame rate in the log):
 
@@ -110,7 +102,6 @@ cargo run -p aivoryd -- map init <repo>
 ```
 cargo test
 cargo test --workspace
-cd apps/mobile && flutter test
 ```
 
 - `cargo test` tests the crates. It leaves out the desktop app.
@@ -121,7 +112,6 @@ Run these checks before you finish a change:
 ```
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cd apps/mobile && flutter analyze
 ```
 
 `cargo deny check` checks the dependency licenses. It needs `cargo install cargo-deny`.
@@ -149,6 +139,7 @@ cd apps/mobile && flutter analyze
 ## License
 
 MIT. Everyone can use, change, and share AIVory Code for free, also at work. See [LICENSE](LICENSE).
+The phone and watch apps have their own license and are not part of this repository.
 There is no paid tier ([ADR 0025](docs/adr/0025-free-for-everyone.md)).
 The bundled fonts use the SIL Open Font License. The license files are in
-`apps/desktop/assets/fonts` and `apps/mobile/assets/fonts`.
+`apps/desktop/assets/fonts`.
