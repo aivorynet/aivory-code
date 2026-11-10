@@ -2,7 +2,7 @@
 //! the war room always fills the window at the left; the command sidebar at the right replaces
 //! the rail and the status bar (one navigation only). Every other screen opens as a riveted steel
 //! window over the dimmed map: Inbox (the Command view of `command_inbox.rs`), Tasks, Repos,
-//! Setup, the session (Unit), Focus and Lens. The X button or a click beside the window closes it.
+//! Setup, the session (Unit) and Lens. The X button or a click beside the window closes it.
 //!
 //! The sidebar: the LED counter (tokens left), the radar of the whole map (a click moves the
 //! view), the screen buttons, the NEW UNIT build tile (the New session dialog, N), the sessions
@@ -23,9 +23,6 @@ use crate::rts::{Frame9, frame, sprites};
 use crate::theme::tk;
 use crate::warroom::skins::command::{SIDE_W, rts_waits};
 
-/// The width of the robot on the NEW UNIT tile.
-const BOT_W: f32 = 58.;
-
 /// The Command views.
 #[derive(Default)]
 pub(super) struct CommandScreens {
@@ -42,7 +39,7 @@ pub(super) struct CommandScreens {
 fn handle(this: &mut Shell, event: &CmdEvent, cx: &mut Context<Shell>) {
     match event {
         CmdEvent::OpenSession(id) => this.open_session(id, cx),
-        CmdEvent::Focus(id) => this.go(Screen::Focus(id.clone()), cx),
+        CmdEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         CmdEvent::Full => {
             this.command.full = true;
             cx.notify();
@@ -156,16 +153,12 @@ impl Shell {
                 war.as_ref().map_or(0, |w| w.codebases.len())
             ),
             Screen::Settings => "SETUP".into(),
-            Screen::Session(id) | Screen::Focus(id) => {
+            Screen::Session(id) => {
                 let t = war
                     .as_ref()
                     .and_then(|w| w.session(id))
                     .map_or(String::new(), |p| cmd::up(&p.title));
-                if matches!(self.screen, Screen::Focus(_)) {
-                    format!("FOCUS · {t}")
-                } else {
-                    format!("UNIT · {t}")
-                }
+                format!("UNIT · {t}")
             }
             Screen::Lens => "LENS".into(),
             Screen::WarRoom => String::new(),
@@ -203,7 +196,7 @@ impl Shell {
                     .child(content),
             );
         } else {
-            let (ww, wh) = ((map_w - 80.).min(1040.), (vh - 80.).min(780.));
+            let (ww, wh) = cmd::win_size(vw, vh, SIDE_W);
             let title = self.command_title(cx);
             // The own Command views draw on the steel; a full screen keeps its page color.
             let own = !self.command.full
@@ -287,6 +280,9 @@ impl Shell {
         let here = self.screen.rail();
         let war = self.model.read(cx).war.clone();
         let s = sprites();
+        // Under 860 px of height the radar is hidden and the rest moves up.
+        let compact = vh < 860.;
+        let dy = if compact { 206. } else { 0. };
         let mut side = div().relative().w(px(SIDE_W)).h(px(vh)).child(
             img(frame(Frame9::Panel, SIDE_W, vh))
                 .absolute()
@@ -416,7 +412,9 @@ impl Shell {
                     .top(px(10.)),
             );
         }
-        side = side.child(radar);
+        if !compact {
+            side = side.child(radar);
+        }
         // the screen buttons
         let inbox = war.as_ref().map_or(0, |w| w.inbox_open);
         for (id, name, screen, x, y, w) in [
@@ -425,7 +423,7 @@ impl Shell {
                 "WAR ROOM".to_string(),
                 Screen::WarRoom,
                 24.,
-                290.,
+                290. - dy,
                 134.,
             ),
             (
@@ -437,12 +435,33 @@ impl Shell {
                 },
                 Screen::Inbox,
                 162.,
-                290.,
+                290. - dy,
                 134.,
             ),
-            ("cmd-tasks", "TASKS".into(), Screen::Tasks, 24., 334., 134.),
-            ("cmd-repos", "REPOS".into(), Screen::Repos, 162., 334., 134.),
-            ("cmd-set", "SETUP".into(), Screen::Settings, 24., 378., 272.),
+            (
+                "cmd-tasks",
+                "TASKS".into(),
+                Screen::Tasks,
+                24.,
+                334. - dy,
+                134.,
+            ),
+            (
+                "cmd-repos",
+                "REPOS".into(),
+                Screen::Repos,
+                162.,
+                334. - dy,
+                134.,
+            ),
+            (
+                "cmd-set",
+                "SETUP".into(),
+                Screen::Settings,
+                24.,
+                378. - dy,
+                272.,
+            ),
         ] {
             side = side.child(
                 cmd::plate(id, name, w, 40., here == screen)
@@ -452,46 +471,60 @@ impl Shell {
                     .on_click(cx.listener(move |this, _, _, cx| this.go(screen.clone(), cx))),
             );
         }
+        // Organizer and New task: two plates under the screen buttons
+        for (k, b) in crate::new_session::launch_buttons("command", |id, label| {
+            cmd::plate(id, label.to_uppercase(), 134., 40., false)
+        })
+        .into_iter()
+        .enumerate()
+        {
+            side = side.child(
+                b.absolute()
+                    .left(px(24. + k as f32 * 138.))
+                    .top(px(422. - dy)),
+            );
+        }
         // NEW UNIT: the build tile of a new session
         side = side.child(
-            well(24., 432., 272., 112.)
+            div()
+                .absolute()
+                .left(px(24.))
+                .top(px(478. - dy))
+                .w(px(272.))
+                .h(px(112.))
                 .id("cmd-new")
                 .cursor_pointer()
-                .hover(|st| st.bg(c(0x141A10, 1.)))
                 .on_click(cx.listener(|this, _, _, cx| this.open_new_session(cx)))
                 .child(
+                    img(frame(Frame9::Button, 272., 112.))
+                        .absolute()
+                        .left_0()
+                        .top_0()
+                        .size_full(),
+                )
+                .child(
+                    // the robot at its own size (no scaling), in a recessed slot
                     div()
                         .absolute()
-                        .left(px(8.))
-                        .top(px(8.))
-                        .size(px(96.))
-                        .overflow_hidden()
-                        .bg(c(0x3A5A2A, 1.))
-                        .border_2()
-                        .border_color(c(cmd::GREEN, 1.))
-                        .child(
-                            div()
-                                .absolute()
-                                .left_0()
-                                .right_0()
-                                .bottom_0()
-                                .h(px(24.))
-                                .bg(c(0x6A5536, 1.)),
-                        )
+                        .left(px(14.))
+                        .top(px(12.))
+                        .w(px(64.))
+                        .h(px(88.))
+                        .bg(c(0x2A4A1E, 1.))
                         .child(
                             img(s.bot.render.clone())
                                 .absolute()
-                                .left(px(((92. - BOT_W) / 2.).floor()))
-                                .top(px(90. - BOT_W * s.bot.h() / s.bot.w()))
-                                .w(px(BOT_W))
-                                .h(px(BOT_W * s.bot.h() / s.bot.w())),
+                                .left(px(9.))
+                                .top_0()
+                                .w(px(s.bot.rgba.width() as f32))
+                                .h(px(s.bot.rgba.height() as f32)),
                         ),
                 )
                 .child(
                     div()
                         .absolute()
-                        .left(px(116.))
-                        .top(px(8.))
+                        .left(px(94.))
+                        .top(px(12.))
                         .flex()
                         .flex_col()
                         .gap(px(1.))
@@ -502,8 +535,14 @@ impl Shell {
                 ),
         );
         // the sessions that wait for you
-        let mut waits = well(24., 556., 272., (vh - 106. - 12. - 556.).max(120.))
+        let wt = 602. - dy;
+        let ram_top = (vh - 106.).max(wt + 132.);
+        let waits_h = ram_top - 12. - wt;
+        // As many rows as the well holds (the label takes about 40 px, a row 46 px).
+        let rows = (((waits_h - 40.) / 46.).floor() as usize).clamp(1, 4);
+        let mut waits = well(24., wt, 272., waits_h)
             .p(px(10.))
+            .overflow_hidden()
             .flex()
             .flex_col();
         let asks: Vec<_> = war
@@ -524,13 +563,13 @@ impl Shell {
             );
         }
         let now = war.as_ref().map_or(0, |w| w.now);
-        for (k, p) in asks.iter().take(4).enumerate() {
+        for (k, p) in asks.iter().take(rows).enumerate() {
             let id = p.id.clone();
             let fault = p.state == SessionState::Error;
             waits = waits.child(
                 div()
                     .id(("cmd-wait", k))
-                    .h(px(46.))
+                    .min_h(px(46.))
                     .flex()
                     .items_center()
                     .justify_between()
@@ -572,7 +611,7 @@ impl Shell {
                 (m.used_mb as f32 / 1024., m.total_mb as f32 / 1024.)
             });
         side.child(
-            well(24., (vh - 106.).max(688.), 272., 82.)
+            well(24., ram_top, 272., 82.)
                 .p(px(12.))
                 .flex()
                 .flex_col()

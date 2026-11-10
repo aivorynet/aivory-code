@@ -102,10 +102,6 @@ pub fn wait_text(minutes: i64) -> String {
         format!("{minutes} min")
     }
 }
-/// The number of turns (user prompts) in a transcript.
-pub fn turn_count(lines: &[Line]) -> usize {
-    lines.iter().filter(|l| l.kind == LineKind::User).count()
-}
 
 #[cfg(test)]
 mod tests {
@@ -116,6 +112,7 @@ mod tests {
             kind,
             label: label.map(String::from),
             text: text.into(),
+            media: None,
         }
     }
 

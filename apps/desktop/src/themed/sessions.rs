@@ -15,6 +15,8 @@ use super::data::{ThemeSnapshot, as_text, tier};
 use super::host::{ComposerCfg, Node, ThemedEvent, ThemedView, TierLayout};
 use super::render::{Frame, Scope, id, item_key, style};
 use crate::actions::Action;
+use crate::compose;
+use crate::media::{self, MediaStyle};
 use crate::theme::tk;
 use crate::ui;
 
@@ -458,8 +460,21 @@ impl ThemedView {
                     .child("No lines yet."),
             );
         }
-        for l in lines {
+        let media_style = MediaStyle {
+            card: rgba(f.tone("surface")),
+            text: rgba(f.tone("text")),
+            muted: rgba(f.tone("muted")),
+            radius: 8.,
+        };
+        for (n, l) in lines.iter().enumerate() {
             d = d.child(line_row(l, f, terminal));
+            if let Some(m) = &l.media {
+                d = d.child(div().flex_none().py(px(4.)).child(media::preview(
+                    m,
+                    ("themed-media", n),
+                    media_style,
+                )));
+            }
         }
         style(d, node, f, sc).into_any_element()
     }
@@ -487,6 +502,22 @@ impl ThemedView {
                         .auto_grow(1, 5)
                 });
                 let k = key.to_string();
+                let weak = cx.weak_entity();
+                let ck = key.to_string();
+                crate::complete::attach(
+                    &input,
+                    self.model.clone(),
+                    move |cx| {
+                        weak.upgrade().and_then(|v| {
+                            v.read(cx)
+                                .composers
+                                .get(&ck)
+                                .and_then(|c| c.session.clone())
+                        })
+                    },
+                    |_| (None, None),
+                    cx,
+                );
                 let sub = cx.subscribe_in(
                     &input,
                     window,
@@ -502,7 +533,24 @@ impl ThemedView {
             }
         };
         let k = key.to_string();
-        div()
+        let sends = self.composers.get(key).is_some_and(|c| c.mode == "send");
+        let attach = sends.then(|| {
+            div()
+                .id(id(&format!("{key}/attach")))
+                .flex_none()
+                .px(px(10.))
+                .py(px(6.))
+                .cursor_pointer()
+                .rounded(px(8.))
+                .text_color(rgba(f.tone("muted")))
+                .text_size(ui::ts(f.theme.types[1]))
+                .hover(|s| s.text_color(rgba(f.tone("text"))))
+                .child("Attach")
+                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                    compose::attach(|this: &mut Self| Some(&mut this.tools), window, cx)
+                }))
+        });
+        let frame = div()
             .flex()
             .flex_row()
             .items_end()
@@ -520,6 +568,7 @@ impl ThemedView {
                     .text_color(rgba(f.tone("text")))
                     .child(input),
             )
+            .children(attach)
             .child(
                 div()
                     .id(id(&format!("{key}/send")))
@@ -535,8 +584,8 @@ impl ThemedView {
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         this.submit_composer(&k, window, cx);
                     })),
-            )
-            .into_any_element()
+            );
+        frame.into_any_element()
     }
 
     pub(super) fn composer(
@@ -588,7 +637,71 @@ impl ThemedView {
             }
         };
         let body = self.composer_box(&key, &ph, f, window, cx);
-        style(div().min_w(px(0.)), node, f, sc)
+        // A composer of a session shows the controls of that session above the text box.
+        let pane = self
+            .composers
+            .get(&key)
+            .filter(|c| c.mode == "send")
+            .and_then(|c| c.session.clone())
+            .and_then(|id| self.pane(&id, cx));
+        let controls = pane.map(|pane| {
+            self.controls.sync(&pane);
+            let providers = self.model.read(cx).providers.clone();
+            let style = crate::compose_controls::ControlStyle {
+                pill: rgba(f.tone("surface")),
+                pill_hover: rgba(f.tone("muted") & 0xFFFFFF00 | 0x60),
+                pill_text: rgba(f.tone("text")),
+                on: rgba(f.tone("accent")),
+                on_text: rgba(f.tone("bg")),
+                menu: rgba(f.tone("surface")),
+                menu_text: rgba(f.tone("text")),
+                menu_hover: rgba(f.tone("muted") & 0xFFFFFF00 | 0x60),
+                font: None,
+                radius: Some(8.),
+                text: None,
+            };
+            self.controls.row(
+                "themed-ctl",
+                &pane,
+                &providers,
+                &style,
+                |this: &mut Self| &mut this.controls,
+                cx,
+            )
+        });
+        let chips = (self.composers.get(&key).is_some_and(|c| c.mode == "send"))
+            .then(|| {
+                let palette = compose::Palette {
+                    text: f.tone("text"),
+                    dim: f.tone("muted"),
+                    line: f.tone("muted") & 0xFFFFFF00 | 0x40,
+                    chip_bg: f.tone("surface"),
+                    hover: f.tone("muted") & 0xFFFFFF00 | 0x60,
+                    fail: f.state_color("error"),
+                    ok: f.state_color("done"),
+                };
+                compose::chips(&self.tools, &key, palette, |i| {
+                    Box::new(cx.listener(move |this, _, _, cx| {
+                        this.tools.remove(i);
+                        cx.notify();
+                    }))
+                })
+            })
+            .flatten();
+        let column = style(
+            div().min_w(px(0.)).flex().flex_col().gap(px(6.)),
+            node,
+            f,
+            sc,
+        );
+        let column = if self.composers.get(&key).is_some_and(|c| c.mode == "send") {
+            compose::media_target(column, |this: &mut Self| Some(&mut this.tools), cx)
+        } else {
+            column
+        };
+        column
+            .children(controls)
+            .children(chips)
             .child(body)
             .into_any_element()
     }
@@ -606,8 +719,19 @@ impl ThemedView {
         ) else {
             return;
         };
-        let text = input.read(cx).value().trim().to_string();
-        if text.is_empty() {
+        let typed = input.read(cx).value().trim().to_string();
+        let sends = cfg.mode == "send";
+        let images = if sends {
+            self.tools.images()
+        } else {
+            Vec::new()
+        };
+        let text = if sends {
+            self.tools.message(&typed, None)
+        } else {
+            typed
+        };
+        if text.trim().is_empty() && images.is_empty() {
             return;
         }
         let snap = self.model.read(cx).snapshot.clone();
@@ -622,10 +746,28 @@ impl ThemedView {
                 _ => return,
             },
             "send" => match cfg.session {
-                Some(id) => Action::Send {
-                    id,
-                    text,
-                    composer: None,
+                // A known session sends with the picked controls (a handoff when the provider
+                // changed); an unknown id goes the theme way.
+                Some(id) => match self.pane(&id, cx) {
+                    Some(pane) => {
+                        let prefs = self.controls.current(&pane);
+                        input.update(cx, |s, cx| s.set_value("", window, cx));
+                        crate::compose_controls::submit(
+                            &self.model,
+                            &pane,
+                            text,
+                            images,
+                            prefs,
+                            cx,
+                        );
+                        self.tools.sent();
+                        return;
+                    }
+                    None => Action::Send {
+                        id,
+                        text,
+                        composer: None,
+                    },
                 },
                 None => return,
             },
@@ -644,6 +786,18 @@ impl ThemedView {
         };
         input.update(cx, |s, cx| s.set_value("", window, cx));
         self.run(action, cx);
+    }
+
+    /// The pane of a session in the war room.
+    fn pane(&self, id: &str, cx: &Context<Self>) -> Option<aivory_protocol::Pane> {
+        self.model
+            .read(cx)
+            .war
+            .as_ref()?
+            .sessions
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
     }
 
     /// The text of a composer, for a control that sends it (`dispatch`, `newSession`).

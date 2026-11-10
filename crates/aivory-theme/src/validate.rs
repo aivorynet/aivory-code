@@ -13,8 +13,13 @@ use crate::paths::{FileKind, kind_of, size_cap};
 use crate::{Issue, assets, caps, layout, package, strings, tokens};
 
 /// The screens of ADR 0024 section 1.
-pub const SCREENS: [&str; 8] = [
-    "warroom", "session", "inbox", "tasks", "repos", "settings", "focus", "decision",
+pub const SCREENS: [&str; 7] = [
+    "warroom", "session", "inbox", "tasks", "repos", "settings", "decision",
+];
+/// Screens that a desktop theme may have but does not need. `focus` is the old name of the
+/// session screen: an old theme keeps it and the shell uses it when `session` is not enough.
+const ACCEPTED: [&str; 8] = [
+    "warroom", "session", "inbox", "tasks", "repos", "settings", "decision", "focus",
 ];
 /// The screens of the `watch` class.
 pub const WATCH_SCREENS: [&str; 2] = ["warroom", "decision"];
@@ -46,7 +51,7 @@ pub fn screens_of(class: DisplayClass) -> &'static [&'static str] {
     if class == DisplayClass::Watch {
         &WATCH_SCREENS
     } else {
-        &SCREENS
+        &ACCEPTED
     }
 }
 
@@ -519,7 +524,7 @@ mod tests {
         assert!(r.is_ok(), "{}", format_issues(&r.issues));
         let p = r.package.unwrap();
         assert_eq!(p.manifest.id, "my-theme");
-        assert_eq!(p.layouts[&DisplayClass::Desktop].len(), 8);
+        assert_eq!(p.layouts[&DisplayClass::Desktop].len(), 7);
         assert_eq!(p.languages, ["en"]);
     }
 

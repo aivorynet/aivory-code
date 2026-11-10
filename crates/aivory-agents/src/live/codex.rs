@@ -20,7 +20,7 @@ use serde_json::{Map, Value, json};
 
 use super::rpc::{AskSlot, Dialect, Io, Tag};
 use super::stream::{MAX_LINE_CHARS, diff_lines, first_line, summarize};
-use super::{RunEvent, StartOptions};
+use super::{Input, RunEvent, StartOptions};
 use crate::mcp::{Answer, truncate};
 
 const INIT: Tag = "initialize";
@@ -345,6 +345,44 @@ fn file_change_lines(change: &Value, out: &mut Vec<RunEvent>) {
     diff_lines(&old.join("\n"), &new.join("\n"), out);
 }
 
+/// The parameters of `turn/start`: the text, the images as `localImage` items, and the model,
+/// effort, approval policy, and sandbox of the run.
+fn turn_params(thread: &str, opts: &StartOptions, input: &Input) -> Value {
+    let mut items = vec![json!({ "type": "text", "text": input.text, "text_elements": [] })];
+    for path in &input.images {
+        items.push(json!({ "type": "localImage", "path": path.display().to_string() }));
+    }
+    let mut p = Map::new();
+    p.insert("threadId".into(), json!(thread));
+    p.insert("input".into(), Value::Array(items));
+    if let Some(v) = &opts.model {
+        p.insert("model".into(), json!(v));
+    }
+    if let Some(v) = &opts.effort {
+        // Codex knows no `max`: its top level is `xhigh`.
+        let v = if v == "max" { "xhigh" } else { v.as_str() };
+        p.insert("effort".into(), json!(v));
+    }
+    if let Some(v) = &opts.permission_mode {
+        p.insert("approvalPolicy".into(), json!(v));
+    }
+    if let Some(v) = opts.sandbox.as_deref().and_then(sandbox_policy) {
+        p.insert("sandboxPolicy".into(), v);
+    }
+    Value::Object(p)
+}
+
+/// The `sandboxPolicy` of a turn for a sandbox mode of `thread/start`.
+fn sandbox_policy(mode: &str) -> Option<Value> {
+    let kind = match mode {
+        "read-only" => "readOnly",
+        "workspace-write" => "workspaceWrite",
+        "danger-full-access" => "dangerFullAccess",
+        _ => return None,
+    };
+    Some(json!({ "type": kind }))
+}
+
 impl Dialect for Codex {
     fn label(&self) -> &'static str {
         "codex"
@@ -494,21 +532,27 @@ impl Dialect for Codex {
         }
     }
 
-    fn start_turn(&mut self, text: &str, io: &Io<'_>) {
+    fn start_turn(&mut self, input: &Input, io: &Io<'_>) {
         let Some(thread) = self.thread.clone() else {
             io.line(Line::error("The Codex thread is not open."));
             io.turn_ended(0.0, 0);
             return;
         };
         self.turn_error = false;
-        io.request(
-            TURN,
-            "turn/start",
-            json!({
-                "threadId": thread,
-                "input": [{ "type": "text", "text": text, "text_elements": [] }],
-            }),
-        );
+        // A new value stays for the turns after this one, as in the Codex CLI.
+        if input.model.is_some() {
+            self.opts.model.clone_from(&input.model);
+        }
+        if input.effort.is_some() {
+            self.opts.effort.clone_from(&input.effort);
+        }
+        if input.permission_mode.is_some() {
+            self.opts.permission_mode.clone_from(&input.permission_mode);
+        }
+        if input.sandbox.is_some() {
+            self.opts.sandbox.clone_from(&input.sandbox);
+        }
+        io.request(TURN, "turn/start", turn_params(&thread, &self.opts, input));
     }
 
     fn interrupt(&mut self, io: &Io<'_>) {
@@ -580,6 +624,33 @@ impl Dialect for Codex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_turn_sends_images_effort_and_sandbox() {
+        let opts = StartOptions {
+            model: Some("gpt".into()),
+            effort: Some("max".into()),
+            permission_mode: Some("on-request".into()),
+            sandbox: Some("read-only".into()),
+            ..StartOptions::default()
+        };
+        let input = Input {
+            text: "see".into(),
+            images: vec!["C:/x/a.png".into()],
+            ..Input::default()
+        };
+        let p = turn_params("th", &opts, &input);
+        assert_eq!(p["threadId"], "th");
+        assert_eq!(p["input"][0]["text"], "see");
+        assert_eq!(
+            p["input"][1],
+            json!({"type": "localImage", "path": "C:/x/a.png"})
+        );
+        assert_eq!(p["effort"], "xhigh");
+        assert_eq!(p["model"], "gpt");
+        assert_eq!(p["approvalPolicy"], "on-request");
+        assert_eq!(p["sandboxPolicy"], json!({"type": "readOnly"}));
+    }
 
     #[test]
     fn file_change_lines_show_a_short_diff() {

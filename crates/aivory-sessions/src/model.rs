@@ -59,6 +59,14 @@ pub struct SessionSummary {
     pub git_branch: Option<String>,
     pub cli_version: Option<String>,
     pub model: Option<String>,
+    /// The last permission mode that the transcript names, in the words of the CLI: Claude
+    /// `default`, `plan`, `acceptEdits`, `auto`, `bypassPermissions`; Codex
+    /// `<approval_policy>/<sandbox type>`, for example `on-request/workspace-write`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// The last effort level that the transcript names (`low` … `max`, Codex `xhigh`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
     /// The main session file.
     pub path: PathBuf,
     /// Sidechain (sub-agent) files that belong to this session.

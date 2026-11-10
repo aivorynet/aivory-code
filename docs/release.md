@@ -1,8 +1,11 @@
 # Release pipeline (GitHub Actions)
 
 ## Make a release
+The version is a calendar version: `<year>.<release>.<fix>`, for example `2026.1.0`. The MSI of
+the GitLab pipeline drops the century (`26.1.0`), because an MSI version allows 255 at most.
+
 1. Set `version` in the root `Cargo.toml` (`[workspace.package]`).
-2. Tag and push: `git tag v0.1.0 && git push github v0.1.0`. A tag `v*` starts `release.yml`.
+2. Tag and push: `git tag v2026.1.0 && git push github v2026.1.0`. A tag `v*` starts `release.yml`.
 3. Run `release.yml` by hand (workflow_dispatch) for a test build. It builds but makes no release.
 
 `ci.yml` runs on each push to `main` and on each PR: fmt, clippy `-D warnings`, tests, `cargo deny`.
@@ -11,9 +14,10 @@
 The builds have no code signature. winget and Homebrew formulas avoid the SmartScreen and
 Gatekeeper prompts, so the README tells users to install through them.
 
-The release job runs `scripts/render-packages.sh`. It fills the templates in `packaging/` with
+The release job runs `packaging/render-packages.sh`. It fills the templates in `packaging/` with
 the version and the SHA-256 of the release files, and attaches `aivory-code-packages.zip` and
-`SHA256SUMS.txt` to the release. The Windows installer gets the fixed name
+`SHA256SUMS.txt` to the release. It also attaches `packaging/install.sh`, the no-package-manager
+route for macOS and Linux (`curl -fsSL .../releases/latest/download/install.sh | sh`). The Windows installer gets the fixed name
 `aivory-code-windows-x64-setup.exe`, because the winget manifest points at it.
 
 First setup, once:
@@ -28,6 +32,9 @@ Each release:
    `winget validate --manifest <folder>`, test it with `winget install --manifest <folder>`,
    and open a PR to `microsoft/winget-pkgs`. Microsoft reviews the first version by hand.
    Later versions can use `wingetcreate update Aivory.AivoryCode --version <v> --urls <url> --submit`.
+4. Website (first release only): when the repo is public, the release has installers, and winget
+   and Homebrew are merged, set `params.codeReleased = true` in `aivory-hugo/hugo.toml` and deploy.
+   It turns on the winget and brew commands and the star, issue, and release links.
 
 Use a formula, not a cask, for Homebrew. Homebrew sets the quarantine flag on cask downloads,
 and Gatekeeper then blocks an app that is not notarized.

@@ -15,12 +15,11 @@ use crate::inbox::{InboxEvent, InboxScreen};
 use crate::lens::{LensEvent, LensScreen};
 use crate::model::{Link, Model};
 use crate::repos::{ReposEvent, ReposScreen};
-use crate::session::{SessionEvent, SessionScreen};
 use crate::settings::SettingsScreen;
 use crate::tasks::{TasksEvent, TasksScreen};
 use crate::theme::*;
 use crate::ui;
-use crate::warroom::{BridgeDetail, BridgeDetailEvent, WarRoomEvent, WarRoomScreen};
+use crate::warroom::{WarRoomEvent, WarRoomScreen};
 
 mod bridge;
 mod command;
@@ -34,7 +33,6 @@ mod neon_focus;
 mod neon_kit;
 mod neon_lens;
 mod neon_screens;
-mod neon_session;
 mod open_fx;
 mod operator;
 mod operator_focus;
@@ -45,9 +43,9 @@ mod tactical;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     WarRoom,
+    /// One session: the chat with the composer controls, the changed code and the console
+    /// output. Every look has one such screen (the Focus and the deep dive are merged).
     Session(String),
-    /// The Focus view of one session: chat and code.
-    Focus(String),
     Inbox,
     Tasks,
     Repos,
@@ -61,7 +59,6 @@ impl Screen {
         match self {
             Screen::WarRoom => "War room",
             Screen::Session(_) => "Session",
-            Screen::Focus(_) => "Focus",
             Screen::Inbox => "Inbox",
             Screen::Tasks => "Tasks",
             Screen::Repos => "Repos",
@@ -72,7 +69,7 @@ impl Screen {
 
     fn icon(&self) -> &'static str {
         match self {
-            Screen::WarRoom | Screen::Session(_) | Screen::Focus(_) => "icons/warroom.svg",
+            Screen::WarRoom | Screen::Session(_) => "icons/warroom.svg",
             Screen::Inbox => "icons/inbox.svg",
             Screen::Tasks => "icons/tasks.svg",
             Screen::Repos | Screen::Lens => "icons/repos.svg",
@@ -83,7 +80,7 @@ impl Screen {
     /// The rail item that is on for this screen.
     fn rail(&self) -> Screen {
         match self {
-            Screen::Session(_) | Screen::Focus(_) => Screen::WarRoom,
+            Screen::Session(_) => Screen::WarRoom,
             Screen::Lens => Screen::Repos,
             other => other.clone(),
         }
@@ -118,12 +115,6 @@ pub struct Shell {
     tasks: Entity<TasksScreen>,
     repos: Entity<ReposScreen>,
     settings: Entity<SettingsScreen>,
-    /// The deep dive of the session on screen: its id, the view, and the event subscription.
-    session: Option<(String, Entity<SessionScreen>, Subscription)>,
-    /// The Bridge session view: its id, the view, and the event subscription.
-    bridge_detail: Option<(String, Entity<BridgeDetail>, Subscription)>,
-    /// The Neon session view: its id, the view, and the event subscription.
-    night_detail: Option<(String, Entity<neon_session::NightSession>, Subscription)>,
     /// The Bridge screens: made when they first show, then kept.
     bridge_screens: BridgeScreens,
     /// The Holo list screens, Focus and Lens.
@@ -150,16 +141,14 @@ pub struct Shell {
     /// Navigator look: the Tasks, Repos and Focus screens.
     irix_screens: irix_screens::IrixScreens,
     /// The Operator look: the start of its animation clock, the steer line of the session view.
-    operator_t0: Option<std::time::Instant>,
-    operator_steer: Option<Entity<gpui_base::input::InputState>>,
-    operator_sub: Option<Subscription>,
     /// The Operator look: its list screens, and the full Settings screen inside its frame.
     operator_screens: operator_screens::OperatorScreens,
     operator_full_settings: bool,
     _clock: Task<()>,
     /// The New session dialog over every screen (key N), and a request to open it.
     new_dialog: Option<(Entity<crate::new_session::NewSessionDialog>, Subscription)>,
-    new_pending: bool,
+    /// Open the launcher at the next frame, for this purpose.
+    new_pending: Option<crate::new_session::Purpose>,
     /// The view of a custom theme layout (ADR 0024), made when a layout first shows.
     themed: Option<(Entity<crate::themed::host::ThemedView>, Subscription)>,
     /// The decision dialog of a theme is open for this session.
@@ -168,6 +157,16 @@ pub struct Shell {
 
 impl Shell {
     pub fn new(model: Entity<Model>, cx: &mut Context<Self>) -> Self {
+        // `AIVORY_LAUNCH=organizer|task|session` opens the launcher at start (screenshot runs).
+        let launch = match std::env::var("AIVORY_LAUNCH").as_deref() {
+            Ok("organizer") => Some(crate::new_session::Purpose::Organizer),
+            Ok("task") => Some(crate::new_session::Purpose::Task),
+            Ok("session") => Some(crate::new_session::Purpose::Session),
+            _ => None,
+        };
+        if launch.is_some() {
+            cx.set_global(crate::new_session::LaunchRequest(launch));
+        }
         let war_room = cx.new(|cx| WarRoomScreen::new(model.clone(), cx));
         let inbox = cx.new(|cx| InboxScreen::new(model.clone(), cx));
         let tasks = cx.new(|cx| TasksScreen::new(model.clone(), cx));
@@ -188,7 +187,7 @@ impl Shell {
                         this.command_escape(cx);
                     }
                 }
-                WarRoomEvent::Focus(id) => this.open_focus(id, cx),
+                WarRoomEvent::Focus(id) => this.open_session(id, cx),
                 WarRoomEvent::OpenFile { session, path } => {
                     this.open_session_file(session, path, cx)
                 }
@@ -239,7 +238,7 @@ impl Shell {
                     .filter(|id| !id.is_empty()),
                 std::env::var("AIVORY_SCREEN").as_deref(),
             ) {
-                (Some(id), _) => Screen::Focus(id),
+                (Some(id), _) => Screen::Session(id),
                 (None, _) if session_env().is_some() => {
                     Screen::Session(session_env().unwrap_or_default())
                 }
@@ -256,9 +255,6 @@ impl Shell {
             tasks,
             repos,
             settings,
-            session: None,
-            bridge_detail: None,
-            night_detail: None,
             bridge_screens: BridgeScreens::default(),
             holo_screens: holo::HoloScreens::default(),
             tactical_screens: Default::default(),
@@ -273,29 +269,20 @@ impl Shell {
             irix_min: Default::default(),
             irix_screens: Default::default(),
             irix_menu: false,
-            operator_t0: None,
-            operator_steer: None,
-            operator_sub: None,
             operator_screens: Default::default(),
             operator_full_settings: false,
             _clock: clock,
             new_dialog: None,
-            new_pending: false,
+            new_pending: None,
             themed: None,
             themed_dialog: None,
         }
     }
 
-    /// Open the Focus view of a session.
-    fn open_focus(&mut self, id: &str, cx: &mut Context<Self>) {
-        self.screen = Screen::Focus(id.to_string());
-        cx.notify();
-    }
-
     /// The Focus view of the session on screen.
     fn focus_screen(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<FocusScreen> {
-        let Screen::Focus(id) = &self.screen else {
-            unreachable!("only the focus screen asks for a focus view");
+        let Screen::Session(id) = &self.screen else {
+            unreachable!("only the session screen asks for a session view");
         };
         if let Some((view, _)) = &self.focus {
             if view.read(cx).session() != id {
@@ -307,25 +294,15 @@ impl Shell {
         let view = cx.new(|cx| FocusScreen::new(self.model.clone(), id.clone(), window, cx));
         let subscription = cx.subscribe(&view, |this, _, event: &FocusEvent, cx| match event {
             FocusEvent::Back => this.go(Screen::WarRoom, cx),
-            FocusEvent::Open(id) => this.open_focus(id, cx),
-            FocusEvent::DeepDive(id) => this.open_session(id, cx),
+            FocusEvent::Open(id) => this.open_session(id, cx),
             FocusEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         });
         self.focus = Some((view.clone(), subscription));
         view
     }
 
-    /// Open the deep dive; Back returns to the screen on view now.
+    /// Open the session screen of a session; Back returns to the screen on view now.
     fn open_session(&mut self, id: &str, cx: &mut Context<Self>) {
-        // Holo and Tactical show a session inside the war room screen (their own session view).
-        if matches!(
-            tk().look,
-            aivory_protocol::Look::Holo | aivory_protocol::Look::Tactical
-        ) {
-            self.war_room.update(cx, |w, cx| w.hud_open(id, cx));
-            self.go(Screen::WarRoom, cx);
-            return;
-        }
         if !matches!(self.screen, Screen::Session(_)) {
             self.back = self.screen.clone();
         }
@@ -333,11 +310,10 @@ impl Shell {
         cx.notify();
     }
 
-    /// Open the deep dive on its Diff tab.
+    /// Open the session screen with its code (the diff) on view.
     fn open_session_diff(&mut self, id: &str, cx: &mut Context<Self>) {
+        crate::session_console::want_code(id);
         self.open_session(id, cx);
-        let view = self.session_screen(cx);
-        view.update(cx, |s, cx| s.show_diff(cx));
     }
 
     /// "Open both" opens the deep dive of the first session; the shell shows one deep dive.
@@ -454,116 +430,6 @@ impl Shell {
         cx.notify();
     }
 
-    /// The deep dive of the session on screen. A view is made when the id changes.
-    fn session_screen(&mut self, cx: &mut Context<Self>) -> Entity<SessionScreen> {
-        let Screen::Session(id) = &self.screen else {
-            unreachable!("only the session screen asks for a session view");
-        };
-        if let Some((open, view, _)) = &self.session
-            && open == id
-        {
-            return view.clone();
-        }
-        let id = id.clone();
-        let opener = id.clone();
-        let view = cx.new(|cx| SessionScreen::new(self.model.clone(), id.clone(), cx));
-        let subscription = cx.subscribe(&view, move |this, _, event: &SessionEvent, cx| {
-            match event {
-                SessionEvent::Back => {
-                    let back = std::mem::replace(&mut this.back, Screen::WarRoom);
-                    this.go(back, cx);
-                }
-                SessionEvent::Open(id) => this.screen = Screen::Session(id.clone()),
-                SessionEvent::OpenFile(path) => {
-                    let codebase = this
-                        .model
-                        .read(cx)
-                        .war
-                        .as_ref()
-                        .and_then(|w| w.session(&opener).map(|s| s.codebase.clone()));
-                    if let Some(codebase) = codebase {
-                        this.open_lens(&codebase, path, Some(opener.clone()), cx);
-                    }
-                }
-            }
-            cx.notify();
-        });
-        self.session = Some((id, view.clone(), subscription));
-        view
-    }
-
-    /// The Neon view of the session on screen. A view is made when the session changes.
-    fn night_detail_screen(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<neon_session::NightSession> {
-        use neon_session::{NightSession, NightSessionEvent};
-        let Screen::Session(id) = &self.screen else {
-            unreachable!("only the session screen asks for a session view");
-        };
-        let id = id.clone();
-        if let Some((open, view, _)) = &mut self.night_detail {
-            if *open != id {
-                view.update(cx, |v, cx| v.show(&id, cx));
-                *open = id;
-            }
-            return view.clone();
-        }
-        let view = cx.new(|cx| NightSession::new(self.model.clone(), id.clone(), window, cx));
-        let subscription = cx.subscribe(&view, |this, _, event: &NightSessionEvent, cx| {
-            match event {
-                NightSessionEvent::Back => {
-                    let back = std::mem::replace(&mut this.back, Screen::WarRoom);
-                    this.go(back, cx);
-                }
-                NightSessionEvent::Switch(id) => this.screen = Screen::Session(id.clone()),
-                NightSessionEvent::OpenFile { session, path } => {
-                    this.open_session_file(session, path, cx)
-                }
-            }
-            cx.notify();
-        });
-        self.night_detail = Some((id, view.clone(), subscription));
-        view
-    }
-
-    /// The Bridge view of the session on screen. A view is made when the session changes.
-    fn bridge_detail_screen(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<BridgeDetail> {
-        let Screen::Session(id) = &self.screen else {
-            unreachable!("only the session screen asks for a session view");
-        };
-        let id = id.clone();
-        if let Some((open, view, _)) = &mut self.bridge_detail {
-            if *open != id {
-                view.update(cx, |v, cx| v.show(&id, cx));
-                *open = id;
-            }
-            return view.clone();
-        }
-        let view = cx.new(|cx| BridgeDetail::new(self.model.clone(), id.clone(), window, cx));
-        let subscription = cx.subscribe(&view, |this, _, event: &BridgeDetailEvent, cx| {
-            match event {
-                BridgeDetailEvent::Back => {
-                    let back = std::mem::replace(&mut this.back, Screen::WarRoom);
-                    this.go(back, cx);
-                }
-                BridgeDetailEvent::Switch(id) => this.screen = Screen::Session(id.clone()),
-                BridgeDetailEvent::Focus(id) => this.open_focus(id, cx),
-                BridgeDetailEvent::OpenFile { session, path } => {
-                    this.open_session_file(session, path, cx)
-                }
-            }
-            cx.notify();
-        });
-        self.bridge_detail = Some((id, view.clone(), subscription));
-        view
-    }
-
     /// The rail. Under [`NARROW`] it is a compact strip of icons: no screen is lost.
     fn rail(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let inbox = self.model.read(cx).war.as_ref().map_or(0, |w| w.inbox_open);
@@ -600,6 +466,31 @@ impl Shell {
             .child(self.rail_item(Screen::Inbox, inbox, compact, cx))
             .child(self.rail_item(Screen::Tasks, 0, compact, cx))
             .child(self.rail_item(Screen::Repos, 0, compact, cx))
+            .child(div().h(px(8.)))
+            .children(crate::new_session::launch_buttons(
+                "minimal",
+                move |id, label| {
+                    let text = match (compact, label) {
+                        (true, "Organizer") => "Org",
+                        (true, _) => "New",
+                        (false, l) => l,
+                    };
+                    div()
+                        .id(id)
+                        .w(px(if compact { 38. } else { 60. }))
+                        .h(px(28.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .whitespace_nowrap()
+                        .rounded(tk().r_rail_item)
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                        .text_color(rgb(tk().ink_3))
+                        .cursor_pointer()
+                        .hover(|s| s.bg(rgb(tk().track)).text_color(rgb(tk().ink)))
+                        .child(text)
+                },
+            ))
             .child(div().flex_1())
             .child(self.rail_item(Screen::Settings, 0, compact, cx))
     }
@@ -873,8 +764,9 @@ impl Shell {
     fn layout_name(&self) -> Option<&'static str> {
         Some(match &self.screen {
             Screen::WarRoom => "warroom",
+            // A theme made before the merge has a "focus" layout only.
+            Screen::Session(_) if !crate::themed::host::has_layout("session") => "focus",
             Screen::Session(_) => "session",
-            Screen::Focus(_) => "focus",
             Screen::Inbox => "inbox",
             Screen::Tasks => "tasks",
             Screen::Repos => "repos",
@@ -902,7 +794,7 @@ impl Shell {
                 let settings: gpui::AnyView = self.settings.clone().into();
                 let view = cx.new(|_| ThemedView::new(self.model.clone(), settings));
                 let sub = cx.subscribe(&view, |this, _, ev: &ThemedEvent, cx| match ev {
-                    ThemedEvent::Screen(Screen::Focus(id)) => this.open_focus(id, cx),
+                    ThemedEvent::Screen(Screen::Session(id)) => this.open_session(id, cx),
                     ThemedEvent::Screen(s) => this.go(s.clone(), cx),
                     ThemedEvent::Decision(id) => {
                         if crate::themed::host::has_layout("decision") {
@@ -922,7 +814,7 @@ impl Shell {
             }
         };
         let selected = match &self.screen {
-            Screen::Session(id) | Screen::Focus(id) => Some(id.clone()),
+            Screen::Session(id) => Some(id.clone()),
             _ => None,
         };
         let dialog = self.themed_dialog.clone();
@@ -934,10 +826,15 @@ impl Shell {
 
     /// Open the New session dialog at the next frame (it needs the window).
     fn open_new_session(&mut self, cx: &mut Context<Self>) {
-        if self.new_dialog.is_none() {
-            self.new_pending = true;
-            cx.notify();
-        }
+        self.open_launcher(crate::new_session::Purpose::Session, cx);
+    }
+
+    /// Open the launcher for a session, a task, or the organizer. An open launcher closes
+    /// first, so the bar buttons switch it.
+    fn open_launcher(&mut self, purpose: crate::new_session::Purpose, cx: &mut Context<Self>) {
+        self.new_dialog = None;
+        self.new_pending = Some(purpose);
+        cx.notify();
     }
 
     /// N (no text field has the focus) or Ctrl+N opens the New session dialog.
@@ -952,6 +849,14 @@ impl Shell {
                     }
                     // In the Command look Esc closes the window over the map.
                     if e.keystroke.key == "escape" {
+                        // Esc closes the completion list of a chat field first.
+                        if crate::complete::is_open(cx) {
+                            return;
+                        }
+                        // Esc closes the large image view first.
+                        if crate::media::close_viewer(cx) {
+                            return;
+                        }
                         let _ = weak.update(cx, |s, cx| s.command_escape(cx));
                         return;
                     }
@@ -975,10 +880,10 @@ impl Shell {
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.new_pending {
-            self.new_pending = false;
+        if let Some(purpose) = self.new_pending.take() {
             let model = self.model.clone();
-            let dialog = cx.new(|cx| crate::new_session::NewSessionDialog::new(model, window, cx));
+            let dialog =
+                cx.new(|cx| crate::new_session::NewSessionDialog::new(model, purpose, window, cx));
             let sub = cx.subscribe(&dialog, |this, _, ev, cx| match ev {
                 crate::new_session::DialogEvent::Close => {
                     this.new_dialog = None;
@@ -989,6 +894,17 @@ impl Render for Shell {
         }
         let looks = self.render_looks(window, cx).into_any_element();
         let keys = self.new_session_keys(cx);
+        // A button of a look asked for the launcher.
+        if let Some(purpose) = cx
+            .try_global::<crate::new_session::LaunchRequest>()
+            .and_then(|r| r.0)
+        {
+            cx.set_global(crate::new_session::LaunchRequest(None));
+            self.new_dialog = None;
+            self.new_pending = Some(purpose);
+            cx.notify();
+        }
+        let viewer = crate::media::viewer(cx);
         let full = window.is_fullscreen();
         let max_or_full = full || window.is_maximized();
         let (max_full, hint) = {
@@ -1032,6 +948,8 @@ impl Render for Shell {
             .children(exit)
             .children(hint)
             .children(self.new_dialog.as_ref().map(|(d, _)| d.clone()))
+            .children(viewer)
+            .children(crate::complete::popup(cx))
     }
 }
 
@@ -1100,21 +1018,15 @@ impl Shell {
 
 impl Shell {
     fn render_looks(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let narrow = window.viewport_size().width < NARROW;
-        // A deep dive that is not on screen stops its polling.
+        // The text scales with the window: the views of this frame draw after this line.
+        let viewport = window.viewport_size();
+        ui::set_fit(f32::from(viewport.width), f32::from(viewport.height));
+        let narrow = viewport.width < NARROW;
+        // A session view that is not on screen stops its polling.
         let bridge = tk().look == aivory_protocol::Look::Bridge;
         let operator = tk().look == aivory_protocol::Look::Operator;
         let night = tk().look == aivory_protocol::Look::Neon;
-        if !matches!(self.screen, Screen::Session(_)) || bridge || operator || night {
-            self.session = None;
-        }
-        if !matches!(self.screen, Screen::Session(_)) || !night {
-            self.night_detail = None;
-        }
-        if !matches!(self.screen, Screen::Session(_)) || !bridge {
-            self.bridge_detail = None;
-        }
-        if !matches!(self.screen, Screen::Focus(_)) {
+        if !matches!(self.screen, Screen::Session(_)) {
             self.focus = None;
             self.irix_screens.focus = None;
         }
@@ -1135,10 +1047,6 @@ impl Shell {
             tk().look,
             aivory_protocol::Look::Holo | aivory_protocol::Look::Tactical
         );
-        if hud && let Screen::Session(id) = self.screen.clone() {
-            self.war_room.update(cx, |w, _| w.hud_set_open(&id));
-            self.screen = Screen::WarRoom;
-        }
         let holo = Self::holo_on();
         if holo {
             self.holo_cycle(cx);
@@ -1151,20 +1059,13 @@ impl Shell {
             Screen::Tasks => self.tasks.clone().into_any_element(),
             Screen::Repos => self.repos.clone().into_any_element(),
             Screen::Settings => self.settings.clone().into_any_element(),
-            Screen::Session(_) if operator => self.operator_session(window, cx),
-            Screen::Session(_) if bridge => {
-                self.bridge_detail_screen(window, cx).into_any_element()
-            }
-            Screen::Session(_) if night => self.night_detail_screen(window, cx).into_any_element(),
-            Screen::Session(_) => self.session_screen(cx).into_any_element(),
-            Screen::Focus(_) if tk().look == aivory_protocol::Look::Tactical => {
+            // The looks with their own session screen draw it in their content step below.
+            Screen::Session(_) if tk().look == aivory_protocol::Look::Tactical => {
                 div().into_any_element()
             }
-            Screen::Focus(_) if operator => div().into_any_element(),
-            Screen::Focus(_) if bridge || holo => div().into_any_element(),
-            Screen::Focus(_) if navigator => self.irix_focus_view(window, cx),
-            Screen::Focus(_) if night => div().into_any_element(),
-            Screen::Focus(_) => self.focus_screen(window, cx).into_any_element(),
+            Screen::Session(_) if operator || bridge || holo || night => div().into_any_element(),
+            Screen::Session(_) if navigator => self.irix_focus_view(window, cx),
+            Screen::Session(_) => self.focus_screen(window, cx).into_any_element(),
             Screen::Lens => match &self.lens {
                 Some((lens, _)) => lens.clone().into_any_element(),
                 None => div().into_any_element(),
@@ -1237,7 +1138,15 @@ impl Shell {
                 .text_size(TEXT)
                 .text_color(rgb(tk().ink))
                 .child(bar)
-                .child(div().relative().flex_1().min_h(px(0.)).child(content))
+                .child(
+                    div()
+                        .relative()
+                        .flex_1()
+                        .min_h(px(0.))
+                        .flex()
+                        .flex_col()
+                        .child(content),
+                )
                 .children(menu)
                 .children(toasts);
         }
@@ -1267,7 +1176,15 @@ impl Shell {
                 .text_size(TEXT)
                 .text_color(rgb(tk().ink))
                 .child(chest)
-                .child(div().relative().flex_1().min_h(px(0.)).child(body))
+                .child(
+                    div()
+                        .relative()
+                        .flex_1()
+                        .min_h(px(0.))
+                        .flex()
+                        .flex_col()
+                        .child(body),
+                )
                 .children(menu)
                 .children(win_menu)
                 .children(toasts);

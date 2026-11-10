@@ -22,6 +22,7 @@ use gpui::{
 use super::neon_kit::*;
 use super::{Screen, Shell};
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::model::Model;
 
 /// What a screen asks the shell to do.
@@ -563,6 +564,12 @@ impl NightTasks {
         .detach();
     }
 
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
+    }
+
     fn of(&self, tab: TaskTab) -> Vec<Task> {
         let Some(d) = &self.data else {
             return Vec::new();
@@ -803,6 +810,16 @@ impl Render for NightTasks {
                 );
             }
             tabs.push(div().flex_1().into_any_element());
+            if let Some(a) = TaskAct::of(t.column) {
+                let id = t.id.clone();
+                tabs.push(
+                    menu_tab("nt-act", &format!("{} ›", a.label()), None, GREEN, false)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            task_act(&this.model, &id, a, Self::reload, cx);
+                        }))
+                        .into_any_element(),
+                );
+            }
             tabs.push(
                 menu_tab("nt-open", "Open session ›", None, CYAN, false)
                     .on_click(cx.listener(move |_, _, _, cx| {
@@ -1437,7 +1454,7 @@ impl Shell {
                 )
                 .into_any_element()
             }
-            Screen::Focus(id) => {
+            Screen::Session(id) => {
                 use super::neon_focus::{NightFocus, NightFocusEvent};
                 if let Some((v, _)) = &self.night_screens.focus {
                     if v.read(cx).session() != id {
@@ -1447,8 +1464,7 @@ impl Shell {
                     let v = cx.new(|cx| NightFocus::new(model, id.clone(), window, cx));
                     let sub = cx.subscribe(&v, |t, _, e: &NightFocusEvent, cx| match e {
                         NightFocusEvent::Back => t.go(Screen::WarRoom, cx),
-                        NightFocusEvent::Open(id) => t.open_focus(id, cx),
-                        NightFocusEvent::Detail(id) => t.open_session(id, cx),
+                        NightFocusEvent::Open(id) => t.open_session(id, cx),
                         NightFocusEvent::OpenFile { session, path } => {
                             t.open_session_file(session, path, cx)
                         }

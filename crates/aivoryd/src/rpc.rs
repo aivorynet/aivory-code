@@ -407,6 +407,15 @@ impl Daemon {
         if method == "organizer/start" {
             return self.organizer_start(params, id, out);
         }
+        if method == "compose/complete" {
+            return self.compose_complete(params, id, out).map(Some);
+        }
+        // A Codex custom prompt (`/prompts:<name>`): the app server does not expand it.
+        let params = if method == "session/send" {
+            self.expand_codex_prompt(params, id, out)
+        } else {
+            params
+        };
         if DemoBackend::handles(method) {
             if let Some(live) = &self.live {
                 return live.dispatch(method, params, id, out);
@@ -422,6 +431,85 @@ impl Daemon {
             };
         }
         self.dispatch_core(method, params, id, out).map(Some)
+    }
+
+    /// `compose/complete`: the agent and the folder come from the session (from the war room),
+    /// else from the params. Without a war-room engine the list has the commands only.
+    fn compose_complete(&self, params: Value, id: &Value, out: &Outbox) -> Result<Value, RpcError> {
+        let p: aivory_protocol::complete::CompleteParams = parse_params(params)?;
+        let snapshot = match (&self.live, &self.demo) {
+            (Some(live), _) => live
+                .dispatch("warroom/snapshot", json!({}), id, out)
+                .ok()
+                .flatten(),
+            (None, Some(demo)) => demo
+                .dispatch("warroom/snapshot", json!({}), id, out)
+                .ok()
+                .flatten(),
+            _ => None,
+        };
+        let war: Option<aivory_protocol::WarRoom> =
+            snapshot.and_then(|v| serde_json::from_value(v).ok());
+        let pane = p
+            .session
+            .as_deref()
+            .and_then(|s| war.as_ref().and_then(|w| w.session(s)).cloned());
+        let provider = pane
+            .as_ref()
+            .map(|p| p.provider.clone())
+            .or_else(|| p.provider.clone())
+            .unwrap_or_else(|| "claude".to_string());
+        let cwd = pane
+            .as_ref()
+            .and_then(|pane| {
+                war.as_ref()?
+                    .codebase(&pane.codebase)
+                    .map(|c| c.path.clone())
+            })
+            .or_else(|| p.cwd.clone())
+            .map(std::path::PathBuf::from)
+            .filter(|c| c.is_dir());
+        let roots = crate::complete::Roots {
+            claude: &self.config.roots.claude,
+            codex: &self.config.roots.codex,
+            gemini: &self.config.roots.gemini,
+        };
+        Ok(json!(crate::complete::list(
+            &p,
+            &provider,
+            cwd.as_deref(),
+            &roots
+        )))
+    }
+
+    /// The text of a `session/send` to a Codex session with `/prompts:<name>` expanded.
+    fn expand_codex_prompt(&self, mut params: Value, id: &Value, out: &Outbox) -> Value {
+        let Some(text) = params["text"]
+            .as_str()
+            .filter(|t| t.trim_start().starts_with("/prompts:"))
+        else {
+            return params;
+        };
+        let Some(session) = params["id"].as_str() else {
+            return params;
+        };
+        let snapshot = match (&self.live, &self.demo) {
+            (Some(live), _) => live
+                .dispatch("warroom/snapshot", json!({}), id, out)
+                .ok()
+                .flatten(),
+            _ => None,
+        };
+        let codex = snapshot
+            .and_then(|v| serde_json::from_value::<aivory_protocol::WarRoom>(v).ok())
+            .and_then(|w| w.session(session).map(|p| p.provider == "codex"))
+            .unwrap_or(false);
+        if codex
+            && let Some(full) = crate::complete::expand_codex_prompt(text, &self.config.roots.codex)
+        {
+            params["text"] = json!(full);
+        }
+        params
     }
 
     /// `organizer/start`: a `session/new` in the first codebase (or the named one) with the
@@ -457,13 +545,14 @@ impl Daemon {
             part: None,
             title: Some(format!("Organizer · {}", p.mode.label())),
             prompt: crate::resources::organizer_prompt(p.mode, &exe),
-            composer: aivory_protocol::ComposerPrefs {
+            composer: p.composer.unwrap_or(aivory_protocol::ComposerPrefs {
                 mode: aivory_protocol::Mode::Auto,
                 provider: "claude".to_string(),
                 model: String::new(),
                 effort: aivory_protocol::Effort::Medium,
-            },
+            }),
             task: None,
+            attachments: Vec::new(),
         };
         war(
             "session/new",
@@ -495,6 +584,10 @@ impl Daemon {
             "daemon/shutdown" => {
                 self.shutdown.store(true, Ordering::SeqCst);
                 Ok(json!({ "ok": true }))
+            }
+            "media/get" => {
+                let p: aivory_protocol::media::MediaGetParams = parse_params(params)?;
+                Ok(json!(media_get(&p.src)?))
             }
             "sessions/list" => {
                 let p: ListParams = parse_params(params)?;
@@ -622,4 +715,52 @@ pub(crate) fn parse_params<T: for<'de> Deserialize<'de>>(params: Value) -> Resul
 
 fn error_response(id: &Value, e: &RpcError) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": e })
+}
+
+/// `media/get`: the bytes of an image, video, or PDF file. Only these media types: the call
+/// reads no source code or other file.
+fn media_get(src: &str) -> Result<aivory_protocol::media::MediaData, RpcError> {
+    use aivory_protocol::media::{MEDIA_GET_MAX_BYTES, Media, MediaKind};
+    use base64::Engine as _;
+    let bad = |m: &str| RpcError::new(aivory_protocol::rpc::code::INVALID_PARAMS, m.to_string());
+    let media = Media::of(src)
+        .filter(|m| m.kind != MediaKind::Link && !src.starts_with("http"))
+        .ok_or_else(|| bad("not an image, video, or PDF file"))?;
+    let path = std::path::Path::new(src);
+    if !path.is_absolute() {
+        return Err(bad("the path is not absolute"));
+    }
+    let meta = std::fs::metadata(path).map_err(|_| bad("no such file"))?;
+    if !meta.is_file() || meta.len() > MEDIA_GET_MAX_BYTES {
+        return Err(bad("no file, or larger than 20 MB"));
+    }
+    let bytes = std::fs::read(path).map_err(|e| bad(&e.to_string()))?;
+    Ok(aivory_protocol::media::MediaData {
+        mime: media.mime.unwrap_or_default(),
+        data: base64::engine::general_purpose::STANDARD.encode(&bytes),
+        size: meta.len(),
+    })
+}
+
+#[cfg(test)]
+mod media_get_tests {
+    use super::media_get;
+
+    #[test]
+    fn media_get_reads_media_files_only() {
+        let dir = std::env::temp_dir().join(format!("aivoryd-media-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let png = dir.join("a.png");
+        std::fs::write(&png, [1u8, 2, 3]).unwrap();
+        let src = dir.join("main.rs");
+        std::fs::write(&src, "fn main() {}").unwrap();
+        let got = media_get(&png.to_string_lossy()).unwrap();
+        assert_eq!(got.mime, "image/png");
+        assert_eq!(got.data, "AQID");
+        assert_eq!(got.size, 3);
+        assert!(media_get(&src.to_string_lossy()).is_err());
+        assert!(media_get("a.png").is_err(), "a relative path");
+        assert!(media_get(&dir.join("gone.png").to_string_lossy()).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

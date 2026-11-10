@@ -69,7 +69,7 @@ fast = 120
     out
 }
 
-/// A full theme: layouts for all 8 screens of the desktop class that use the catalog, a strings
+/// A full theme: layouts for all 7 screens of the desktop class that use the catalog, a strings
 /// table, and the tokens of `files` with more space names. The desktop tests and the
 /// end-to-end run use it. `aivoryd theme init` still writes the small starter.
 pub fn full_files(id: &str, version: &str) -> Vec<(String, Vec<u8>)> {
@@ -199,6 +199,8 @@ pub fn full_files(id: &str, version: &str) -> Vec<(String, Vec<u8>)> {
                     mode("Plan", "plan"), mode("Edit", "edit"), mode("Auto", "auto")
                 ] }
             ] },
+            { "type": "panel", "title": "Prompt", "children": [
+                { "type": "diff", "value": "$selected.prompt" } ] },
             { "type": "panel", "variant": "monitor", "title": "Terminal", "grow": 1,
               "children": [ { "type": "terminal", "grow": 1 } ] }
         ] }
@@ -243,19 +245,6 @@ pub fn full_files(id: &str, version: &str) -> Vec<(String, Vec<u8>)> {
         json!({ "type": "frame", "segments": ["Settings"], "grow": 1,
         "children": [ { "type": "settings_section", "grow": 1 } ] }),
     ]);
-    let focus_screen = page(vec![
-        json!({ "type": "stack", "dir": "row", "gap": "md", "grow": 1,
-        "children": [
-        chat,
-        { "type": "stack", "dir": "column", "gap": "md", "width": 320, "children": [
-            facts,
-            { "type": "panel", "title": "Prompt", "children": [
-                { "type": "diff", "value": "$selected.prompt" } ] },
-            { "type": "panel", "variant": "monitor", "title": "Terminal", "grow": 1,
-              "children": [ { "type": "terminal", "grow": 1 } ] }
-        ] }
-    ] }),
-    ]);
     let decision = json!({ "type": "stack", "dir": "column", "gap": "md", "pad": "md", "children": [
         { "type": "text", "value": "$strings.decide", "size": "lg", "weight": "bold" },
         { "type": "text", "value": "$selected.title", "color": "muted" },
@@ -287,7 +276,6 @@ pub fn full_files(id: &str, version: &str) -> Vec<(String, Vec<u8>)> {
         ("tasks", tasks),
         ("repos", repos),
         ("settings", settings),
-        ("focus", focus_screen),
         ("decision", decision),
     ] {
         let text = serde_json::to_string_pretty(&json!({ "root": doc })).unwrap_or_default();

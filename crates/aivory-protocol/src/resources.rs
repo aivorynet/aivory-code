@@ -68,7 +68,31 @@ impl OrganizerMode {
             Self::MemoryOnly => "Memory only",
         }
     }
+
+    /// One sentence on what the organizer does in this mode (the info text of the clients).
+    pub fn about(self) -> &'static str {
+        match self {
+            Self::FullAuto => {
+                "It acts for you: it pauses, parks, stops and resumes sessions, sets the autopilot and queues tasks."
+            }
+            Self::MemoryAndSessions => {
+                "It watches the RAM and the sessions and tells you what to do. It changes nothing."
+            }
+            Self::FeedbackOnly => {
+                "It watches the sessions only (stuck, waiting, in conflict) and tells you what to do."
+            }
+            Self::MemoryOnly => "It watches the RAM only and warns you before it runs low.",
+        }
+    }
 }
+
+/// What the organizer is: the info text of the clients.
+pub const ORGANIZER_INFO: &str = concat!(
+    "The organizer is one extra agent session that keeps an eye on all your other sessions ",
+    "and on the RAM of this machine. It reports sessions that are stuck, wait for you, or ",
+    "touch the same files, and it warns before the memory runs low. Pick how much it may do: ",
+    "only report, or also act."
+);
 
 /// `organizer/start`: start the organizer agent as a session of aivoryd.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
@@ -79,6 +103,10 @@ pub struct OrganizerStartParams {
     /// The codebase whose folder the agent runs in (default: the first codebase).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codebase: Option<String>,
+    /// Mode, provider, model, and effort of the organizer session. Default: Auto, claude,
+    /// the default model, medium effort.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer: Option<crate::ComposerPrefs>,
 }
 
 #[cfg(test)]

@@ -6,8 +6,11 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use aivory_protocol::rpc::{
-    HandoffParams, NewSessionParams, StartWhen, TaskCreateParams, TaskListParams, TaskUpdateParams,
-    method,
+    HandoffParams, NewSessionParams, StartWhen, TaskCreateParams, TaskListParams, TaskStartParams,
+    TaskUpdateParams, method,
+};
+use aivory_protocol::schedules::{
+    OsEntry, Schedule, ScheduleCreateParams, ScheduleRef, ScheduleUpdateParams, TaskTemplate,
 };
 use aivory_protocol::{
     AskKind, ComposerPrefs, Effort, GateState, MINUTE_MS, Mode, Playbook, ProviderPrefs,
@@ -49,6 +52,7 @@ const FOLDED_W: f32 = 56.;
 const STRIP_TEXT: f32 = 13.;
 const NO_PART: &str = "general";
 const NEW_TASK_W: f32 = 420.;
+const SCHEDULES_W: f32 = 480.;
 
 // Surfaces of the board that no other screen shares.
 fn step_off() -> u32 {
@@ -148,6 +152,7 @@ enum Overlay {
     None,
     NewTask,
     Handoff,
+    Schedules,
 }
 
 /// The fields of the New task popover.
@@ -163,6 +168,18 @@ struct NewTask {
     _events: Vec<Subscription>,
 }
 
+/// The Schedules panel: the list and the form that adds a schedule.
+#[derive(Default)]
+struct Schedules {
+    list: Vec<Schedule>,
+    name: Option<Entity<InputState>>,
+    cron: Option<Entity<InputState>>,
+    prompt: Option<Entity<TextareaState>>,
+    codebase: Option<String>,
+    error: Option<String>,
+    busy: bool,
+}
+
 pub struct TasksScreen {
     model: Entity<Model>,
     tasks: Option<Rc<Vec<Task>>>,
@@ -176,6 +193,7 @@ pub struct TasksScreen {
     /// open it again.
     closed: Option<(Overlay, Instant)>,
     new_task: NewTask,
+    sched: Schedules,
     /// The providers the daemon can run, with their models.
     providers: Vec<(String, Vec<String>)>,
     prefs: BTreeMap<String, ProviderPrefs>,
@@ -229,6 +247,7 @@ impl TasksScreen {
             open: Overlay::None,
             closed: None,
             new_task: NewTask::default(),
+            sched: Schedules::default(),
             providers: Vec::new(),
             prefs: BTreeMap::new(),
             acting: false,
@@ -255,11 +274,21 @@ impl TasksScreen {
             .model
             .read(cx)
             .call::<method::TasksList>(TaskListParams::default(), cx);
+        let sched_call = self
+            .model
+            .read(cx)
+            .call::<method::SchedulesList>(Default::default(), cx);
         cx.spawn(async move |this, cx| {
             let list = call.await;
+            let scheds = sched_call.await;
             let _ = this.update(cx, |this, cx| {
                 this.refreshing = false;
                 let stale = generation != this.generation;
+                match scheds {
+                    Ok(s) if !stale => this.sched.list = s.schedules,
+                    Ok(_) => {}
+                    Err(e) => eprintln!("aivory: schedules/list failed: {e:#}"),
+                }
                 match list {
                     Ok(list) if !stale => this.tasks = Some(Rc::new(list.tasks)),
                     Ok(_) => {}
@@ -369,6 +398,7 @@ impl TasksScreen {
             prompt: task.prompt.clone(),
             composer: self.composer_for(provider),
             task: Some(task.id.clone()),
+            attachments: Vec::new(),
         }
     }
 
@@ -388,31 +418,20 @@ impl TasksScreen {
         cx.notify();
     }
 
-    /// Start a planned task: a session that does the task, then the task moves to Working.
+    /// Start a planned task: the daemon starts its first session and moves it to Working.
     fn start_now(&mut self, id: &str, cx: &mut Context<Self>) {
-        let Some(task) = self.task(id) else { return };
-        if self.acting {
+        if self.task(id).is_none() || self.acting {
             return;
         }
-        let provider = self.default_provider();
-        let params = self.session_params(task, &provider);
-        let update = TaskUpdateParams {
+        let params = TaskStartParams {
             id: id.to_string(),
-            column: Some(TaskColumn::Working),
-            ..Default::default()
+            composer: Some(self.composer_for(&self.default_provider())),
         };
         self.acting = true;
         self.error = None;
-        let call = self.model.read(cx).call::<method::SessionNew>(params, cx);
+        let call = self.model.read(cx).call::<method::TasksStart>(params, cx);
         cx.spawn(async move |this, cx| {
-            let result = async {
-                call.await?;
-                let next = this.update(cx, |this, cx| {
-                    this.model.read(cx).call::<method::TasksUpdate>(update, cx)
-                })?;
-                next.await.map(|_| ())
-            }
-            .await;
+            let result = call.await.map(|_| ());
             let _ = this.update(cx, |this, cx| this.acted(result, cx));
         })
         .detach();
@@ -545,6 +564,19 @@ impl TasksScreen {
                 .submit_on_enter(true)
                 .auto_grow(3, 8)
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &prompt,
+            self.model.clone(),
+            |_| None,
+            move |cx| {
+                weak.upgrade().map_or((None, None), |v| {
+                    let v = v.read(cx);
+                    (None, v.codebase_path(v.new_task.codebase.as_deref(), cx))
+                })
+            },
+            cx,
+        );
         let events = vec![
             cx.subscribe_in(&title, window, |this, _, event: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { .. } = event
@@ -621,6 +653,7 @@ impl TasksScreen {
             provider: None,
             mode: None,
             priority: None,
+            composer: Some(self.composer_for(&self.default_provider())),
         };
         self.new_task.busy = true;
         self.new_task.error = None;
@@ -648,6 +681,382 @@ impl TasksScreen {
         })
         .detach();
         cx.notify();
+    }
+
+    // ---- Schedules ----
+
+    fn ensure_schedules(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sched.name.is_some() {
+            return;
+        }
+        self.sched.name =
+            Some(cx.new(|cx| InputState::new(window, cx).placeholder("A short name")));
+        self.sched.cron = Some(cx.new(|cx| InputState::new(window, cx).placeholder("0 9 * * 1-5")));
+        let prompt = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .placeholder("What should the agents do?")
+                .auto_grow(3, 8)
+        });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &prompt,
+            self.model.clone(),
+            |_| None,
+            move |cx| {
+                weak.upgrade().map_or((None, None), |v| {
+                    let v = v.read(cx);
+                    (None, v.codebase_path(v.sched.codebase.as_deref(), cx))
+                })
+            },
+            cx,
+        );
+        self.sched.prompt = Some(prompt);
+    }
+
+    /// The folder of the codebase `id`.
+    fn codebase_path(&self, id: Option<&str>, cx: &gpui::App) -> Option<String> {
+        let id = id?;
+        self.model
+            .read(cx)
+            .war
+            .as_ref()?
+            .codebases
+            .iter()
+            .find(|c| c.id == id)
+            .map(|c| c.path.clone())
+    }
+
+    fn open_schedules(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.toggle(Overlay::Schedules, cx);
+        if self.open == Overlay::Schedules {
+            self.ensure_schedules(window, cx);
+            self.refresh(cx);
+        }
+    }
+
+    fn create_schedule(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(name_in), Some(cron_in), Some(prompt_in)) = (
+            self.sched.name.clone(),
+            self.sched.cron.clone(),
+            self.sched.prompt.clone(),
+        ) else {
+            return;
+        };
+        if self.sched.busy {
+            return;
+        }
+        let name = name_in.read(cx).value().trim().to_string();
+        let cron = cron_in.read(cx).value().trim().to_string();
+        let mut prompt = prompt_in.read(cx).value().trim().to_string();
+        let problem = if name.is_empty() {
+            Some("Add a name.")
+        } else if cron.is_empty() {
+            Some("Add a cron expression.")
+        } else if self.sched.codebase.is_none() {
+            Some("Pick a codebase.")
+        } else {
+            None
+        };
+        if let Some(text) = problem {
+            self.sched.error = Some(text.into());
+            cx.notify();
+            return;
+        }
+        if prompt.is_empty() {
+            prompt.clone_from(&name);
+        }
+        let params = ScheduleCreateParams {
+            name: name.clone(),
+            cron,
+            template: TaskTemplate {
+                title: name,
+                codebase: self.sched.codebase.clone().unwrap_or_default(),
+                part: None,
+                playbook: Playbook::Feature,
+                prompt,
+                composer: Some(self.composer_for(&self.default_provider())),
+            },
+            enabled: None,
+        };
+        self.sched.busy = true;
+        self.sched.error = None;
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SchedulesCreate>(params, cx);
+        cx.spawn_in(window, async move |this, cx| {
+            let result = call.await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.sched.busy = false;
+                match result {
+                    Ok(_) => {
+                        name_in.update(cx, |s, cx| s.clean(window, cx));
+                        cron_in.update(cx, |s, cx| s.clean(window, cx));
+                        prompt_in.update(cx, |s, cx| s.clean(window, cx));
+                        this.generation += 1;
+                        this.refresh(cx);
+                    }
+                    Err(e) => this.sched.error = Some(format!("{e:#}")),
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// The end of a switch, run or delete call: show the error, or load the list again.
+    fn schedule_done(&mut self, result: anyhow::Result<()>, cx: &mut Context<Self>) {
+        match result {
+            Ok(()) => {
+                self.sched.error = None;
+                self.generation += 1;
+                self.refresh(cx);
+            }
+            Err(e) => self.sched.error = Some(format!("{e:#}")),
+        }
+        cx.notify();
+    }
+
+    fn schedule_enable(&mut self, id: String, enabled: bool, cx: &mut Context<Self>) {
+        let params = ScheduleUpdateParams {
+            id,
+            enabled: Some(enabled),
+            ..Default::default()
+        };
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SchedulesUpdate>(params, cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await.map(|_| ());
+            let _ = this.update(cx, |this, cx| this.schedule_done(result, cx));
+        })
+        .detach();
+    }
+
+    fn schedule_run(&mut self, id: String, cx: &mut Context<Self>) {
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SchedulesRun>(ScheduleRef { id }, cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await.map(|_| ());
+            let _ = this.update(cx, |this, cx| this.schedule_done(result, cx));
+        })
+        .detach();
+    }
+
+    fn schedule_delete(&mut self, id: String, cx: &mut Context<Self>) {
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SchedulesDelete>(ScheduleRef { id }, cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await.map(|_| ());
+            let _ = this.update(cx, |this, cx| this.schedule_done(result, cx));
+        })
+        .detach();
+    }
+
+    fn schedules_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+        self.ensure_schedules(window, cx);
+        let codebases: Vec<String> = self
+            .model
+            .read(cx)
+            .war
+            .as_ref()
+            .map(|w| w.codebases.iter().map(|c| c.id.clone()).collect())
+            .unwrap_or_default();
+        if self
+            .sched
+            .codebase
+            .as_ref()
+            .is_none_or(|c| !codebases.contains(c))
+        {
+            self.sched.codebase = self
+                .filter
+                .clone()
+                .filter(|f| codebases.contains(f))
+                .or_else(|| codebases.first().cloned());
+        }
+        let small = crate::ui::ts(crate::theme::T_SMALL);
+        let mut list = div()
+            .id("schedule-list")
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .max_h(px(280.))
+            .overflow_y_scroll();
+        if self.sched.list.is_empty() {
+            list = list.child(
+                div()
+                    .text_size(small)
+                    .text_color(rgb(tk().ink_3))
+                    .child("No schedule yet."),
+            );
+        }
+        for (ix, sc) in self.sched.list.iter().enumerate() {
+            let (sid, on) = (sc.id.clone(), sc.enabled);
+            let os = os_entry_text(&sc.os_entry);
+            let last = sc.last_task.as_deref().map_or_else(
+                || "no task yet".to_string(),
+                |t| format!("last task {}", self.task(t).map_or(t, |t| t.title.as_str())),
+            );
+            let (run_id, del_id) = (sc.id.clone(), sc.id.clone());
+            list = list.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(4.))
+                    .pb(px(10.))
+                    .border_b_1()
+                    .border_color(rgba(tk().line))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(10.))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w(px(0.))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(sc.name.clone()),
+                            )
+                            .child(ui::switch_button(
+                                ("sc-on", ix),
+                                on,
+                                Box::new(cx.listener(move |this, _, _, cx| {
+                                    this.schedule_enable(sid.clone(), !on, cx)
+                                })),
+                            ))
+                            .child(ui::button_sm(("sc-run", ix), "Run now", false).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.schedule_run(run_id.clone(), cx)
+                                }),
+                            ))
+                            .child(ui::button_sm(("sc-del", ix), "Delete", false).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.schedule_delete(del_id.clone(), cx)
+                                }),
+                            )),
+                    )
+                    .child(
+                        div()
+                            .text_size(small)
+                            .text_color(rgb(tk().ink_2))
+                            .child(format!(
+                                "{} · next {} · {}",
+                                sc.cron,
+                                fire_text(sc.next_fire, &chrono::Local),
+                                last
+                            )),
+                    )
+                    .child(
+                        div()
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                            .text_color(rgb(tk().ink_3))
+                            .child(format!("OS scheduler: {os}")),
+                    )
+                    .when_some(sc.os_entry.error.clone(), |d, e| {
+                        d.child(
+                            div()
+                                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                                .text_color(rgb(tk().e_text))
+                                .child(e),
+                        )
+                    }),
+            );
+        }
+        let mut cb_chips = div().flex().flex_wrap().gap(px(6.));
+        for (ix, id) in codebases.iter().enumerate() {
+            let value = id.clone();
+            cb_chips = cb_chips.child(
+                option_chip(
+                    ("sc-cb", ix),
+                    id.clone(),
+                    self.sched.codebase.as_ref() == Some(id),
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.sched.codebase = Some(value.clone());
+                    cx.notify();
+                })),
+            );
+        }
+        let field = |label: &'static str, control: AnyElement| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .child(div().text_color(rgb(tk().ink_2)).child(label))
+                .child(control)
+        };
+        let boxed = || {
+            div()
+                .px(px(10.))
+                .py(px(8.))
+                .rounded(tk().r_button)
+                .border_1()
+                .border_color(rgb(field_border()))
+                .text_size(crate::ui::ts(crate::theme::T_BODY))
+        };
+        let name = self.sched.name.clone().expect("name exists");
+        let cron = self.sched.cron.clone().expect("cron exists");
+        let prompt = self.sched.prompt.clone().expect("prompt exists");
+        ui::popover(SCHEDULES_W)
+            .child(div().font_weight(FontWeight::BOLD).child("Schedules"))
+            .child(list)
+            .child(div().h(px(1.)).bg(rgba(tk().line)))
+            .child(div().font_weight(FontWeight::BOLD).child("Add a schedule"))
+            .child(field(
+                "Name",
+                boxed()
+                    .h(px(36.))
+                    .flex()
+                    .items_center()
+                    .child(name)
+                    .into_any_element(),
+            ))
+            .child(field(
+                "Cron",
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(4.))
+                    .child(boxed().h(px(36.)).flex().items_center().child(cron))
+                    .child(
+                        div()
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                            .text_color(rgb(tk().ink_3))
+                            .child("minute hour day month weekday"),
+                    )
+                    .into_any_element(),
+            ))
+            .child(field("Codebase", cb_chips.into_any_element()))
+            .child(field(
+                "Prompt",
+                boxed()
+                    .min_h(px(64.))
+                    .line_height(relative(1.45))
+                    .child(prompt)
+                    .into_any_element(),
+            ))
+            .when_some(self.sched.error.clone(), |d, e| {
+                d.child(div().text_size(small).text_color(rgb(tk().e_text)).child(e))
+            })
+            .child(
+                div().flex().justify_end().child(
+                    ui::button("sc-add", "Add schedule", true)
+                        .when(self.sched.busy, |d| d.opacity(0.6))
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.create_schedule(window, cx)),
+                        ),
+                ),
+            )
     }
 
     // ---- Views ----
@@ -698,6 +1107,16 @@ impl TasksScreen {
             new =
                 new.child(self.overlay(div().absolute().top(px(42.)).right_0().child(popover), cx));
         }
+        let mut schedules = div().relative().flex_none().child(
+            ui::button("schedules", "Schedules", false)
+                .text_size(crate::ui::ts(crate::theme::T_BODY))
+                .on_click(cx.listener(|this, _, window, cx| this.open_schedules(window, cx))),
+        );
+        if self.open == Overlay::Schedules {
+            let panel = self.schedules_panel(window, cx);
+            schedules = schedules
+                .child(self.overlay(div().absolute().top(px(42.)).right_0().child(panel), cx));
+        }
         div()
             .flex_none()
             .min_h(HEADER_H)
@@ -725,6 +1144,7 @@ impl TasksScreen {
             )
             .child(div().flex_1())
             .child(chip_row)
+            .child(schedules)
             .child(new)
     }
 
@@ -1868,6 +2288,26 @@ fn same_day(a: UnixMs, b: UnixMs, utc: bool) -> bool {
     day(a).is_some() && day(a) == day(b)
 }
 
+/// A fire time as short local text, for example `Mon 09 Nov 09:00`. `None`: the schedule is off.
+fn fire_text<Tz: chrono::TimeZone>(at: Option<UnixMs>, zone: &Tz) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
+    at.and_then(chrono::DateTime::from_timestamp_millis)
+        .map_or_else(
+            || "never".to_string(),
+            |t| t.with_timezone(zone).format("%a %d %b %H:%M").to_string(),
+        )
+}
+
+/// The scheduler of the operating system that holds the entry.
+fn os_entry_text(entry: &OsEntry) -> String {
+    match entry.scheduler.as_str() {
+        "none" => "none (the daemon fires it)".to_string(),
+        name => name.to_string(),
+    }
+}
+
 /// The first line of a prompt as a title, cut at 60 characters.
 fn title_from_prompt(prompt: &str) -> String {
     let line = prompt.lines().next().unwrap_or_default().trim();
@@ -1917,6 +2357,30 @@ mod tests {
 
     fn task<'a>(tasks: &'a [Task], id: &str) -> &'a Task {
         tasks.iter().find(|t| t.id == id).expect("demo task")
+    }
+
+    #[test]
+    fn fire_text_is_short_and_never_when_off() {
+        // 2026-11-09 09:00 UTC is a Monday.
+        let at = chrono::DateTime::parse_from_rfc3339("2026-11-09T09:00:00Z")
+            .expect("date")
+            .timestamp_millis();
+        assert_eq!(fire_text(Some(at), &chrono::Utc), "Mon 09 Nov 09:00");
+        assert_eq!(fire_text(None, &chrono::Utc), "never");
+    }
+
+    #[test]
+    fn os_entry_names_the_scheduler() {
+        let none = OsEntry {
+            scheduler: "none".into(),
+            ..Default::default()
+        };
+        assert!(os_entry_text(&none).starts_with("none"));
+        let win = OsEntry {
+            scheduler: "windows".into(),
+            ..Default::default()
+        };
+        assert_eq!(os_entry_text(&win), "windows");
     }
 
     #[test]

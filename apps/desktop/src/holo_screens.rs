@@ -16,6 +16,7 @@ use gpui::prelude::*;
 use gpui::{AnyElement, Context, Entity, EventEmitter, Task as GpuiTask, Window, div, px, rgb};
 
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::holo_kit::*;
 use crate::model::Model;
 
@@ -503,6 +504,12 @@ impl HoloTasks {
         .detach();
     }
 
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
+    }
+
     fn of(&self, tab: TaskTab) -> Vec<Task> {
         let Some(d) = &self.data else {
             return Vec::new();
@@ -738,6 +745,20 @@ impl Render for HoloTasks {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.side = s;
                         cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        if let Some((t, a)) = cur
+            .as_ref()
+            .and_then(|t| TaskAct::of(t.column).map(|a| (t, a)))
+        {
+            let id = t.id.clone();
+            right_tabs.push(
+                tab("rt-act", &format!("{} ›", a.label()), GD, false)
+                    .h(px(40.))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        task_act(&this.model, &id, a, Self::reload, cx);
                     }))
                     .into_any_element(),
             );

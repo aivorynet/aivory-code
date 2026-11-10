@@ -21,8 +21,9 @@ use gpui::{
     AnyElement, Bounds, Context, Div, MouseButton, PathBuilder, Pixels, Point, RenderImage,
     SharedString, Stateful, Window, canvas, div, img, point, px, rgb,
 };
-use image::{ImageFormat, RgbaImage};
+use image::RgbaImage;
 
+use super::planetgen;
 use crate::actions::Action;
 use crate::bridge_kit::{Art, LABEL, short_name};
 use crate::warroom::decisions::decisions;
@@ -84,11 +85,15 @@ struct Globe {
 static GLOBE: OnceLock<Globe> = OnceLock::new();
 static CROPS: [OnceLock<Arc<RenderImage>>; 8] = [const { OnceLock::new() }; 8];
 
-fn picture(bytes: &[u8], format: ImageFormat) -> Arc<RenderImage> {
-    let px = image::load_from_memory_with_format(bytes, format)
-        .map(|i| i.to_rgba8())
-        .unwrap_or_else(|_| RgbaImage::new(1, 1));
-    crate::rts::to_render(&px)
+/// The seed of the planet: the local date of the first use. One run keeps one planet.
+fn seed() -> u32 {
+    static S: OnceLock<u32> = OnceLock::new();
+    *S.get_or_init(planetgen::today_seed)
+}
+
+/// The centres of the sites in the globe space.
+fn centres() -> Vec<(f32, f32)> {
+    defs().iter().map(|d| (d.cx, d.cy)).collect()
 }
 
 /// The shade over the disc, 900 units wide around it.
@@ -111,43 +116,28 @@ fn shade() -> RgbaImage {
     })
 }
 
-/// Decode the planet once, away from the UI thread.
+/// Make the planet of the day once, away from the UI thread.
 fn load_globe() {
     static START: Once = Once::new();
     START.call_once(|| {
         std::thread::spawn(|| {
+            let (seed, sites) = (seed(), centres());
             let _ = GLOBE.set(Globe {
-                planet: picture(
-                    include_bytes!("../../../../assets/bridge/planet.jpg"),
-                    ImageFormat::Jpeg,
-                ),
-                clouds: picture(
-                    include_bytes!("../../../../assets/bridge/clouds.webp"),
-                    ImageFormat::WebP,
-                ),
+                planet: crate::rts::to_render(&planetgen::planet(seed, &sites)),
+                clouds: crate::rts::to_render(&planetgen::clouds(seed)),
                 shade: crate::rts::to_render(&shade()),
             });
         });
     });
 }
 
-const CROP_BYTES: [&[u8]; 8] = [
-    include_bytes!("../../../../assets/bridge/site0.jpg"),
-    include_bytes!("../../../../assets/bridge/site1.jpg"),
-    include_bytes!("../../../../assets/bridge/site2.jpg"),
-    include_bytes!("../../../../assets/bridge/site3.jpg"),
-    include_bytes!("../../../../assets/bridge/site4.jpg"),
-    include_bytes!("../../../../assets/bridge/site5.jpg"),
-    include_bytes!("../../../../assets/bridge/site6.jpg"),
-    include_bytes!("../../../../assets/bridge/site7.jpg"),
-];
-
-/// Decode the crop of a site when somebody first goes there.
+/// Make the crop of a site when somebody first goes there.
 fn load_crop(site: usize) {
     static START: [Once; 8] = [const { Once::new() }; 8];
     START[site].call_once(move || {
         std::thread::spawn(move || {
-            let _ = CROPS[site].set(picture(CROP_BYTES[site], ImageFormat::Jpeg));
+            let crop = planetgen::site_crop(seed(), site, &centres());
+            let _ = CROPS[site].set(crate::rts::to_render(&crop));
         });
     });
 }
@@ -845,8 +835,27 @@ impl WarRoomScreen {
             w: vw - 16.,
             h: vh - 16.,
         };
+        // After the lock the brackets stay on the target while the camera zooms into it: the
+        // box moves and grows with the same camera, then it fades.
+        let followed = p.fly.filter(|_| p.br_open).map(|(_, g0, s0)| {
+            let (c0, c1) = if level == AGENT {
+                (s0, surf)
+            } else {
+                (g0, globe)
+            };
+            let b = p.br_from;
+            let (x, y) = c1.at((b.x - c0.x) / c0.z, (b.y - c0.y) / c0.z);
+            let k = c1.z / c0.z;
+            Boxed {
+                x,
+                y,
+                w: b.w * k,
+                h: b.h * k,
+            }
+        });
+        let _ = full;
         let (br_to, br_ms) = if p.br_open {
-            (full, FLY_MS)
+            (followed.unwrap_or(p.br_from), FLY_MS)
         } else if let Some((l, _)) = &p.lock {
             (l.target, 220.)
         } else {
@@ -862,7 +871,11 @@ impl WarRoomScreen {
         match p.br_at {
             Some(at) => {
                 let f = since_ms(at, now) / br_ms;
-                p.br = p.br_from.mix(br_to, glide(f));
+                p.br = if p.br_open {
+                    br_to
+                } else {
+                    p.br_from.mix(br_to, glide(f))
+                };
                 if p.br_open {
                     br_alpha = (1. - f).clamp(0., 1.);
                 }
@@ -995,13 +1008,19 @@ impl WarRoomScreen {
                 alpha: 1.,
                 width: 1.5,
             });
+            // The brackets frame the dots that wait, not the middle of the site.
+            let mut wait_spots: Vec<(f32, f32)> = Vec::new();
             for (k, a) in agents.iter().enumerate() {
                 let (from, to, t) = self.bridge.planet.pad_of(&a.id, now);
                 let (pa, pb) = (&d.pads[from], &d.pads[to]);
                 let t = glide(t);
                 let (x, y) = mid(pa.gx + (pb.gx - pa.gx) * t, pa.gy + (pb.gy - pa.gy) * t);
-                let r = if waits(a) { 9. } else { 8. } * globe.z.max(0.6);
-                let shift = (k % 3) as f32 * 3. * globe.z;
+                let dz = globe.z.clamp(0.6, 1.1);
+                let r = if waits(a) { 9. } else { 8. } * dz;
+                let shift = (k % 3) as f32 * 7. * dz;
+                if waits(a) {
+                    wait_spots.push((x + shift, y - shift));
+                }
                 dots.push(
                     dot(x + shift, y - shift, r, a, clock, k as f32 * 0.41).into_any_element(),
                 );
@@ -1009,7 +1028,15 @@ impl WarRoomScreen {
             if level != PLANET {
                 continue;
             }
-            let (ex, ey) = mid(d.cx, d.cy);
+            let (ex, ey) = if wait_spots.is_empty() {
+                mid(d.cx, d.cy)
+            } else {
+                let n = wait_spots.len() as f32;
+                let (sx, sy) = wait_spots
+                    .iter()
+                    .fold((0., 0.), |(ax, ay), (x, y)| (ax + x, ay + y));
+                (sx / n, sy / n)
+            };
             if waiting > 0 {
                 let beat = 1. + 0.05 * (1. - ((clock / 2.4).fract() * 2. - 1.).abs());
                 for left in [true, false] {
@@ -1107,7 +1134,18 @@ impl WarRoomScreen {
                     .into_any_element(),
             );
         }
-        view = view.child(layer(inks)).children(dots);
+        // The marks of the planet fade out while the camera zooms into a site (and back in).
+        let marks_alpha = if level == PLANET {
+            ((flown - 300.) / 300.).clamp(0., 1.)
+        } else {
+            (1. - flown / 300.).clamp(0., 1.)
+        };
+        view = view.child(
+            spot(0., 0., vw, vh)
+                .opacity(marks_alpha)
+                .child(layer(inks))
+                .children(dots),
+        );
 
         // The gold crosshair on the site of the oldest decision.
         if let (PLANET, Some(first)) = (level, queue.first()) {
@@ -1310,7 +1348,7 @@ impl WarRoomScreen {
                     .absolute()
                     .top_0()
                     .bottom_0()
-                    .w(px(44.))
+                    .w(px((brk.w * 0.3).clamp(12., 44.)))
                     .border_color(rgb(OR))
                     .border_t(px(10.))
                     .border_b(px(10.));

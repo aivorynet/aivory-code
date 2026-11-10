@@ -23,7 +23,7 @@ use serde_json::Value;
 use super::common::{
     Facts, ReadError, added_lines, error_ask, for_each_line, main_arg, one_line, permission_ask,
     plan_ask, push_diff, push_output, push_prompt, push_text, question_ask, replace_lines,
-    str_field, turn_line, with_tail,
+    stored_image, str_field, turn_line, with_tail,
 };
 use crate::timeutil::{format_utc_minutes, parse_rfc3339_ms};
 
@@ -158,6 +158,20 @@ fn load<R: BufRead>(reader: R, document: bool) -> Result<Session, ReadError> {
 }
 
 /// The text of a message `content`: a string, or the `text` of a list of parts.
+/// The preview lines of the `inlineData` images of a message.
+fn inline_images(v: Option<&Value>) -> Vec<Line> {
+    let Some(Value::Array(parts)) = v else {
+        return Vec::new();
+    };
+    parts
+        .iter()
+        .filter_map(|p| {
+            let d = p.get("inlineData")?;
+            stored_image(d.get("mimeType")?.as_str()?, d.get("data")?.as_str()?)
+        })
+        .collect()
+}
+
 fn content_text(v: Option<&Value>) -> String {
     match v {
         Some(Value::String(s)) => s.clone(),
@@ -221,6 +235,7 @@ fn render(s: &Session) -> Vec<Line> {
                 turns += 1;
                 out.push(turn_line(turns, at));
                 push_prompt(&mut out, &text);
+                out.extend(inline_images(m.content.as_ref()));
             }
             Some("gemini") => {
                 if let Some(name) = m.model.as_deref()

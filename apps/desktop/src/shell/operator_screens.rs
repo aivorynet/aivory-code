@@ -20,6 +20,7 @@ use gpui::{
 };
 
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::model::Model;
 use crate::ui;
 use crate::warroom::skins::operator::kit::*;
@@ -62,7 +63,7 @@ pub(super) struct OperatorScreens {
 
 /// The title line of a screen: the F-key and the title on the left, facts on the right.
 pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -> Div {
-    let mut line = div()
+    let line = div()
         .flex_none()
         .h(px(68.))
         .flex()
@@ -70,15 +71,27 @@ pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -
         .gap(px(28.))
         .child(
             div()
+                .flex_none()
+                .whitespace_nowrap()
                 .text_size(ui::ts(T_TITLE))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(rgb(GREEN_HI))
                 .child(format!("{fkey} // {}", title.to_uppercase())),
         )
         .child(div().flex_1());
+    // The facts wrap into two lines when the window is narrow; none is cut at the edge.
+    let mut facts = div()
+        .min_w(px(0.))
+        .flex()
+        .flex_wrap()
+        .justify_end()
+        .gap_x(px(20.))
+        .gap_y(px(2.));
     for (k, v) in stats {
-        line = line.child(
+        facts = facts.child(
             div()
+                .flex_none()
+                .whitespace_nowrap()
                 .flex()
                 .items_center()
                 .gap(px(8.))
@@ -96,7 +109,7 @@ pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -
                 ),
         );
     }
-    line
+    line.child(facts)
 }
 
 /// The layout of a screen: the title line over a row of screens.
@@ -769,6 +782,12 @@ impl OperatorTasks {
         .detach();
     }
 
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
+    }
+
     fn of(&self, tab: TaskTab) -> Vec<Task> {
         let Some(d) = &self.data else {
             return Vec::new();
@@ -957,6 +976,14 @@ impl Render for OperatorTasks {
                         },
                     )),
                 );
+            }
+            if let Some(a) = TaskAct::of(t.column) {
+                let id = t.id.clone();
+                tabs = tabs.child(btn("mt-act".into(), a.label(), false).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        task_act(&this.model, &id, a, Self::reload, cx);
+                    },
+                )));
             }
             body = body.child(tabs);
             match self.side {

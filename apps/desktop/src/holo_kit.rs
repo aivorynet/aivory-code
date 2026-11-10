@@ -413,7 +413,7 @@ pub fn glass_tab(text: &str, hot: bool) -> Div {
         .bg(ink(c, 0.88))
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(px(S_SMALL))
+        .text_size(ui::ts(S_SMALL))
         .text_color(rgb(BLACK))
         .whitespace_nowrap()
         .child(text.to_uppercase())
@@ -428,7 +428,7 @@ pub fn panel(title: &str, hot: bool) -> Div {
         .child(glass_tab(title, hot))
         .text_color(rgb(if hot { WARM } else { TXT }))
         .font_family(BODY)
-        .text_size(px(S_BODY))
+        .text_size(ui::ts(S_BODY))
 }
 
 // ---- small parts -------------------------------------------------------------------------
@@ -439,8 +439,8 @@ pub fn th(text: impl Into<SharedString>) -> Div {
     div()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(px(S_SMALL))
-        .line_height(px(S_SMALL + 5.))
+        .text_size(ui::ts(S_SMALL))
+        .line_height(ui::ts(S_SMALL + 5.))
         .text_color(rgb(MUTED))
         .whitespace_nowrap()
         .overflow_hidden()
@@ -454,8 +454,8 @@ pub fn sec(text: impl Into<SharedString>) -> Div {
     div()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(px(S_SECTION))
-        .line_height(px(S_SECTION + 8.))
+        .text_size(ui::ts(S_SECTION))
+        .line_height(ui::ts(S_SECTION + 8.))
         .text_color(rgb(PA))
         .whitespace_nowrap()
         .overflow_hidden()
@@ -475,7 +475,7 @@ pub fn button(id: impl Into<SharedString>, tone: Tone, label: &str) -> Stateful<
     let base = div()
         .id(id.into())
         .flex_none()
-        .h(px(36.))
+        .min_h(px(36.))
         .px(px(18.))
         .flex()
         .items_center()
@@ -483,7 +483,7 @@ pub fn button(id: impl Into<SharedString>, tone: Tone, label: &str) -> Stateful<
         .rounded(px(4.))
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(px(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL + 1.))
         .whitespace_nowrap()
         .cursor_pointer();
     match tone {
@@ -525,12 +525,12 @@ pub fn link(id: impl Into<SharedString>, label: &str, c: u32) -> Stateful<Div> {
     div()
         .id(id.into())
         .flex_none()
-        .h(px(28.))
+        .min_h(px(28.))
         .flex()
         .items_center()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(px(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL + 1.))
         .text_color(ink(c, 0.8))
         .whitespace_nowrap()
         .cursor_pointer()
@@ -544,13 +544,13 @@ pub(crate) fn tab(id: impl Into<SharedString>, label: &str, color: u32, on: bool
     div()
         .id(id.into())
         .flex_none()
-        .h(px(34.))
+        .min_h(px(34.))
         .px(px(4.))
         .flex()
         .items_center()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(px(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL + 1.))
         .whitespace_nowrap()
         .cursor_pointer()
         .border_b_2()
@@ -578,9 +578,19 @@ pub struct Island {
 
 /// The layer of a list screen: the title and the readouts on top, then two glass panels. The
 /// left panel lists, the right panel shows the one selected thing; each has a menu of tabs.
-pub fn island(_art: Art, i: Island) -> Div {
+pub fn island(art: Art, i: Island) -> Div {
+    island_with(art, i, false)
+}
+
+/// Like `island`; with `one` only the left panel shows, over the full width (narrow windows).
+pub fn island_with(_art: Art, i: Island, one: bool) -> Div {
     let hot = i.left_color == RS || i.left_color == OR;
-    let mut stats = div().flex().items_end().gap(px(GAP));
+    let mut stats = div()
+        .flex()
+        .flex_wrap()
+        .items_end()
+        .gap_x(px(GAP / 2.))
+        .gap_y(px(4.));
     for (label, value, color) in i.stats {
         stats = stats.child(
             div()
@@ -593,8 +603,8 @@ pub fn island(_art: Art, i: Island) -> Div {
                     div()
                         .font_family(FIGURE)
                         .font_weight(gpui::FontWeight::BOLD)
-                        .text_size(px(S_BIG))
-                        .line_height(px(S_BIG + 4.))
+                        .text_size(ui::ts(S_BIG))
+                        .line_height(ui::ts(S_BIG + 4.))
                         .text_color(rgb(if color == TXT { PA } else { color }))
                         .child(value),
                 ),
@@ -620,7 +630,8 @@ pub fn island(_art: Art, i: Island) -> Div {
             .children(tabs)
     };
     let left = glass(0x2AA9E0, false)
-        .w(relative(0.46))
+        .when(one, |d| d.flex_1().min_w(px(0.)))
+        .when(!one, |d| d.w(relative(0.46)))
         .h_full()
         .flex()
         .flex_col()
@@ -646,27 +657,31 @@ pub fn island(_art: Art, i: Island) -> Div {
         .flex_col()
         .px(px(MARGIN))
         .pt(px(8.))
-        .pb(px(40.))
-        .gap(px(36.))
+        .pb(px(if ui::short() { 16. } else { 40. }))
+        .gap(px(if ui::short() { 12. } else { 36. }))
         .font_family(BODY)
         .text_color(rgb(TXT))
-        .child(
-            div()
-                .flex_none()
-                .flex()
-                .items_end()
-                .justify_between()
-                .child(
-                    div()
-                        .font_family(LABEL)
-                        .font_weight(gpui::FontWeight::BOLD)
-                        .text_size(px(S_TITLE))
-                        .line_height(px(S_TITLE + 6.))
-                        .text_color(rgb(TXT))
-                        .child(i.left_title.to_uppercase()),
-                )
-                .child(stats),
-        )
+        .when(!ui::short(), |d| {
+            d.child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .flex_wrap()
+                    .gap_x(px(24.))
+                    .items_end()
+                    .justify_between()
+                    .child(
+                        div()
+                            .font_family(LABEL)
+                            .font_weight(gpui::FontWeight::BOLD)
+                            .text_size(ui::ts(S_TITLE))
+                            .line_height(ui::ts(S_TITLE + 6.))
+                            .text_color(rgb(TXT))
+                            .child(i.left_title.to_uppercase()),
+                    )
+                    .child(stats),
+            )
+        })
         .child(
             div()
                 .flex_1()
@@ -674,7 +689,7 @@ pub fn island(_art: Art, i: Island) -> Div {
                 .flex()
                 .gap(px(GAP))
                 .child(left)
-                .child(right),
+                .children((!one).then_some(right)),
         )
 }
 
@@ -725,8 +740,8 @@ pub(crate) fn row(
                     div()
                         .truncate()
                         .font_family(BODY)
-                        .text_size(px(S_BODY))
-                        .line_height(px(LH_BODY))
+                        .text_size(ui::ts(S_BODY))
+                        .line_height(ui::ts(LH_BODY))
                         .text_color(ink(TXT, if on { 1. } else { 0.85 }))
                         .child(title.to_string()),
                 )
@@ -734,8 +749,8 @@ pub(crate) fn row(
                     div()
                         .truncate()
                         .font_family(BODY)
-                        .text_size(px(S_SMALL))
-                        .line_height(px(S_SMALL + 6.))
+                        .text_size(ui::ts(S_SMALL))
+                        .line_height(ui::ts(S_SMALL + 6.))
                         .text_color(ink(MUTED, 0.8))
                         .child(sub.to_string()),
                 ),
@@ -745,7 +760,7 @@ pub(crate) fn row(
                 .flex_none()
                 .font_family(LABEL)
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_size(px(S_SMALL))
+                .text_size(ui::ts(S_SMALL))
                 .text_color(rgb(note_color))
                 .child(note.to_uppercase()),
         )
@@ -755,8 +770,8 @@ pub(crate) fn row(
 pub(crate) fn prose(text: &str) -> Div {
     div()
         .font_family(BODY)
-        .text_size(px(S_BODY))
-        .line_height(px(LH_BODY))
+        .text_size(ui::ts(S_BODY))
+        .line_height(ui::ts(LH_BODY))
         .text_color(ink(TXT, 0.9))
         .child(text.to_string())
 }
@@ -771,8 +786,8 @@ pub(crate) fn code(text: &str, color: u32) -> Div {
         .border_1()
         .border_color(ink(color, 0.25))
         .font_family(CODE)
-        .text_size(px(S_CODE))
-        .line_height(px(S_CODE + 9.))
+        .text_size(ui::ts(S_CODE))
+        .line_height(ui::ts(S_CODE + 9.))
         .text_color(rgb(if color == TXT { PA } else { color }))
         .child(text.to_string())
 }
@@ -782,8 +797,8 @@ pub(crate) fn big(text: &str) -> Div {
     div()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(px(S_BIG))
-        .line_height(px(S_BIG + 6.))
+        .text_size(ui::ts(S_BIG))
+        .line_height(ui::ts(S_BIG + 6.))
         .text_color(rgb(TXT))
         .child(text.to_string())
 }
@@ -815,7 +830,7 @@ pub fn verb(label: &str) -> Div {
         .bg(rgb(bg))
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(px(S_SMALL - 1.))
+        .text_size(ui::ts(S_SMALL - 1.))
         .text_color(rgb(fg))
         .child(name)
 }
@@ -843,15 +858,15 @@ pub fn display_rows(lines: &[DLine]) -> Vec<Div> {
         let body = match d.kind {
             DKind::You => div()
                 .font_family(CODE)
-                .text_size(px(S_CODE))
-                .line_height(px(S_CODE + 9.))
+                .text_size(ui::ts(S_CODE))
+                .line_height(ui::ts(S_CODE + 9.))
                 .text_color(rgb(DIM))
                 .child(format!("> {text}")),
             DKind::Heading => div()
                 .font_family(LABEL)
                 .font_weight(gpui::FontWeight::BOLD)
-                .text_size(px(S_LEAD))
-                .line_height(px(S_LEAD + 8.))
+                .text_size(ui::ts(S_LEAD))
+                .line_height(ui::ts(S_LEAD + 8.))
                 .text_color(rgb(PA))
                 .child(text),
             DKind::Code | DKind::Table => div()
@@ -865,37 +880,37 @@ pub fn display_rows(lines: &[DLine]) -> Vec<Div> {
                 } else {
                     gpui::FontWeight::NORMAL
                 })
-                .text_size(px(S_CODE))
-                .line_height(px(S_CODE + 8.))
+                .text_size(ui::ts(S_CODE))
+                .line_height(ui::ts(S_CODE + 8.))
                 .text_color(rgb(PA))
                 .whitespace_nowrap()
                 .child(text),
             DKind::Tool => div()
                 .overflow_hidden()
                 .font_family(CODE)
-                .text_size(px(S_CODE))
-                .line_height(px(S_CODE + 9.))
+                .text_size(ui::ts(S_CODE))
+                .line_height(ui::ts(S_CODE + 9.))
                 .text_color(rgb(PA))
                 .whitespace_nowrap()
                 .child(text),
             DKind::Output => div()
                 .overflow_hidden()
                 .font_family(CODE)
-                .text_size(px(S_CODE - 1.))
-                .line_height(px(S_CODE + 7.))
+                .text_size(ui::ts(S_CODE - 1.))
+                .line_height(ui::ts(S_CODE + 7.))
                 .text_color(rgb(0x5F95B8))
                 .whitespace_nowrap()
                 .child(format!("└ {text}")),
             DKind::Error => div()
                 .font_family(CODE)
-                .text_size(px(S_CODE))
+                .text_size(ui::ts(S_CODE))
                 .text_color(rgb(GD))
                 .child(text),
             _ => div()
                 .max_h(px(LH_BODY * 3.))
                 .overflow_hidden()
-                .line_height(px(LH_BODY))
-                .text_size(px(S_BODY))
+                .line_height(ui::ts(LH_BODY))
+                .text_size(ui::ts(S_BODY))
                 .text_color(ink(0xBFE6F7, 0.95))
                 .child(text),
         };

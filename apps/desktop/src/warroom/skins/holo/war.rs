@@ -92,7 +92,15 @@ fn whole_lines(text: &str, width: usize, max: usize) -> Vec<String> {
     let wrap = |t: &str| -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         let mut line = String::new();
+        // A word longer than a line (a path) breaks into pieces.
+        let mut words: Vec<String> = Vec::new();
         for word in t.split_whitespace() {
+            let chars: Vec<char> = word.chars().collect();
+            for piece in chars.chunks(width.max(8) - 2) {
+                words.push(piece.iter().collect());
+            }
+        }
+        for word in words.iter().map(String::as_str) {
             if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > width {
                 out.push(std::mem::take(&mut line));
             }
@@ -166,6 +174,8 @@ struct Bloom {
 }
 
 const HEAD: f32 = 64.;
+/// The width of a label column at each side of the synapse network.
+const TAG_W: f32 = 140.;
 const FOOT: f32 = 100.;
 
 /// The bloom for a window of `w` x `h` pixels (under the bar).
@@ -173,7 +183,8 @@ fn bloom_geo(w: f32, h: f32) -> Bloom {
     let cw = (w - 2. * (MARGIN + column(w) + GAP)).max(240.);
     let ch = (h - TOP - BOTTOM).max(300.);
     let avail = (ch - HEAD - FOOT).max(200.);
-    let s = ((cw / 2. - 28.) / 292.)
+    // The sides keep room for the label columns (TAG_W): the network stays between them.
+    let s = ((cw / 2. - 28. - 0.6 * TAG_W) / 292.)
         .min((avail / 2. - 6.) / 292.)
         .clamp(0.35, 1.15);
     Bloom {
@@ -592,58 +603,199 @@ impl WarRoomScreen {
             );
         }
         let spots: Vec<[f32; 2]> = (0..syn.nodes.len()).map(|i| syn.node_at(i, cam)).collect();
-        // Codebase labels open their session.
-        for (k, cl) in syn.clusters.iter().enumerate() {
-            let target = cl
-                .nodes
-                .iter()
-                .copied()
-                .find(|&n| list[syn.nodes[n].idx].waits())
-                .or(cl.nodes.first().copied());
-            let Some(target) = target.and_then(|n| list.get(syn.nodes[n].idx)) else {
-                continue;
-            };
-            let id = target.id.clone();
-            let waits = cl.nodes.iter().any(|&n| list[syn.nodes[n].idx].waits());
-            // The label keeps clear of the neuron circles: it moves out from the middle.
-            let mut label = syn.label_at(k, cam);
-            let (dx, dy) = (label[0] - g.c[0], label[1] - g.c[1]);
-            let d = dx.hypot(dy).max(1.);
-            for _ in 0..14 {
-                let hit = spots
-                    .iter()
-                    .any(|s| (s[0] - label[0]).abs() < 92. && (s[1] - label[1]).abs() < 26.);
-                if !hit {
-                    break;
-                }
-                label = [label[0] + dx / d * 12., label[1] + dy / d * 12.];
-            }
-            center = center.child(
-                div()
-                    .id(SharedString::from(format!("holo-book-{k}")))
-                    .absolute()
-                    .left(px(label[0] - 80.))
-                    .top(px(label[1] - 12.))
-                    .w(px(160.))
-                    .h(px(24.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .gap(px(6.))
-                    .cursor_pointer()
-                    .font_family(LABEL)
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_size(px(S_SMALL + 1.))
-                    .text_color(ink(if waits { GD } else { PA }, 0.9))
-                    .hover(|s| s.text_color(rgb(TXT)))
-                    .child(clip(&cl.name, 16))
-                    .child(mono(cl.nodes.len().to_string(), 0x5F95B8))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.holo.open = Some(id.clone());
-                        cx.notify();
-                    })),
-            );
+        // Codebase labels open their session. They stand in two columns at the sides of the
+        // region, sorted by the height of their cluster, at least one row apart, so no two
+        // labels ever overlap; a thin leader line runs from each label to its cluster.
+        struct Tag {
+            k: usize,
+            anchor: [f32; 2],
+            y: f32,
         }
+        let (mut left_tags, mut right_tags): (Vec<Tag>, Vec<Tag>) = (Vec::new(), Vec::new());
+        for (k, cl) in syn.clusters.iter().enumerate() {
+            if cl.nodes.is_empty() {
+                continue;
+            }
+            let n = cl.nodes.len() as f32;
+            let (sx, sy) = cl.nodes.iter().fold((0., 0.), |(ax, ay), &i| {
+                let p = spots[i];
+                (ax + p[0], ay + p[1])
+            });
+            let anchor = [sx / n, sy / n];
+            let tag = Tag {
+                k,
+                anchor,
+                y: anchor[1],
+            };
+            if anchor[0] < g.c[0] {
+                left_tags.push(tag);
+            } else {
+                right_tags.push(tag);
+            }
+        }
+        const TAG_ROW: f32 = 30.;
+        let (top, bottom) = (HEAD + 18., (g.ch - FOOT - 12.).max(HEAD + 60.));
+        let spread = |tags: &mut Vec<Tag>| {
+            tags.sort_by(|a, b| a.anchor[1].total_cmp(&b.anchor[1]));
+            let mut prev = top - TAG_ROW;
+            for t in tags.iter_mut() {
+                t.y = t.anchor[1].max(prev + TAG_ROW).max(top);
+                prev = t.y;
+            }
+            // Too many for the room below: push the column up from the bottom.
+            let mut next = bottom + TAG_ROW;
+            for t in tags.iter_mut().rev() {
+                t.y = t.y.min(next - TAG_ROW);
+                next = t.y;
+            }
+        };
+        spread(&mut left_tags);
+        spread(&mut right_tags);
+        let mut leaders: Vec<([f32; 2], [f32; 2], bool)> = Vec::new();
+        let mut tag_els: Vec<gpui::Stateful<Div>> = Vec::new();
+        for (tags, left) in [(&left_tags, true), (&right_tags, false)] {
+            for tag in tags.iter() {
+                let cl = &syn.clusters[tag.k];
+                let target = cl
+                    .nodes
+                    .iter()
+                    .copied()
+                    .find(|&n| list[syn.nodes[n].idx].waits())
+                    .or(cl.nodes.first().copied());
+                let Some(target) = target.and_then(|n| list.get(syn.nodes[n].idx)) else {
+                    continue;
+                };
+                let id = target.id.clone();
+                let waits = cl.nodes.iter().any(|&n| list[syn.nodes[n].idx].waits());
+                // The label hugs the outer edge; its line starts at the end of the text.
+                let text_w = 10. + 7.4 * (clip(&cl.name, 16).chars().count() as f32 + 3.);
+                let x = if left { 0. } else { g.cw - TAG_W };
+                let end = if left {
+                    text_w.min(TAG_W) + 2.
+                } else {
+                    g.cw - text_w.min(TAG_W) - 2.
+                };
+                leaders.push(([end, tag.y], tag.anchor, waits));
+                tag_els.push(
+                    div()
+                        .id(SharedString::from(format!("holo-book-{}", tag.k)))
+                        .absolute()
+                        .left(px(x))
+                        .top(px(tag.y - 12.))
+                        .w(px(TAG_W))
+                        .h(px(24.))
+                        .flex()
+                        .items_center()
+                        .when(!left, |d| d.justify_end())
+                        .cursor_pointer()
+                        .font_family(LABEL)
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_size(px(S_SMALL + 1.))
+                        .text_color(ink(if waits { GD } else { PA }, 0.9))
+                        .hover(|s| s.text_color(rgb(TXT)))
+                        .child(
+                            // A dark glass backing: the label stays readable over the network.
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(6.))
+                                .px(px(5.))
+                                .py(px(2.))
+                                .rounded(px(4.))
+                                .bg(ink(0x020B16, 0.78))
+                                .border_1()
+                                .border_color(ink(if waits { GD } else { PK }, 0.3))
+                                .child(clip(&cl.name, 16))
+                                .child(mono(cl.nodes.len().to_string(), 0x5F95B8)),
+                        )
+                        .on_click(cx.listener(move |_this, _, _, cx| {
+                            cx.emit(crate::warroom::WarRoomEvent::OpenSession(id.clone()));
+                        })),
+                );
+            }
+        }
+        // Zoom: wheel or these buttons; drag turns the network.
+        let zoom_btn = |id: &'static str, tip: &'static str| {
+            div()
+                .id(id)
+                .min_w(px(28.))
+                .h(px(24.))
+                .px(px(8.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(4.))
+                .bg(ink(PK, 0.14))
+                .border_1()
+                .border_color(ink(PK, 0.4))
+                .font_family(LABEL)
+                .text_size(px(S_SMALL + 1.))
+                .text_color(ink(PA, 0.95))
+                .cursor_pointer()
+                .hover(|s| s.bg(ink(PK, 0.3)).border_color(ink(PK, 0.8)))
+                .tooltip(crate::ui::tip(tip))
+        };
+        let zoom_pct = (self.holo.orbit.zoom * 100.).round() as u32;
+        center = center.child(
+            div()
+                .absolute()
+                .left(px(g.c[0] - 90.))
+                .top(px((g.ch - FOOT - 40.).max(HEAD + 40.)))
+                .w(px(180.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .gap(px(6.))
+                .child(
+                    zoom_btn("holo-zoom-out", "Zoom out (wheel down)")
+                        .child("−")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.holo.orbit.zoom_by(1. / 1.4);
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    zoom_btn("holo-zoom-reset", "Back to the start view")
+                        .child(format!("{zoom_pct}%"))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.holo.orbit.reset();
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    zoom_btn("holo-zoom-in", "Zoom in (wheel up); drag turns")
+                        .child("+")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.holo.orbit.zoom_by(1.4);
+                            cx.notify();
+                        })),
+                ),
+        );
+        // The leader lines: a short level run from the label, then straight to the cluster.
+        center = center.child(
+            canvas(
+                |_, _, _| (),
+                move |b, _, window, _| {
+                    let (ox, oy) = (f32::from(b.origin.x), f32::from(b.origin.y));
+                    for (from, to, waits) in &leaders {
+                        let knee = if from[0] < to[0] {
+                            from[0] + 14.
+                        } else {
+                            from[0] - 14.
+                        };
+                        let pts = [
+                            [from[0] + ox, from[1] + oy],
+                            [knee + ox, from[1] + oy],
+                            [to[0] + ox, to[1] + oy],
+                        ];
+                        line(window, &pts, if *waits { GD } else { PK }, 1., 0.45, false);
+                    }
+                },
+            )
+            .absolute()
+            .inset_0(),
+        );
+        center = center.children(tag_els);
         // One hit area per neuron: a small tip on hover, a click selects (waits: opens).
         for (i, node) in syn.nodes.iter().enumerate() {
             let con = &list[node.idx];
@@ -702,7 +854,7 @@ impl WarRoomScreen {
                     .child(tip)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if waits {
-                            this.holo.open = Some(id.clone());
+                            cx.emit(crate::warroom::WarRoomEvent::OpenSession(id.clone()));
                         } else {
                             this.holo.sel = Some(id.clone());
                         }
@@ -849,11 +1001,10 @@ impl WarRoomScreen {
             && fit > 0
         {
             let mut shown = div().flex().flex_col();
-            for l in whole_lines(&why, 34, fit) {
+            for l in whole_lines(&why, 28, fit) {
                 shown = shown.child(
                     div()
-                        .h(px(25.))
-                        .whitespace_nowrap()
+                        .min_h(px(25.))
                         .text_color(ink(0xFFD9BD, 0.85))
                         .child(l),
                 );
@@ -885,10 +1036,11 @@ impl WarRoomScreen {
         }
         let (open_id, park_id) = (pane.id.clone(), pane.id.clone());
         let mut links = div().flex().items_center().justify_between().child(
-            link("holo-open", "Open session ›", GD).on_click(cx.listener(move |this, _, _, cx| {
-                this.holo.open = Some(open_id.clone());
-                cx.notify();
-            })),
+            link("holo-open", "Open session ›", GD).on_click(cx.listener(
+                move |_this, _, _, cx| {
+                    cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
+                },
+            )),
         );
         links = links.child(link("holo-park", "Park", MUTED).on_click(
             cx.listener(move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx)),
@@ -994,15 +1146,16 @@ impl WarRoomScreen {
                             .flex()
                             .items_center()
                             .gap(px(10.))
-                            .child(th(format!("{} {}", u.provider, u.label)).flex_none())
+                            // A long window name gets an ellipsis; the reset time and the
+                            // percent stay inside the card.
                             .child(
-                                div()
+                                th(format!("{} {}", u.provider, u.label))
                                     .flex_1()
-                                    .flex()
-                                    .justify_end()
-                                    .child(mono(resets(u), 0x5F95B8).whitespace_nowrap()),
+                                    .min_w(px(0.))
+                                    .truncate(),
                             )
-                            .child(mono(format!("{}%", u.pct), PA)),
+                            .child(mono(resets(u), 0x5F95B8).flex_none().whitespace_nowrap())
+                            .child(mono(format!("{}%", u.pct), PA).flex_none()),
                     )
                     .child(meter(u.pct, color_of(u))),
             );
@@ -1115,9 +1268,8 @@ impl WarRoomScreen {
             )
             .child(div().flex().justify_between().child(
                 link("holo-sel-open", "Open session ›", PK).on_click(cx.listener(
-                    move |this, _, _, cx| {
-                        this.holo.open = Some(open_id.clone());
-                        cx.notify();
+                    move |_this, _, _, cx| {
+                        cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
                     },
                 )),
             ))

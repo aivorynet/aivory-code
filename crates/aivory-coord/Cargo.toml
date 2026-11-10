@@ -14,7 +14,7 @@ aivory-vcs = { workspace = true }
 # MIT or Apache-2.0 (CC0 for the C part). Hash of a declaration body.
 blake3 = "1"
 # MIT. `bundled` compiles SQLite (public domain); same version as `aivory-engine`, so one SQLite links.
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

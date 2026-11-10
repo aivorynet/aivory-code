@@ -7,7 +7,7 @@
 use std::rc::Rc;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Div, SharedString, Window, div, px, rgb};
+use gpui::{AnyElement, Context, Div, Window, div, px, rgb};
 
 use super::{Screen, Shell, first_windows};
 use crate::actions::{Action, act};
@@ -21,8 +21,6 @@ enum Shape {
     Planet,
     /// The other main screens: the header bars; the screen draws its islands below.
     Overview,
-    /// The session view: header bars, the session switcher, the bottom bars.
-    Detail,
     /// Every other screen: a column, the bottom bars, and a box for the screen.
     Plain,
 }
@@ -145,14 +143,13 @@ impl Shell {
         let facts = self.bridge_facts(cx);
         let shape = match self.screen {
             Screen::WarRoom => Shape::Planet,
-            Screen::Inbox | Screen::Tasks | Screen::Repos | Screen::Focus(_) | Screen::Lens => {
+            Screen::Inbox | Screen::Tasks | Screen::Repos | Screen::Session(_) | Screen::Lens => {
                 Shape::Overview
             }
             Screen::Settings if !self.bridge_full_settings => Shape::Overview,
-            Screen::Session(_) => Shape::Detail,
             _ => Shape::Plain,
         };
-        // The session that the Detail entry opens: the open one, else the war room pick.
+        // The session that the Session entry opens: the open one, else the war room pick.
         let detail_id: Option<String> = match &self.screen {
             Screen::Session(id) => Some(id.clone()),
             _ => self.war_room.read(cx).bridge_selected(),
@@ -199,7 +196,7 @@ impl Shell {
         };
 
         let sub = match self.screen {
-            Screen::Focus(_) => Some(0),
+            Screen::Session(_) => Some(0),
             Screen::Lens => Some(3),
             _ => None,
         };
@@ -211,51 +208,21 @@ impl Shell {
         };
         let look = self.bridge_look_button(cx);
         match shape {
-            Shape::Overview | Shape::Detail => {
+            Shape::Overview => {
                 frame.extend(
                     upper_elbow(art)
                         .into_iter()
                         .map(IntoElement::into_any_element),
                 );
-                if shape == Shape::Overview {
-                    frame.push(
-                        bar_text(bar(art.rx(986.), 234., 316., PK), &facts.status)
-                            .into_any_element(),
-                    );
-                    frame.push(look(art.rx(1306.), 234., 118., 16.));
-                } else {
-                    frame.push(bar(art.rx(986.), 234., 316., PK).into_any_element());
-                }
+                frame.push(
+                    bar_text(bar(art.rx(986.), 234., 316., PK), &facts.status).into_any_element(),
+                );
+                frame.push(look(art.rx(1306.), 234., 118., 16.));
             }
             Shape::Plain => {
                 frame.push(rect(16., 188., 150., art.by(786.) - 188., PU).into_any_element());
             }
             Shape::Planet => {}
-        }
-        if shape == Shape::Detail {
-            frame.push(
-                bar(art.rx(1306.), 234., 118., PU)
-                    .rounded_r(px(8.))
-                    .into_any_element(),
-            );
-            frame.push(
-                rect(16., 266., 262., 62., OR)
-                    .rounded_tl(px(54.))
-                    .into_any_element(),
-            );
-            frame.push(
-                rect(166., 282., 115., 46., BLACK)
-                    .rounded_tl(px(26.))
-                    .into_any_element(),
-            );
-            frame.push(bar(282., 266., 760. + art.dx, OR).into_any_element());
-            frame.push(bar(art.rx(1046.), 266., 230., PK).into_any_element());
-            frame.push(
-                bar(art.rx(1280.), 266., 144., OR)
-                    .rounded_r(px(8.))
-                    .into_any_element(),
-            );
-            frame.extend(self.bridge_switcher(art, &facts, at, cx));
         }
         if shape != Shape::Overview && shape != Shape::Planet {
             frame.extend(
@@ -273,8 +240,8 @@ impl Shell {
         }
 
         let body = match shape {
-            Shape::Planet | Shape::Overview | Shape::Detail => {
-                div().absolute().inset_0().child(content)
+            Shape::Planet | Shape::Overview => {
+                div().absolute().inset_0().flex().flex_col().child(content)
             }
             Shape::Plain => div()
                 .absolute()
@@ -299,7 +266,7 @@ impl Shell {
         let heading = if shape == Shape::Plain {
             div()
                 .absolute()
-                .left(px(190.))
+                .left(px(400.))
                 .right(px(16.))
                 .top(px(6.))
                 .h(px(48.))
@@ -316,6 +283,20 @@ impl Shell {
                 .h(px(48.))
                 .child(name)
         };
+        // Organizer and New task: a row of two pills where no frame part sits. The planet has a
+        // free corner at the bottom left, next to the labels; the other screens have the black
+        // gap between the upper and the lower frame island.
+        let launch = div()
+            .absolute()
+            .flex()
+            .gap(px(8.))
+            .map(|d| match shape {
+                Shape::Planet => d.left(px(204.)).bottom(px(16.)),
+                Shape::Overview | Shape::Plain => d.left(px(16.)).top(px(262.)),
+            })
+            .children(crate::new_session::launch_buttons("bridge", |id, label| {
+                pill(id, if label == "Organizer" { OR } else { PK }, label).w(px(130.))
+            }));
         let planet = (shape == Shape::Planet).then(|| {
             planet_nav(
                 art,
@@ -344,6 +325,7 @@ impl Shell {
             .child(body)
             .children((shape != Shape::Planet).then_some(heading))
             .children(planet)
+            .child(launch)
             .children(menu)
             .children(toasts)
     }
@@ -433,43 +415,6 @@ impl Shell {
             }))
             .into_any_element()
     }
-
-    /// The session switcher: one segment for every live session, as far as the column holds.
-    fn bridge_switcher(
-        &self,
-        art: Art,
-        facts: &Facts,
-        at: Option<usize>,
-        cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
-        let room = (((art.by(780.) - 332.) / 32.).floor() as usize).max(1);
-        let n = facts.switcher.len();
-        let start = at
-            .map_or(0, |i| i.saturating_sub(room / 2))
-            .min(n.saturating_sub(room));
-        let mut out = vec![rect(16., art.by(780.), 150., 6., PU).into_any_element()];
-        for (i, (id, name, c)) in facts.switcher.iter().enumerate().skip(start).take(room) {
-            let on = at == Some(i);
-            let id = id.clone();
-            let row = (i - start) as f32;
-            out.push(
-                seg(
-                    SharedString::from(format!("lc-sw-{i}")),
-                    (16., 332. + row * 32., 150., 28.),
-                    if on { PA } else { *c },
-                    S_SMALL,
-                    &format!("{:02}", i + 1),
-                    &short_name(name, 13),
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.screen = Screen::Session(id.clone());
-                    cx.notify();
-                }))
-                .into_any_element(),
-            );
-        }
-        out
-    }
 }
 
 impl Shell {
@@ -495,19 +440,18 @@ impl Shell {
         }
         let model = self.model.clone();
         let focus_id = match &self.screen {
-            Screen::Focus(id) => Some(id.clone()),
+            Screen::Session(id) => Some(id.clone()),
             _ => None,
         };
         match self.screen {
-            Screen::Focus(_) => {
+            Screen::Session(_) => {
                 let id = focus_id.unwrap_or_default();
                 if let Some((v, _)) = &self.bridge_screens.focus {
                     v.update(cx, |v, cx| v.show(&id, cx));
                 } else {
                     let v = cx.new(|cx| BridgeFocus::new(model, id, window, cx));
                     let sub = cx.subscribe(&v, |t, _, e: &BridgeFocusEvent, cx| match e {
-                        BridgeFocusEvent::Open(id) => t.open_focus(id, cx),
-                        BridgeFocusEvent::Detail(id) => t.open_session(id, cx),
+                        BridgeFocusEvent::Open(id) => t.open_session(id, cx),
                         BridgeFocusEvent::OpenFile { session, path } => {
                             t.open_session_file(session, path, cx)
                         }

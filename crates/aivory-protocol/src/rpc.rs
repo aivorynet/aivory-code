@@ -341,6 +341,10 @@ pub struct NewSessionParams {
     pub composer: ComposerPrefs,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<String>,
+    /// Files of the first turn. Images (png, jpeg, gif, webp) go to the agent as images;
+    /// the client names other files in the prompt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<String>,
 }
 
 /// Start work from one line, or queue it (`session/dispatch`).
@@ -366,6 +370,9 @@ pub struct DispatchParams {
     /// The effort of the session (default: the provider setting).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
+    /// The permission mode of the session (default: the provider setting).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<Mode>,
     pub prompt: String,
 }
 
@@ -399,6 +406,7 @@ impl DispatchParams {
             agent,
             model: None,
             effort: None,
+            mode: None,
             prompt: prompt.join(" "),
         })
     }
@@ -574,6 +582,20 @@ pub struct TaskCreateParams {
     /// Default: `Normal`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<crate::tasks::TaskPriority>,
+    /// Mode, provider, model, and effort of the first session. It wins over `provider` and
+    /// `mode`. Default: the provider defaults of Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer: Option<ComposerPrefs>,
+}
+
+/// Start the first session of a planned task now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskStartParams {
+    pub id: String,
+    /// Default: the provider defaults of Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer: Option<ComposerPrefs>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
@@ -668,6 +690,12 @@ methods! {
     /// Start the organizer agent: a session of aivoryd that watches RAM and the other
     /// sessions, and acts or gives feedback by its mode.
     OrganizerStart = "organizer/start", crate::resources::OrganizerStartParams => Created;
+    /// Read an image, video, or PDF file of the daemon machine. Another file type, a missing
+    /// file, or a file over 20 MB: `INVALID_PARAMS`.
+    MediaGet = "media/get", crate::media::MediaGetParams => crate::media::MediaData;
+    /// The suggestions for the word at the cursor of a chat field: `/` commands of the agent
+    /// of the session, `@` files of its codebase and subagents. At most 40, best first.
+    ComposeComplete = "compose/complete", crate::complete::CompleteParams => crate::complete::CompleteList;
     /// Set the permission mode of the composer of a session. The daemon stores it in
     /// `composer.mode` of the pane; it applies from the next turn. The change reaches the
     /// subscribers as a `session` delta.
@@ -685,7 +713,22 @@ methods! {
     InboxSnooze = "inbox/snooze", InboxSnoozeParams => Ack;
     TasksList = "tasks/list", TaskListParams => TaskList;
     TasksCreate = "tasks/create", TaskCreateParams => Task;
+    /// Change a task. A move to `working` does not start a session: use `tasks/start`.
     TasksUpdate = "tasks/update", TaskUpdateParams => Task;
+    /// Start the first session of a planned task. A task that is not planned: `INVALID_STATE`.
+    TasksStart = "tasks/start", TaskStartParams => Task;
+    /// The scheduled tasks.
+    SchedulesList = "schedules/list", Empty => crate::schedules::ScheduleList;
+    /// A scheduled task: at each fire time a task and its first session start. A bad cron
+    /// expression or an unknown codebase: `INVALID_PARAMS`.
+    SchedulesCreate = "schedules/create", crate::schedules::ScheduleCreateParams => crate::schedules::Schedule;
+    SchedulesUpdate = "schedules/update", crate::schedules::ScheduleUpdateParams => crate::schedules::Schedule;
+    SchedulesDelete = "schedules/delete", crate::schedules::ScheduleRef => Ack;
+    /// Fire a schedule now (its next fire time stays).
+    SchedulesRun = "schedules/run", crate::schedules::ScheduleRef => crate::schedules::Schedule;
+    /// The entry of the operating system fires a schedule. A `due` time that fired already
+    /// does nothing.
+    SchedulesFire = "schedules/fire", crate::schedules::ScheduleFireParams => crate::schedules::Schedule;
     ReposList = "repos/list", Empty => RepoList;
     ReposGet = "repos/get", CodebaseRef => RepoDetail;
     ReposMap = "repos/map", CodebaseRef => MapFile;

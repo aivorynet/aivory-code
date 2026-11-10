@@ -105,6 +105,17 @@ enum Command {
         #[command(subcommand)]
         action: PushCommand,
     },
+    /// Fire a scheduled task (the entry in the scheduler of the operating system runs this).
+    /// Starts the daemon when it does not run.
+    Fire {
+        /// The schedule id
+        id: String,
+        /// The fire time of the entry (Unix ms): a time that fired already does nothing
+        #[arg(long)]
+        due: Option<i64>,
+        #[arg(long, default_value = Endpoint::DEFAULT_NAME)]
+        endpoint: String,
+    },
     /// Call one JSON-RPC method of a running daemon and print the messages
     Call {
         method: String,
@@ -212,6 +223,9 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
     }
     if let Command::Map { action } = &cli.command {
         return map(action);
+    }
+    if let Command::Fire { id, due, endpoint } = &cli.command {
+        return fire(id, *due, endpoint);
     }
     let config = build_config(&cli)?;
     match &cli.command {
@@ -406,6 +420,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Call { .. }
+        | Command::Fire { .. }
         | Command::Map { .. }
         | Command::Push { .. }
         | Command::Theme { .. }
@@ -476,6 +491,46 @@ fn call(method: &str, params: Option<&str>, endpoint: &str) -> Result<ExitCode, 
     };
     let response = client::call(&endpoint, method, params, &mut |note| println!("{note}"))
         .map_err(|e| format!("cannot reach the daemon at {}: {e}", endpoint.address()))?;
+    println!("{response}");
+    Ok(if response.get("error").is_some() {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+/// `aivoryd fire`: call `schedules/fire`. When no daemon answers, start `aivoryd serve` in
+/// the background and wait up to 60 seconds for it.
+fn fire(id: &str, due: Option<i64>, endpoint: &str) -> Result<ExitCode, String> {
+    let ep = Endpoint::new(endpoint).map_err(|e| e.to_string())?;
+    let params = json!({ "id": id, "due": due });
+    let up = |ep: &Endpoint| client::call(ep, "daemon/info", json!({}), &mut |_| {}).is_ok();
+    if !up(&ep) {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new(exe);
+        cmd.args(["serve", "--endpoint", endpoint])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt as _;
+            // No console window, and the daemon outlives this process.
+            const DETACHED: u32 = 0x0000_0008 | 0x0800_0000;
+            cmd.creation_flags(DETACHED);
+        }
+        cmd.spawn()
+            .map_err(|e| format!("cannot start the daemon: {e}"))?;
+        let begin = std::time::Instant::now();
+        while !up(&ep) {
+            if begin.elapsed() > std::time::Duration::from_secs(60) {
+                return Err("the daemon did not start within 60 seconds".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+    let response = client::call(&ep, "schedules/fire", params, &mut |_| {})
+        .map_err(|e| format!("cannot reach the daemon at {}: {e}", ep.address()))?;
     println!("{response}");
     Ok(if response.get("error").is_some() {
         ExitCode::from(1)

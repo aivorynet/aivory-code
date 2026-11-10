@@ -169,11 +169,22 @@ impl Tools {
         }
     }
 
-    /// The `@path` references of the chips.
+    /// The `@path` references of the chips that are no images. Images go as attachments
+    /// ([`Tools::images`]), so that the agent sees them.
     pub fn references(&self, cwd: Option<&Path>) -> Vec<String> {
         self.attachments
             .iter()
+            .filter(|a| !is_image(&a.path))
             .map(|a| reference(&a.path, cwd))
+            .collect()
+    }
+
+    /// The absolute paths of the image chips, for `attachments` of a send.
+    pub fn images(&self) -> Vec<String> {
+        self.attachments
+            .iter()
+            .filter(|a| is_image(&a.path))
+            .map(|a| a.path.to_string_lossy().into_owned())
             .collect()
     }
 
@@ -196,6 +207,16 @@ impl Tools {
     }
 }
 
+/// An image that the agents take as data (png, jpeg, gif, webp).
+pub fn is_image(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+        matches!(
+            e.to_ascii_lowercase().as_str(),
+            "png" | "jpg" | "jpeg" | "gif" | "webp"
+        )
+    })
+}
+
 /// `@path` for the prompt: relative to `cwd` when the file is inside it, else absolute. A path
 /// with a space gets quotes.
 pub fn reference(path: &Path, cwd: Option<&Path>) -> String {
@@ -210,19 +231,40 @@ pub fn reference(path: &Path, cwd: Option<&Path>) -> String {
     }
 }
 
-/// Put `text` at the caret of the input. A space separates it from the text before it.
-fn insert(input: &Entity<TextareaState>, text: &str, window: &mut Window, cx: &mut gpui::App) {
-    let before = input.read(cx).value();
-    let gap = !before.is_empty() && !before.ends_with(char::is_whitespace);
-    let text = if gap {
+/// A composer that dictation can write into: the multi-line textarea of most looks, or the
+/// one-line input of the Operator look.
+pub trait Target: Clone + 'static {
+    /// Put `text` at the caret. A space separates it from the text before it.
+    fn put(&self, text: &str, window: &mut Window, cx: &mut gpui::App);
+}
+
+/// The spaced text that dictation inserts after `before`.
+fn spaced(before: &str, text: &str) -> String {
+    if !before.is_empty() && !before.ends_with(char::is_whitespace) {
         format!(" {text} ")
     } else {
         format!("{text} ")
-    };
-    input.update(cx, |s, cx| {
-        s.insert(text, window, cx);
-        s.focus(window, cx);
-    });
+    }
+}
+
+impl Target for Entity<TextareaState> {
+    fn put(&self, text: &str, window: &mut Window, cx: &mut gpui::App) {
+        let text = spaced(&self.read(cx).value(), text);
+        self.update(cx, |s, cx| {
+            s.insert(text, window, cx);
+            s.focus(window, cx);
+        });
+    }
+}
+
+impl Target for Entity<gpui_base::input::InputState> {
+    fn put(&self, text: &str, window: &mut Window, cx: &mut gpui::App) {
+        let text = spaced(&self.read(cx).value(), text);
+        self.update(cx, |s, cx| {
+            s.insert(text, window, cx);
+            s.focus(window, cx);
+        });
+    }
 }
 
 /// Show a line on the tools of a screen; it hides itself.
@@ -287,6 +329,93 @@ pub fn attach<T: 'static>(
 /// The folder of the captures: `<cache>/captures`.
 pub fn captures_dir() -> PathBuf {
     cache_base().join("captures")
+}
+
+/// The folder of pasted images: `<cache>/paste`.
+pub fn paste_dir() -> PathBuf {
+    cache_base().join("paste")
+}
+
+/// Save the image of the clipboard as a file in [`paste_dir`]. `None` when the clipboard holds
+/// no image the agents take (png, jpeg, gif, webp) or the file cannot be written. The same
+/// image twice is one file (the name is a hash of the bytes).
+pub fn paste_image(cx: &gpui::App) -> Option<PathBuf> {
+    use std::hash::{Hash, Hasher};
+    let item = cx.read_from_clipboard()?;
+    let image = item.entries().iter().find_map(|e| match e {
+        gpui::ClipboardEntry::Image(i) => Some(i.clone()),
+        _ => None,
+    })?;
+    let ext = match image.format {
+        gpui::ImageFormat::Png => "png",
+        gpui::ImageFormat::Jpeg => "jpg",
+        gpui::ImageFormat::Webp => "webp",
+        gpui::ImageFormat::Gif => "gif",
+        _ => return None,
+    };
+    if image.bytes.is_empty() {
+        return None;
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    image.bytes.hash(&mut h);
+    let dir = paste_dir();
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join(format!("paste-{:016x}.{ext}", h.finish()));
+    if !path.is_file() {
+        std::fs::write(&path, &image.bytes).ok()?;
+    }
+    Some(path)
+}
+
+/// The files of the clipboard (files copied in the file manager).
+pub fn paste_files(cx: &gpui::App) -> Vec<PathBuf> {
+    cx.read_from_clipboard()
+        .map(|item| {
+            item.entries()
+                .iter()
+                .filter_map(|e| match e {
+                    gpui::ClipboardEntry::ExternalPaths(p) => Some(p.paths().to_vec()),
+                    _ => None,
+                })
+                .flatten()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Make `el` (the frame of a composer) take images and files: Ctrl+V with an image on the
+/// clipboard adds it as a chip (a text paste goes on to the text field), and files dropped
+/// on the frame become chips.
+pub fn media_target<V: 'static>(
+    el: Div,
+    access: impl Fn(&mut V) -> Option<&mut Tools> + Clone + 'static,
+    cx: &mut Context<V>,
+) -> Div {
+    let drop_access = access.clone();
+    el.capture_key_down(cx.listener(move |this, e: &gpui::KeyDownEvent, _, cx| {
+        let m = &e.keystroke.modifiers;
+        let paste = e.keystroke.key == "v" && (m.control || m.platform) && !m.alt && !m.shift;
+        if !paste {
+            return;
+        }
+        let mut files = paste_files(cx);
+        files.extend(paste_image(cx));
+        if !files.is_empty()
+            && let Some(tools) = access(this)
+        {
+            tools.add_files(files, false);
+            cx.stop_propagation();
+            cx.notify();
+        }
+    }))
+    .on_drop(
+        cx.listener(move |this, paths: &gpui::ExternalPaths, _, cx| {
+            if let Some(tools) = drop_access(this) {
+                tools.add_files(paths.paths().to_vec(), false);
+                cx.notify();
+            }
+        }),
+    )
 }
 
 /// The cache folder of the app: `$AIVORY_CACHE_DIR`, else the per-user cache folder.
@@ -416,10 +545,10 @@ pub fn explain_speech_error(error: &str) -> SpeechProblem {
 /// input. The recognizer runs on its own thread. Call [`Tools::start_listening`] first. When
 /// Windows has "Online speech recognition" off, the offline model takes over, or the line offers
 /// its download.
-pub fn dictate<T: 'static>(
+pub fn dictate<T: 'static, I: Target>(
     access: impl Fn(&mut T) -> Option<&mut Tools> + Clone + 'static,
     stop: Arc<AtomicBool>,
-    input: Entity<TextareaState>,
+    input: I,
     window: &mut Window,
     cx: &mut Context<T>,
 ) {
@@ -435,10 +564,10 @@ pub fn dictate<T: 'static>(
 }
 
 /// Run one dictation on its own thread and put the result into the composer.
-fn run_dictation<T: 'static>(
+fn run_dictation<T: 'static, I: Target>(
     access: impl Fn(&mut T) -> Option<&mut Tools> + Clone + 'static,
     stop: Arc<AtomicBool>,
-    input: Entity<TextareaState>,
+    input: I,
     window: &mut Window,
     cx: &mut Context<T>,
     engine: impl FnOnce(&AtomicBool) -> Result<String> + Send + 'static,
@@ -461,7 +590,7 @@ fn run_dictation<T: 'static>(
                     note(this, access.clone(), "No speech heard.".into(), false, None, cx)
                 }
                 Ok(text) => {
-                    insert(&input, text.trim(), window, cx);
+                    input.put(text.trim(), window, cx);
                     cx.notify();
                 }
                 Err(e) => {
@@ -493,10 +622,10 @@ fn run_dictation<T: 'static>(
 }
 
 /// Dictate with the offline model. The model must be installed.
-fn start_offline<T: 'static>(
+fn start_offline<T: 'static, I: Target>(
     this: &mut T,
     access: impl Fn(&mut T) -> Option<&mut Tools> + Clone + 'static,
-    input: Entity<TextareaState>,
+    input: I,
     window: &mut Window,
     cx: &mut Context<T>,
 ) {
@@ -551,10 +680,10 @@ fn offer_offline<T: 'static>(
 }
 
 /// Download the model after the user agreed; then dictate with it.
-fn start_download<T: 'static>(
+fn start_download<T: 'static, I: Target>(
     this: &mut T,
     access: impl Fn(&mut T) -> Option<&mut Tools> + Clone + 'static,
-    input: Entity<TextareaState>,
+    input: I,
     window: &mut Window,
     cx: &mut Context<T>,
 ) {
@@ -635,11 +764,11 @@ fn start_download<T: 'static>(
 }
 
 /// A button of the tool line was pressed. `input` is the composer that receives the words.
-pub fn handle_action<T: 'static>(
+pub fn handle_action<T: 'static, I: Target>(
     this: &mut T,
     action: ToolAction,
     access: impl Fn(&mut T) -> Option<&mut Tools> + Clone + 'static,
-    input: Entity<TextareaState>,
+    input: I,
     window: &mut Window,
     cx: &mut Context<T>,
 ) {
@@ -1044,14 +1173,20 @@ mod tests {
         let cwd = Path::new("C:/work/shop");
         assert_eq!(t.message("fix it", Some(cwd)), "fix it");
         t.add_files(
-            vec!["C:/work/shop/src/pay.rs".into(), "C:/o/a b.png".into()],
+            vec![
+                "C:/work/shop/src/pay.rs".into(),
+                "C:/o/a b.txt".into(),
+                "C:/o/shot.PNG".into(),
+            ],
             false,
         );
         assert_eq!(
             t.message("fix it ", Some(cwd)),
-            "fix it @src/pay.rs @\"C:/o/a b.png\""
+            "fix it @src/pay.rs @\"C:/o/a b.txt\""
         );
-        assert_eq!(t.message("", Some(cwd)), "@src/pay.rs @\"C:/o/a b.png\"");
+        assert_eq!(t.message("", Some(cwd)), "@src/pay.rs @\"C:/o/a b.txt\"");
+        // An image goes as an attachment, not as a reference.
+        assert_eq!(t.images(), ["C:/o/shot.PNG"]);
         t.sent();
         assert!(!t.active());
     }

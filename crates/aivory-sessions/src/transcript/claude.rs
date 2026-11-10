@@ -26,7 +26,7 @@ use serde_json::value::RawValue;
 use super::common::{
     Facts, ReadError, added_lines, between, error_ask, for_each_line, main_arg, permission_ask,
     plan_ask, push_diff, push_output, push_prompt, push_text, question_ask, replace_lines,
-    str_field, turn_line, with_tail,
+    stored_image, str_field, turn_line, with_tail,
 };
 use super::derive_state;
 use crate::model::Provider;
@@ -124,6 +124,19 @@ struct Block {
     tool_use_id: Option<String>,
     content: Option<Value>,
     is_error: Option<bool>,
+    /// An image block: `{"type": "base64", "media_type", "data"}`.
+    source: Option<Value>,
+}
+
+/// The preview line of an image block (a pasted image, or an image of a tool result).
+fn image_line(source: &Value) -> Option<Line> {
+    if source.get("type").and_then(Value::as_str) != Some("base64") {
+        return None;
+    }
+    stored_image(
+        source.get("media_type")?.as_str()?,
+        source.get("data")?.as_str()?,
+    )
 }
 
 impl Entry {
@@ -323,6 +336,14 @@ impl Normalizer {
         }
         if e.human() {
             self.prompt(&msg.text(), e.time());
+            // The images that the user pasted, after the prompt text.
+            for b in msg.blocks() {
+                if b.kind.as_deref() == Some("image")
+                    && let Some(line) = b.source.as_ref().and_then(image_line)
+                {
+                    self.out.push(line);
+                }
+            }
         }
     }
 
@@ -345,6 +366,16 @@ impl Normalizer {
             return;
         }
         push_output(&mut self.out, &result_text(b.content.as_ref()), is_error);
+        // A tool can return images (a screenshot, a rendered chart).
+        if let Some(Value::Array(parts)) = b.content.as_ref() {
+            for p in parts {
+                if p.get("type").and_then(Value::as_str) == Some("image")
+                    && let Some(line) = p.get("source").and_then(image_line)
+                {
+                    self.out.push(line);
+                }
+            }
+        }
     }
 
     fn assistant(&mut self, e: &Entry) {

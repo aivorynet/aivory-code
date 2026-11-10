@@ -8,8 +8,6 @@
 //! The right column holds the tracking panel (the order request, the buttons), the mission
 //! route, the supply bars and the comms log. The dossier of one session is in `session.rs`.
 
-mod session;
-
 use std::f32::consts::TAU;
 use std::time::Instant;
 
@@ -417,11 +415,21 @@ fn radar(scope: Scope) -> PaintFn {
 
         // ---- the blips ---------------------------------------------------------------------
         let mut placed_labels: Vec<[f32; 4]> = tag_rects.clone();
+        // Keep the labels off the ring labels and off the two axes.
+        for (f, name) in [(0.25, "1M"), (0.5, "5M"), (0.75, "15M"), (1., "60M")] {
+            let wr = width_of(p, name, 12., false);
+            placed_labels.push([center[0] + 4., center[1] - rad * f + 1., wr + 8., 18.]);
+        }
+        placed_labels.push([center[0] - 3., center[1] - rad, 6., rad * 2.]);
+        placed_labels.push([center[0] - rad, center[1] - 3., rad * 2., 6.]);
+        let blip_pts: Vec<[f32; 2]> = (0..list.len())
+            .map(|i| at(center, spots[i].deg, rad * spots[i].range))
+            .collect();
         let mut order: Vec<usize> = (0..list.len()).collect();
         order.sort_by_key(|&i| (!list[i].waits(), list[i].id.clone()));
         for i in order {
             let (s, spot) = (&list[i], spots[i]);
-            let q = at(center, spot.deg, rad * spot.range);
+            let q = blip_pts[i];
             // The blip is brightest when the sweep passes and fades until the next turn.
             let behind = ((head - spot.deg).rem_euclid(360.)) / 360.;
             let glow = 1. - behind;
@@ -475,11 +483,33 @@ fn radar(scope: Scope) -> PaintFn {
                 // A name only when it fits: fewer labels rather than crowded ones.
                 // The whole name where it fits: right of the blip, else left, else a line above
                 // or below. A short cut only when no place is free.
-                let full = s.title.to_uppercase();
+                // Only a working or picked contact shows the whole name; idle ones a short one.
+                let full = if s.state == SessionState::Working || picked {
+                    s.title.to_uppercase()
+                } else {
+                    dots(&s.title.to_uppercase(), 16)
+                };
                 let wf = width_of(p, &full, 12., false);
                 let edge = ox + rcol - 8.;
                 let free_at = |r: [f32; 4], placed: &[[f32; 4]]| {
-                    r[0] >= ox + 150.
+                    let inside = [
+                        (r[0], r[1]),
+                        (r[0] + r[2], r[1]),
+                        (r[0], r[1] + r[3]),
+                        (r[0] + r[2], r[1] + r[3]),
+                    ]
+                    .iter()
+                    .all(|c| (c.0 - center[0]).hypot(c.1 - center[1]) <= rad - 6.);
+                    let off_blips = blip_pts.iter().enumerate().all(|(j, b)| {
+                        j == i
+                            || b[0] + 9. < r[0]
+                            || b[0] - 9. > r[0] + r[2]
+                            || b[1] + 9. < r[1]
+                            || b[1] - 9. > r[1] + r[3]
+                    });
+                    inside
+                        && off_blips
+                        && r[0] >= ox + 150.
                         && r[0] + r[2] <= edge
                         && placed.iter().all(|o| {
                             r[0] > o[0] + o[2] + 4.
@@ -516,13 +546,19 @@ fn radar(scope: Scope) -> PaintFn {
                     }
                 }
                 if let Some((name, rect)) = chosen {
+                    let wb = width_of(p, &name, 12., false);
+                    p.rect((rect[0] - 3., rect[1] + 1., wb + 6., 16.), 0x010C03, 0.9);
                     txt(
                         p,
                         &name,
                         12.,
                         false,
                         text,
-                        0.55 + 0.45 * glow,
+                        if picked || s.state == SessionState::Working {
+                            0.55 + 0.45 * glow
+                        } else {
+                            0.4 + 0.2 * glow
+                        },
                         (rect[0], rect[1] + 9.),
                         Align::Left,
                     );
@@ -812,7 +848,7 @@ fn comms_text(s: &Pane) -> (String, u32) {
 }
 
 impl WarRoomScreen {
-    /// The war room (and the dossier of a session) in the Tactical look.
+    /// The war room in the Tactical look.
     pub(super) fn tactical_render(
         &mut self,
         war: &WarRoom,
@@ -823,15 +859,8 @@ impl WarRoomScreen {
         let st = &mut self.tactical;
         let t = (now - *st.started.get_or_insert(now)).as_secs_f32();
         st.observe(war, now);
-        if st.open.as_ref().is_some_and(|id| war.session(id).is_none()) {
-            st.open = None;
-        }
-        let open = st.open.clone();
         crate::ui::animate(window, cx);
-        match open {
-            Some(id) => self.tactical_dossier(war, &id, window, cx),
-            None => self.tactical_overview(war, t, cx),
-        }
+        self.tactical_overview(war, t, cx)
     }
 
     fn tactical_overview(&mut self, war: &WarRoom, t: f32, cx: &mut Context<Self>) -> AnyElement {
@@ -1061,13 +1090,12 @@ impl WarRoomScreen {
             cx.listener(move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx)),
         ));
         nav = nav.child(
-            tac::navb("tac-open", "OPEN DOSSIER >", false)
+            tac::navb("tac-open", "OPEN SESSION >", false)
                 .border_1()
                 .border_color(c(tac::INK, 1.))
                 .text_color(c(tac::INK, 1.))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.tactical.open = Some(open_id.clone());
-                    cx.notify();
+                .on_click(cx.listener(move |_this, _, _, cx| {
+                    cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
                 })),
         );
         nav = nav.child(tac::navb("tac-next", "NEXT >", false).on_click(cx.listener(

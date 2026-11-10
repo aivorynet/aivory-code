@@ -24,8 +24,8 @@ use aivory_protocol::{Ask, Line, SessionState};
 use serde_json::{Value, json};
 
 use super::{
-    LiveError, RunEvent, STDERR_KEEP_BYTES, StartOptions, Trace, is_shell_script, lock, no_window,
-    open_trace, read_tail, send_event, write_loop,
+    Input, LiveError, RunEvent, STDERR_KEEP_BYTES, StartOptions, Trace, is_shell_script, lock,
+    no_window, open_trace, read_tail, send_event, write_loop,
 };
 use crate::command::resolve_program;
 use crate::error::AgentError;
@@ -61,7 +61,7 @@ pub(super) trait Dialect: Send {
     /// A request from the CLI. Answer it with `io.respond` now or later (an ask).
     fn request(&mut self, id: &Value, method: &str, params: &Value, io: &Io<'_>);
     /// Start one user turn. End it with `io.turn_ended`.
-    fn start_turn(&mut self, text: &str, io: &Io<'_>);
+    fn start_turn(&mut self, input: &Input, io: &Io<'_>);
     /// Stop the turn that runs.
     fn interrupt(&mut self, io: &Io<'_>);
     /// Turn the answer of the user into the response (or the next ask).
@@ -88,7 +88,7 @@ pub(super) struct Core {
     turn_active: AtomicBool,
     /// The handshake is done: turns may start.
     ready: AtomicBool,
-    queue: Mutex<VecDeque<String>>,
+    queue: Mutex<VecDeque<Input>>,
     asks: Mutex<HashMap<String, AskSlot>>,
     pending: Mutex<HashMap<u64, Tag>>,
     ended: Mutex<Option<(f64, u8)>>,
@@ -263,9 +263,9 @@ impl Core {
             }
             if self.ready.load(Ordering::SeqCst) && !self.turn_active.load(Ordering::SeqCst) {
                 let next = lock(&self.queue).pop_front();
-                if let Some(text) = next {
+                if let Some(input) = next {
                     self.turn_active.store(true, Ordering::SeqCst);
-                    d.start_turn(&text, &Io(self));
+                    d.start_turn(&input, &Io(self));
                     continue;
                 }
             }
@@ -420,7 +420,7 @@ impl RpcRun {
             .spawn(move || watch_open(&watch, limit))?;
 
         let run = Self { core };
-        if run.send(&opts.prompt).is_err() {
+        if run.send_input(&Input::first(&opts)).is_err() {
             return Err(std::io::Error::other("the agent process closed its input").into());
         }
         Ok((run, rx))
@@ -449,12 +449,20 @@ impl RpcRun {
 
     /// Send the next user turn. The text also appears as a user line in the transcript.
     pub fn send(&self, text: &str) -> Result<(), LiveError> {
+        self.send_input(&Input::text(text))
+    }
+
+    /// Send the next user turn with its images, and with a new mode, model, or effort for
+    /// this turn and the turns after it.
+    pub fn send_input(&self, input: &Input) -> Result<(), LiveError> {
         if lock(&self.core.exited).is_some() || lock(&self.core.input).is_none() {
             return Err(LiveError::NotRunning);
         }
         self.core.open_turns.fetch_add(1, Ordering::SeqCst);
-        lock(&self.core.queue).push_back(text.to_string());
-        send_event(&self.core.events, RunEvent::Line(Line::user(text)));
+        lock(&self.core.queue).push_back(input.clone());
+        for line in input.lines(&[]) {
+            send_event(&self.core.events, RunEvent::Line(line));
+        }
         let mut d = lock(&self.core.dialect);
         self.core.settle(&mut **d);
         Ok(())

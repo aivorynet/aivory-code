@@ -98,14 +98,20 @@ jobs:
       - name: Render the winget manifests and the Homebrew formula
         run: |
           version="${GITHUB_REF_NAME#v}"
-          bash scripts/render-packages.sh "$version" dist packages
+          bash packaging/render-packages.sh "$version" dist packages
           (cd packages && zip -r ../dist/aivory-code-packages.zip winget homebrew)
           cp packages/SHA256SUMS.txt dist/
+          cp packaging/install.sh dist/
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
           body: |
-            Windows is the supported platform. The macOS and Linux builds are a preview.
-            The builds have no code signature yet. Install with `winget install Aivory.AivoryCode`
-            or `brew install aivorynet/tap/aivory-code` to avoid the SmartScreen and Gatekeeper prompts.
+            AIVory Code runs on Windows, macOS and Linux. The builds have no code signature yet,
+            so install through a package manager or the script to avoid the SmartScreen and
+            Gatekeeper prompts:
+
+            - Windows: `winget install Aivory.AivoryCode`
+            - macOS and Linux (Homebrew): `brew install aivorynet/tap/aivory-code`
+            - macOS and Linux (script): `curl -fsSL https://github.com/aivorynet/aivory-code/releases/latest/download/install.sh | sh`
+            - Linux packages: the `.deb` and the `.AppImage` below.

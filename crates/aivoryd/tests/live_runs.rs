@@ -22,7 +22,10 @@ struct Scratch(PathBuf);
 
 impl Scratch {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("aivoryd-live-runs-{}", std::process::id()));
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir =
+            std::env::temp_dir().join(format!("aivoryd-live-runs-{}-{n}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         Self(dir)
@@ -126,7 +129,10 @@ fn setup(scratch: &Scratch, fake: &Path) -> (PathBuf, PathBuf, PathBuf) {
 }
 
 fn start_daemon(scratch: &Scratch, repo: &Path, home: &Path, bin: &Path) -> Daemon {
-    let name = format!("live-runs-{}", std::process::id());
+    // Tests of this file run in parallel: each daemon gets its own endpoint.
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let name = format!("live-runs-{}-{n}", std::process::id());
     let path = std::env::join_paths(std::iter::once(bin.to_path_buf()).chain(
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
     ))
@@ -138,6 +144,8 @@ fn start_daemon(scratch: &Scratch, repo: &Path, home: &Path, bin: &Path) -> Daem
         .env("USERPROFILE", home)
         .env("HOME", home)
         .env("AIVORY_CACHE_DIR", scratch.0.join("cache"))
+        // Schedules write their OS entries as files under the cache folder.
+        .env("AIVORY_SCHEDULER", "fake")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -307,4 +315,159 @@ fn codex_and_gemini_runs_start_ask_answer_fork_and_stop() {
             "composer": {"mode": "edit", "provider": "opencode", "model": "", "effort": "high"}}),
     );
     assert_eq!(r["error"]["code"], code::NOT_AVAILABLE, "{r}");
+}
+
+/// `tasks/start` starts one session with the picked composer, notes the native id, refuses a
+/// second start, and a finished turn moves the playbook one step.
+#[test]
+fn a_task_starts_one_session_and_follows_its_native_id() {
+    let fake = build_fake_agent();
+    let scratch = Scratch::new();
+    let (repo, home, bin) = setup(&scratch, &fake);
+    let d = start_daemon(&scratch, &repo, &home, &bin);
+    let codebase = wait_for(&d, "a codebase", |w| {
+        w.codebases.first().map(|c| c.id.clone())
+    });
+
+    let task = ok(
+        &d,
+        "tasks/create",
+        json!({
+            "title": "T", "codebase": codebase, "part": "root", "playbook": "feature",
+            "prompt": "say hello", "when": "queue"
+        }),
+    );
+    let id = task["id"].as_str().unwrap().to_string();
+    assert_eq!(task["column"], "planned");
+    let started = ok(
+        &d,
+        "tasks/start",
+        json!({
+            "id": id,
+            "composer": {"mode": "plan", "provider": "codex", "model": "", "effort": "low"},
+        }),
+    );
+    assert_eq!(started["column"], "working");
+    assert_eq!(started["agents"], json!(["codex"]));
+    let run = started["sessions"][0]["session"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(run.starts_with("run-"), "{run}");
+
+    // A second start (Start now twice, or a drag to Working) does not spawn a second run.
+    let again = call(&d, "tasks/start", json!({ "id": id }));
+    assert_eq!(again["error"]["code"], code::INVALID_STATE, "{again}");
+    let moved = call(&d, "tasks/update", json!({ "id": id, "column": "working" }));
+    assert!(
+        moved.get("error").is_some() || moved["result"]["sessions"].as_array().unwrap().len() == 1,
+        "{moved}"
+    );
+    let panes = snapshot(&d).unwrap();
+    let of_task = panes
+        .sessions
+        .iter()
+        .filter(|p| p.task.as_deref() == Some(id.as_str()))
+        .count();
+    assert_eq!(of_task, 1);
+
+    // The task notes the native id that the CLI reports.
+    let begin = Instant::now();
+    loop {
+        let list = ok(&d, "tasks/list", json!({}));
+        let t = list["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == id.as_str())
+            .unwrap()
+            .clone();
+        if t["sessions"][0]["native"] == "fake-thread" {
+            break;
+        }
+        assert!(begin.elapsed() < WAIT, "timeout: no native id in {t}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    // The finished first turn moves the playbook from Plan to Implement.
+    let begin = Instant::now();
+    loop {
+        let list = ok(&d, "tasks/list", json!({}));
+        let t = list["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == id.as_str())
+            .unwrap()
+            .clone();
+        if t["step"] == 1 {
+            assert_eq!(t["steps"][0]["state"], "done", "{t}");
+            break;
+        }
+        assert!(begin.elapsed() < WAIT, "timeout: no step in {t}");
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// A schedule gets a next fire time and an OS entry; Run now starts its task; a fire for a
+/// time that fired already does nothing; delete removes the entry.
+#[test]
+fn a_schedule_fires_a_task_once_and_keeps_an_os_entry() {
+    let fake = build_fake_agent();
+    let scratch = Scratch::new();
+    let (repo, home, bin) = setup(&scratch, &fake);
+    let d = start_daemon(&scratch, &repo, &home, &bin);
+    let codebase = wait_for(&d, "a codebase", |w| {
+        w.codebases.first().map(|c| c.id.clone())
+    });
+    let bad = call(
+        &d,
+        "schedules/create",
+        json!({"name": "x", "cron": "61 * * * *",
+               "template": {"title": "t", "codebase": codebase, "prompt": "p"}}),
+    );
+    assert_eq!(bad["error"]["code"], code::INVALID_PARAMS, "{bad}");
+    let s = ok(
+        &d,
+        "schedules/create",
+        json!({"name": "nightly", "cron": "0 3 * * *",
+               "template": {"title": "Nightly check", "codebase": codebase, "prompt": "say hello",
+                            "composer": {"mode": "plan", "provider": "codex", "model": "", "effort": "low"}}}),
+    );
+    let id = s["id"].as_str().unwrap().to_string();
+    assert!(s["nextFire"].as_i64().is_some(), "{s}");
+    assert_eq!(s["osEntry"]["scheduler"], "fake");
+    let entry = scratch
+        .0
+        .join("cache")
+        .join("os-schedule")
+        .join(format!("{id}.txt"));
+    assert!(entry.is_file());
+
+    let run = ok(&d, "schedules/run", json!({ "id": id }));
+    let task = run["lastTask"].as_str().expect("a task").to_string();
+    let fired = run["lastFired"].as_i64().unwrap();
+    let tasks = ok(&d, "tasks/list", json!({}));
+    assert_eq!(
+        tasks["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|t| t["id"] == task.as_str())
+            .count(),
+        1
+    );
+    // The OS entry for a time that fired already: no second task.
+    let again = ok(&d, "schedules/fire", json!({ "id": id, "due": fired }));
+    assert_eq!(again["lastTask"], task.as_str());
+    assert_eq!(
+        ok(&d, "schedules/list", json!({}))["schedules"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    ok(&d, "schedules/delete", json!({ "id": id }));
+    assert!(!entry.exists());
 }

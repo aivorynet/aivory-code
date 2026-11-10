@@ -111,9 +111,35 @@ pub fn cached(text: &str) -> Rc<Md> {
 pub fn parse(text: &str) -> Md {
     let options =
         Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
-    let events: Vec<Event> = Parser::new_ext(text, options).collect();
+    let text = end_tables(text);
+    let events: Vec<Event> = Parser::new_ext(&text, options).collect();
     let mut p = Walker { events, pos: 0 };
     Md { blocks: p.blocks() }
+}
+
+/// GFM keeps a table open until a blank line, so a sentence right under a table becomes a
+/// one-cell row (and widens the first column). Agents mean a new paragraph there: a line
+/// without a `|` after a table row gets a blank line before it. Code fences stay as they are.
+fn end_tables(text: &str) -> std::borrow::Cow<'_, str> {
+    if !text.contains('|') {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let mut out = String::with_capacity(text.len() + 8);
+    let (mut fence, mut in_table) = (false, false);
+    for line in text.split_inclusive('\n') {
+        let t = line.trim();
+        if t.starts_with("```") || t.starts_with("~~~") {
+            fence = !fence;
+            in_table = false;
+        } else if !fence {
+            if in_table && !t.is_empty() && !t.contains('|') {
+                out.push('\n');
+            }
+            in_table = t.starts_with('|') || (in_table && t.contains('|'));
+        }
+        out.push_str(line);
+    }
+    std::borrow::Cow::Owned(out)
 }
 
 struct Walker<'a> {
@@ -447,6 +473,21 @@ pub fn language(info: &str) -> Option<Language> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_sentence_under_a_table_is_a_paragraph() {
+        let md = super::parse("| a | b |\n|---|---|\n| 1 | 2 |\nSee the notes.");
+        let rows = md.blocks.iter().find_map(|b| match b {
+            super::MdBlock::Table { rows, .. } => Some(rows.len()),
+            _ => None,
+        });
+        assert_eq!(rows, Some(1));
+        assert!(
+            md.blocks
+                .iter()
+                .any(|b| matches!(b, super::MdBlock::Para(t) if t.text == "See the notes."))
+        );
+    }
+
     use super::*;
 
     fn para(md: &Md, i: usize) -> &Inline {

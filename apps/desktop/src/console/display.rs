@@ -214,16 +214,24 @@ fn block(b: &MdBlock, out: &mut Vec<DLine>) {
             }
         }
         MdBlock::Table { head, rows, widths } => {
+            // A plain text row: one long cell must not push all other columns far apart, so a
+            // column is at most TABLE_COL characters and a longer cell ends with an ellipsis.
             let row = |cells: Vec<&str>| {
                 cells
                     .iter()
                     .enumerate()
                     .map(|(c, t)| {
-                        let w = widths.get(c).copied().unwrap_or(0);
-                        format!("{t:<w$}")
+                        let w = widths.get(c).copied().unwrap_or(0).min(TABLE_COL);
+                        let cell = if t.chars().count() > w {
+                            let cut: String = t.chars().take(w.saturating_sub(1)).collect();
+                            format!("{cut}…")
+                        } else {
+                            (*t).to_string()
+                        };
+                        format!("{cell:<w$}")
                     })
                     .collect::<Vec<_>>()
-                    .join("   ")
+                    .join("  ")
                     .trim_end()
                     .to_string()
             };
@@ -246,6 +254,8 @@ fn block(b: &MdBlock, out: &mut Vec<DLine>) {
     }
 }
 
+/// The widest column of a plain text table row, in characters.
+const TABLE_COL: usize = 28;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,6 +298,22 @@ mod tests {
         );
         // One label per message: the prompt and the first agent line.
         assert_eq!(v.iter().filter(|d| d.first).count(), 2);
+    }
+
+    #[test]
+    fn a_long_table_cell_does_not_spread_the_columns() {
+        let long = "x".repeat(60);
+        let md = format!("| a | b |\n|---|---|\n| {long} | y |\n| z | w |");
+        let v = lines(&[agent(&md)]);
+        let rows: Vec<&DLine> = v.iter().filter(|d| d.kind == DKind::Table).collect();
+        assert_eq!(rows.len(), 3);
+        for r in &rows {
+            assert!(r.text.chars().count() <= TABLE_COL + 2 + 1, "{}", r.text);
+        }
+        assert!(rows[1].text.contains('…'));
+        // The second column starts at the same place in every row.
+        let at = |r: &DLine, c: char| r.text.chars().position(|x| x == c);
+        assert_eq!(at(rows[1], 'y'), at(rows[2], 'w'));
     }
 
     #[test]

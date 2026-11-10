@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 aivory-protocol.workspace = true
 aivory-sessions.workspace = true
+base64 = "0.22"
 getrandom = "0.3"
 serde.workspace = true
 serde_json.workspace = true

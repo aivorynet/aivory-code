@@ -71,6 +71,26 @@ impl WarRoomScreen {
                     .submit_on_enter(true)
                     .auto_grow(3, 8)
             });
+            let weak = cx.weak_entity();
+            crate::complete::attach(
+                &input,
+                self.model.clone(),
+                |_| None,
+                move |cx| {
+                    weak.upgrade().map_or((None, None), |v| {
+                        let v = v.read(cx);
+                        let path = v.war.as_ref().and_then(|w| {
+                            let id = v.new_session.codebase.as_ref()?;
+                            w.codebases
+                                .iter()
+                                .find(|c| &c.id == id)
+                                .map(|c| c.path.clone())
+                        });
+                        (v.new_session.provider.clone(), path)
+                    })
+                },
+                cx,
+            );
             let events =
                 cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
                     if let InputEvent::PressEnter { shift: false, .. } = event {
@@ -250,6 +270,7 @@ impl WarRoomScreen {
                 effort: Effort::High,
             },
             task: None,
+            attachments: Vec::new(),
         };
         let call = self.model.read(cx).call::<method::SessionNew>(params, cx);
         cx.spawn_in(window, async move |this, cx| {

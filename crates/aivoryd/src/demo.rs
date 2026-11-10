@@ -13,7 +13,7 @@ use aivory_protocol::rpc::{
     self, Ack, AutopilotPatch, CodebaseRef, Created, Delta, DeltaNote, DeviceRef, HandoffParams,
     HistoryParams, InboxAnswerParams, InboxListParams, InboxSnoozeParams, Method, NewSessionParams,
     RpcError, SendParams, SessionRef, SettingsSetParams, StartWhen, SubscribeParams, Subscription,
-    TaskCreateParams, TaskListParams, TaskUpdateParams, code, method,
+    TaskCreateParams, TaskListParams, TaskStartParams, TaskUpdateParams, code, method,
 };
 use aivory_protocol::{
     AcpAdded, AddAcpParams, AddPartParams, Autopilot, Codebase, ComposerPrefs, DaemonKind,
@@ -93,7 +93,10 @@ impl DemoBackend {
     /// The methods of the war-room surface. `daemon/*` stays with the daemon.
     pub fn handles(method: &str) -> bool {
         rpc::METHODS.contains(&method)
-            && !matches!(method, "daemon/info" | "daemon/shutdown" | "daemon/restart")
+            && !matches!(
+                method,
+                "daemon/info" | "daemon/shutdown" | "daemon/restart" | "media/get"
+            )
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
@@ -190,6 +193,14 @@ impl DemoBackend {
             "tasks/list" => call::<method::TasksList>(params, |p| Ok(st.tasks(&p))),
             "tasks/create" => call::<method::TasksCreate>(params, |p| st.create_task(p)),
             "tasks/update" => call::<method::TasksUpdate>(params, |p| st.update_task(p)),
+            "tasks/start" => call::<method::TasksStart>(params, |p| st.start_task(p)),
+            // The demo keeps no schedules: no entry in the scheduler of the system.
+            "schedules/list" => call::<method::SchedulesList>(params, |_| Ok(Default::default())),
+            "schedules/create" | "schedules/update" | "schedules/delete" | "schedules/run"
+            | "schedules/fire" => Err(RpcError::new(
+                code::NOT_AVAILABLE,
+                "the demo keeps no schedules; start the daemon with `aivoryd serve`",
+            )),
             "repos/list" => call::<method::ReposList>(params, |_| {
                 Ok(RepoList {
                     codebases: st.demo.war_room.codebases.clone(),
@@ -611,6 +622,7 @@ impl State {
             title: pane.title.clone(),
             role: format!("{} · {}", if main { "main" } else { "sub" }, pane.model),
             state: pane.state,
+            native: None,
         });
         if !task.agents.contains(&pane.provider) {
             task.agents.push(pane.provider.clone());
@@ -720,6 +732,7 @@ impl State {
                 provider: Some(provider),
                 mode: None,
                 priority: None,
+                composer: None,
             })?;
             return Ok(rpc::Dispatched {
                 session: None,
@@ -734,7 +747,9 @@ impl State {
             .get(&provider)
             .cloned();
         let composer = ComposerPrefs {
-            mode: prefs.as_ref().map_or(Mode::Edit, |x| x.mode),
+            mode: p
+                .mode
+                .unwrap_or_else(|| prefs.as_ref().map_or(Mode::Edit, |x| x.mode)),
             model: p
                 .model
                 .clone()
@@ -749,6 +764,7 @@ impl State {
             prompt,
             composer,
             task: None,
+            attachments: Vec::new(),
         })?;
         Ok(rpc::Dispatched {
             session: Some(session),
@@ -778,6 +794,7 @@ impl State {
                 ..old.composer.clone()
             },
             task: old.task.clone(),
+            attachments: Vec::new(),
         })?;
         if old.state != SessionState::Parked {
             self.finish(
@@ -843,6 +860,7 @@ impl State {
                 }),
                 composer: old.composer.clone(),
                 task: old.task.clone(),
+                attachments: Vec::new(),
             },
             carried,
         )?;
@@ -978,14 +996,6 @@ impl State {
             return Err(RpcError::not_found("codebase", &p.codebase));
         }
         let id = format!("t{}", self.demo.tasks.len() + 1);
-        let provider = p.provider.clone().unwrap_or_else(|| "claude".to_string());
-        let prefs = self
-            .demo
-            .settings
-            .settings
-            .providers
-            .get(&provider)
-            .cloned();
         let column = match p.when {
             StartWhen::Queue => TaskColumn::Planned,
             StartWhen::Now | StartWhen::PlanOnly => TaskColumn::Working,
@@ -1010,19 +1020,10 @@ impl State {
             steps: demo::task_steps(p.playbook, column, 0, false),
         };
         if column == TaskColumn::Working {
-            let mode = match p.when {
-                StartWhen::PlanOnly => Mode::Plan,
-                _ => p
-                    .mode
-                    .or(prefs.as_ref().map(|x| x.mode))
-                    .unwrap_or(Mode::Edit),
-            };
-            let composer = ComposerPrefs {
-                mode,
-                provider: provider.clone(),
-                model: self.default_model(&provider),
-                effort: prefs.map_or(Effort::High, |x| x.effort),
-            };
+            let plan = (p.when == StartWhen::PlanOnly).then_some(Mode::Plan);
+            let composer =
+                self.task_composer(p.composer.clone(), p.provider.clone(), plan.or(p.mode));
+            let provider = composer.provider.clone();
             let session = self.create_session(NewSessionParams {
                 codebase: p.codebase,
                 part: Some(p.part),
@@ -1030,6 +1031,7 @@ impl State {
                 prompt: p.prompt,
                 composer: composer.clone(),
                 task: Some(id.clone()),
+                attachments: Vec::new(),
             })?;
             task.started = Some(self.now());
             task.agents = vec![provider];
@@ -1038,12 +1040,89 @@ impl State {
                 title: p.title,
                 role: format!("main · {}", composer.model),
                 state: SessionState::Working,
+                native: None,
             }];
         }
         self.demo.tasks.push(task.clone());
         let counts = self.counts();
         self.publish(vec![counts]);
         Ok(task)
+    }
+
+    /// The composer of a task session: `composer` wins, then `provider` and `mode` over the
+    /// provider defaults of Settings.
+    fn task_composer(
+        &self,
+        composer: Option<ComposerPrefs>,
+        provider: Option<String>,
+        mode: Option<Mode>,
+    ) -> ComposerPrefs {
+        if let Some(mut c) = composer {
+            if let Some(m) = mode.filter(|m| *m == Mode::Plan) {
+                c.mode = m;
+            }
+            if c.model.is_empty() {
+                c.model = self.default_model(&c.provider);
+            }
+            return c;
+        }
+        let provider = provider.unwrap_or_else(|| "claude".to_string());
+        let prefs = self
+            .demo
+            .settings
+            .settings
+            .providers
+            .get(&provider)
+            .cloned();
+        ComposerPrefs {
+            mode: mode
+                .or(prefs.as_ref().map(|x| x.mode))
+                .unwrap_or(Mode::Edit),
+            model: self.default_model(&provider),
+            provider,
+            effort: prefs.map_or(Effort::High, |x| x.effort),
+        }
+    }
+
+    /// Start the first session of a planned task.
+    fn start_task(&mut self, p: TaskStartParams) -> Result<Task, RpcError> {
+        let task = self
+            .demo
+            .tasks
+            .iter()
+            .find(|t| t.id == p.id)
+            .cloned()
+            .ok_or_else(|| RpcError::not_found("task", &p.id))?;
+        if task.column != TaskColumn::Planned {
+            return Err(invalid_state(format!(
+                "task '{}' runs already; only a planned task starts",
+                p.id
+            )));
+        }
+        let composer = self.task_composer(p.composer, None, None);
+        self.create_session(NewSessionParams {
+            codebase: task.codebase.clone(),
+            part: Some(task.part.clone()),
+            title: Some(task.title.clone()),
+            prompt: task.prompt.clone(),
+            composer,
+            task: Some(task.id.clone()),
+            attachments: Vec::new(),
+        })?;
+        let now = self.now();
+        let t = self
+            .demo
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == p.id)
+            .ok_or_else(|| RpcError::not_found("task", &p.id))?;
+        t.column = TaskColumn::Working;
+        t.started = Some(now);
+        t.steps = demo::task_steps(t.playbook, t.column, t.step, false);
+        let t = t.clone();
+        let counts = self.counts();
+        self.publish(vec![counts]);
+        Ok(t)
     }
 
     fn update_task(&mut self, p: TaskUpdateParams) -> Result<Task, RpcError> {
@@ -1410,6 +1489,7 @@ mod tests {
                 prompt: task.prompt.clone(),
                 composer,
                 task: Some(task.id.clone()),
+                attachments: Vec::new(),
             })
             .unwrap();
         let after = st.demo.tasks.iter().find(|t| t.id == task.id).unwrap();

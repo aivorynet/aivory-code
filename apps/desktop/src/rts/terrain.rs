@@ -9,7 +9,6 @@ use super::sprites;
 
 const PATH_LO: Rgba<u8> = Rgba([104, 84, 54, 255]);
 const PATH_HI: Rgba<u8> = Rgba([164, 140, 98, 255]);
-const SAND: Rgba<u8> = Rgba([150, 134, 98, 255]);
 const WATER: Rgba<u8> = Rgba([58, 98, 110, 255]);
 const FOAM: Rgba<u8> = Rgba([126, 164, 172, 255]);
 
@@ -40,6 +39,74 @@ fn disc(img: &mut RgbaImage, x: i32, y: i32, r: i32, color: Rgba<u8>) {
                     img.put_pixel(px as u32, py as u32, color);
                 }
             }
+        }
+    }
+}
+
+/// A cheap hash of two integers.
+fn hash(x: i32, y: i32) -> u32 {
+    let mut h = (x as u32).wrapping_mul(0x85EB_CA6B) ^ (y as u32).wrapping_mul(0xC2B2_AE35);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x2C1B_3C6D);
+    h ^ (h >> 13)
+}
+
+/// A river in pixel style: stepped edges, a muddy and stony bank that breaks into the grass,
+/// light water at the edges, dark water in the middle, and ripples and flecks.
+fn river(img: &mut RgbaImage, gy: f32) {
+    let (w, h) = (img.width() as i32, img.height() as i32);
+    for x in 0..w {
+        let f = x as f32;
+        let mid = (gy + 9. * (f / 94.).sin() + 6. * (f / 38.).sin()) as i32;
+        // the banks change in steps of 3 px, so the edge looks stepped and uneven
+        let n = (hash(x / 3, 7) % 5) as i32;
+        let half = 21 + n + (3. * (f / 61.).sin()) as i32;
+        let bank = 6 + (hash(x / 2, 11) % 4) as i32;
+        for dy in -(half + bank)..=(half + bank) {
+            let y = mid + dy;
+            if y < 0 || y >= h {
+                continue;
+            }
+            let d = dy.abs();
+            let r = hash(x, y);
+            let px = if d > half {
+                let o = d - half;
+                // the outer bank pixels leave gaps, so the grass grows over the mud
+                if o > bank - 3 && !r.is_multiple_of(3) {
+                    continue;
+                }
+                match r % 7 {
+                    0 | 1 => Rgba([84, 68, 46, 255]),
+                    2 => Rgba([142, 130, 108, 255]),
+                    3 => Rgba([128, 112, 82, 255]),
+                    _ => Rgba([108, 90, 60, 255]),
+                }
+            } else {
+                let depth = half - d;
+                let ripple = (x / 2 + y * 5) % 11 == 0 && r.is_multiple_of(4);
+                if depth <= 2 {
+                    Rgba([100, 142, 150, 255])
+                } else if depth <= 5 {
+                    if r.is_multiple_of(6) {
+                        FOAM
+                    } else {
+                        Rgba([78, 120, 130, 255])
+                    }
+                } else if ripple || r.is_multiple_of(53) {
+                    FOAM
+                } else if d < half - 12 {
+                    if r.is_multiple_of(5) {
+                        Rgba([46, 82, 98, 255])
+                    } else {
+                        Rgba([34, 66, 82, 255])
+                    }
+                } else if r.is_multiple_of(5) {
+                    Rgba([66, 108, 120, 255])
+                } else {
+                    WATER
+                }
+            };
+            img.put_pixel(x as u32, y as u32, px);
         }
     }
 }
@@ -99,19 +166,7 @@ pub fn ground(l: &Layout) -> RgbaImage {
     let mut wet: Vec<(f32, f32)> = Vec::new();
     for gy in &l.gaps {
         wet.push((*gy - 44., *gy + 44.));
-        for x in (0..w as i32).step_by(4) {
-            let f = x as f32;
-            let mid = gy + 9. * (f / 94.).sin() + 6. * (f / 38.).sin();
-            disc(&mut img, x, mid as i32, 34, SAND);
-        }
-        for x in (0..w as i32).step_by(4) {
-            let f = x as f32;
-            let mid = gy + 9. * (f / 94.).sin() + 6. * (f / 38.).sin();
-            disc(&mut img, x, mid as i32, 26, WATER);
-            if x % 92 == 0 {
-                disc(&mut img, x, mid as i32 + (x % 17) - 8, 2, FOAM);
-            }
-        }
+        river(&mut img, *gy);
     }
     // field paths: from the main building to each site and each resource
     let mut path: Vec<(i32, i32)> = Vec::new();

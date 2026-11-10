@@ -72,67 +72,91 @@ impl Shell {
         };
         div()
             .flex_none()
-            .h(px(BAR_H))
+            .min_h(px(BAR_H))
             .mx(px(20.))
             .flex()
+            .flex_wrap()
             .items_center()
-            .gap(px(22.))
+            .justify_between()
+            .gap_x(px(22.))
+            .gap_y(px(4.))
             .border_b_1()
             .border_color(c(tac::DEEP, 1.))
             .font_family(tac::MONO)
             .child(
                 div()
-                    .font_family(tac::SANS)
-                    .font_weight(FontWeight::BOLD)
-                    .text_size(ui::ts(15.))
-                    .text_color(c(tac::INK, 1.))
-                    .child("AIVORY // TACTICAL"),
-            )
-            .child(
-                div()
+                    .min_w(px(0.))
                     .flex()
-                    .gap(px(4.))
-                    .child(entry("tac-war", "OPS".into(), Screen::WarRoom, cx))
-                    .child(entry(
-                        "tac-inbox",
-                        if inbox > 0 {
-                            format!("INBOX ({inbox})")
-                        } else {
-                            "INBOX".into()
-                        },
-                        Screen::Inbox,
-                        cx,
-                    ))
-                    .child(entry("tac-tasks", "TASKS".into(), Screen::Tasks, cx))
-                    .child(entry("tac-repos", "REPOS".into(), Screen::Repos, cx))
-                    .child(entry("tac-set", "SETUP".into(), Screen::Settings, cx)),
+                    .flex_wrap()
+                    .items_center()
+                    .gap_x(px(22.))
+                    .child(
+                        div()
+                            .font_family(tac::SANS)
+                            .font_weight(FontWeight::BOLD)
+                            .text_size(ui::ts(15.))
+                            .whitespace_nowrap()
+                            .text_color(c(tac::INK, 1.))
+                            .child("AIVORY // TACTICAL"),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(4.))
+                            .child(entry("tac-war", "OPS".into(), Screen::WarRoom, cx))
+                            .child(entry(
+                                "tac-inbox",
+                                if inbox > 0 {
+                                    format!("INBOX ({inbox})")
+                                } else {
+                                    "INBOX".into()
+                                },
+                                Screen::Inbox,
+                                cx,
+                            ))
+                            .child(entry("tac-tasks", "TASKS".into(), Screen::Tasks, cx))
+                            .child(entry("tac-repos", "REPOS".into(), Screen::Repos, cx))
+                            .child(entry("tac-set", "SETUP".into(), Screen::Settings, cx))
+                            .children(crate::new_session::launch_buttons(
+                                "tactical",
+                                |id, label| navb(id, &label.to_uppercase(), false),
+                            )),
+                    ),
             )
-            .child(div().flex_1())
-            .child(tac::label(format!("{live} CONTACTS")))
-            .child(
-                tac::label(format!("{waits} AWAIT ORDERS"))
-                    .text_color(c(if waits > 0 { tac::WHITE } else { tac::LABEL }, 1.)),
-            )
-            .child(tac::label(format!(
-                "AUTOPILOT: {}",
-                if auto { "ON" } else { "OFF" }
-            )))
             .child(
                 div()
-                    .text_size(ui::ts(14.))
-                    .text_color(c(tac::INK, 1.))
-                    .child(tac::utc(now)),
-            )
-            .child(
-                navb(
-                    "tac-look",
-                    &format!("LOOK: {} v", crate::look::name(tk().look).to_uppercase()),
-                    false,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.look_menu = !this.look_menu;
-                    cx.notify();
-                })),
+                    .min_w(px(0.))
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_x(px(22.))
+                    .child(tac::label(format!("{live} CONTACTS")))
+                    .child(
+                        tac::label(format!("{waits} AWAIT ORDERS"))
+                            .text_color(c(if waits > 0 { tac::WHITE } else { tac::LABEL }, 1.)),
+                    )
+                    .child(tac::label(format!(
+                        "AUTOPILOT: {}",
+                        if auto { "ON" } else { "OFF" }
+                    )))
+                    .child(
+                        div()
+                            .text_size(ui::ts(14.))
+                            .text_color(c(tac::INK, 1.))
+                            .child(tac::utc(now)),
+                    )
+                    .child(
+                        navb(
+                            "tac-look",
+                            &format!("LOOK: {} v", crate::look::name(tk().look).to_uppercase()),
+                            false,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.look_menu = !this.look_menu;
+                            cx.notify();
+                        })),
+                    ),
             )
     }
 
@@ -233,15 +257,14 @@ impl Shell {
             Screen::Tasks => self.tactical_full("TASKS", "ALL FUNCTIONS OF THE TASKS", content, cx),
             Screen::Repos => self.tactical_full("REPOS", "ALL FUNCTIONS OF THE REPOS", content, cx),
             Screen::Settings => self.tactical_full("SETUP", "ALL SETTINGS", content, cx),
-            Screen::Focus(id) => {
+            Screen::Session(id) => {
                 if let Some((v, _)) = &self.tactical_screens.focus {
                     v.update(cx, |v, cx| v.show(&id, cx));
                 } else {
                     let v = cx.new(|cx| TacticalFocus::new(model, id, window, cx));
                     let sub = cx.subscribe(&v, |t, _, e: &TacFocusEvent, cx| match e {
                         TacFocusEvent::Back => t.go(Screen::WarRoom, cx),
-                        TacFocusEvent::Open(id) => t.open_focus(id, cx),
-                        TacFocusEvent::Dossier(id) => t.open_session(id, cx),
+                        TacFocusEvent::Open(id) => t.open_session(id, cx),
                         TacFocusEvent::OpenFile { session, path } => {
                             t.open_session_file(session, path, cx)
                         }

@@ -259,6 +259,8 @@ fn summary(
         git_branch: None,
         cli_version: None,
         model,
+        mode: None,
+        effort: None,
         path: file.path.clone(),
         sidechains: Vec::new(),
     }

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::{DiffFile, DiffLineKind, SessionDiff};
-use aivory_protocol::{AskKind, ComposerPrefs, Effort, Mode, Pane};
+use aivory_protocol::{AskKind, Pane};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Entity, EventEmitter, FontWeight, ScrollHandle, Subscription, Window, div,
@@ -16,11 +16,16 @@ use gpui::{
 use gpui_base::input::{InputEvent, InputState};
 
 use crate::actions::{Action, act};
+use crate::compose::{self, Tools};
+use crate::compose_controls::{ControlStyle, Controls};
 use crate::console::display::{DKind, last};
+use crate::media::{self, MediaStyle};
 use crate::model::Model;
+use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole};
 use crate::tactical_kit::{
     self as tac, Btn, Frame, c, dots, entry, frame, label, navb, section, tbox, trow,
 };
+use crate::theme::PaneTheme;
 use crate::ui;
 
 /// How old a diff gets before the view asks again.
@@ -32,13 +37,33 @@ pub enum TacFocusEvent {
     Back,
     /// Show another contact.
     Open(String),
-    /// The dossier of the contact.
-    Dossier(String),
     /// Open a file of the contact in the Lens.
     OpenFile { session: String, path: String },
 }
 
 impl EventEmitter<TacFocusEvent> for TacticalFocus {}
+
+/// The console in phosphor green on the black of the panel.
+fn console_look() -> ConsoleLook {
+    let o = |rgb: u32| (rgb << 8) | 0xFF;
+    let theme = PaneTheme {
+        bg: o(tac::PANEL),
+        top: o(tac::PANEL),
+        text: o(tac::TEXT),
+        dim: o(tac::LABEL),
+        accent: o(tac::INK),
+        add: o(tac::INK),
+        del: o(tac::LABEL),
+        tool: o(tac::MID),
+        ..PaneTheme::DARK
+    };
+    ConsoleLook {
+        theme: Some(theme),
+        size: 12.5,
+        pad_x: 4.,
+        max_w: None,
+    }
+}
 
 pub struct TacticalFocus {
     model: Entity<Model>,
@@ -48,8 +73,12 @@ pub struct TacticalFocus {
     busy: bool,
     /// The path of the file that the diff shows. The first file when `None`.
     file: Option<String>,
-    /// The mode and the effort that the next message carries; the pane's own when `None`.
-    prefs: Option<ComposerPrefs>,
+    controls: Controls,
+    tools: Tools,
+    console: Entity<SessionConsole>,
+    show_console: bool,
+    /// Narrow window: the chat tab is on. Else the details tabs show.
+    show_chat: bool,
     scroll: ScrollHandle,
     scrolled: String,
     _subs: Vec<Subscription>,
@@ -70,17 +99,41 @@ impl TacticalFocus {
                 this.send(window, cx);
             }
         });
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            {
+                let weak = cx.entity().downgrade();
+                move |cx| weak.upgrade().map(|v| v.read(cx).id.clone())
+            },
+            |_| (None, None),
+            cx,
+        );
+        let console = cx.new(|cx| SessionConsole::new(model.clone(), id.clone(), cx));
+        console.update(cx, |c, _| c.set_look(console_look()));
+        let opened = cx.subscribe(&console, |_, _, e: &ConsoleEvent, cx| {
+            let ConsoleEvent::OpenFile { session, path } = e;
+            cx.emit(TacFocusEvent::OpenFile {
+                session: session.clone(),
+                path: path.clone(),
+            });
+        });
+        let _ = crate::session_console::take_want_code(&id);
         Self {
             model,
             id,
             input,
+            console,
+            show_console: false,
+            show_chat: true,
             diff: None,
             busy: false,
             file: None,
-            prefs: None,
+            controls: Controls::default(),
+            tools: Tools::default(),
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
-            _subs: vec![observe, events],
+            _subs: vec![observe, events, opened],
         }
     }
 
@@ -88,9 +141,14 @@ impl TacticalFocus {
     pub fn show(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.id != id {
             self.id = id.to_string();
+            self.console.update(cx, |c, cx| c.show(id, cx));
+            if crate::session_console::take_want_code(id) {
+                self.show_console = false;
+            }
             self.diff = None;
             self.file = None;
-            self.prefs = None;
+            self.controls = Controls::default();
+            self.tools = Tools::default();
             self.scrolled.clear();
             cx.notify();
         }
@@ -107,11 +165,13 @@ impl TacticalFocus {
 
     /// Send the field: an answer to the open ask, else a message to the agent.
     fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let text = self.input.read(cx).value().trim().to_string();
+        let typed = self.input.read(cx).value().trim().to_string();
         let Some(pane) = self.pane(cx) else {
             return;
         };
-        if text.is_empty() {
+        let images = self.tools.images();
+        let text = self.tools.message(&typed, None);
+        if text.trim().is_empty() && images.is_empty() {
             return;
         }
         let action = match &pane.ask {
@@ -121,13 +181,16 @@ impl TacticalFocus {
                 option: None,
                 text: Some(text),
             },
-            _ => Action::Send {
-                id: pane.id.clone(),
-                text,
-                composer: self.prefs.clone().filter(|p| *p != pane.composer),
-            },
+            _ => {
+                let prefs = self.controls.current(&pane);
+                crate::compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+                self.tools.sent();
+                self.input.update(cx, |s, cx| s.clean(window, cx));
+                return;
+            }
         };
         act(&self.model, action, cx);
+        self.tools.sent();
         self.input.update(cx, |s, cx| s.clean(window, cx));
     }
 
@@ -155,31 +218,17 @@ impl TacticalFocus {
     }
 }
 
-fn next_mode(m: Mode) -> Mode {
-    match m {
-        Mode::Plan => Mode::Edit,
-        Mode::Edit => Mode::Auto,
-        Mode::Auto => Mode::Plan,
-    }
-}
-
-fn next_effort(e: Effort) -> Effort {
-    match e {
-        Effort::Low => Effort::Medium,
-        Effort::Medium => Effort::High,
-        Effort::High => Effort::Max,
-        Effort::Max => Effort::Low,
-    }
-}
-
 impl Render for TacticalFocus {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let vp = window.viewport_size();
+        let (vw, vh) = (f32::from(vp.width), f32::from(vp.height));
+        let narrow = vw < 1100.;
         let back = navb("tf-back", "< OPS", false)
             .on_click(cx.listener(|_, _, _, cx| cx.emit(TacFocusEvent::Back)))
             .into_any_element();
         let Some(p) = self.pane(cx) else {
             return frame(Frame {
-                title: "FOCUS",
+                title: "SESSION",
                 kicker: "THIS CONTACT IS GONE".into(),
                 stats: Vec::new(),
                 menu: vec![back],
@@ -190,7 +239,6 @@ impl Render for TacticalFocus {
         let now = self.model.read(cx).war.as_ref().map_or(0, |w| w.now);
         let waits = p.ask.is_some();
         let call = format!("{}/{}", p.codebase, p.title).to_uppercase();
-        let prefs = self.prefs.clone().unwrap_or_else(|| p.composer.clone());
 
         // ---- the menu: the contact tabs with full names ------------------------------------
         let mut contacts: Vec<(String, String, bool)> = self
@@ -211,7 +259,7 @@ impl Render for TacticalFocus {
             .unwrap_or_default();
         contacts.sort_by(|a, b| (!a.2, &a.0).cmp(&(!b.2, &b.0)));
         // Room for the tabs: the window less the page padding and the buttons at the right.
-        let room = f32::from(window.viewport_size().width) - 64. - 260.;
+        let room = vw - 64. - 260.;
         let mut used = 0.;
         let mut shown: Vec<&(String, String, bool)> = Vec::new();
         if let Some(cur) = contacts.iter().find(|x| x.0 == self.id) {
@@ -255,17 +303,6 @@ impl Render for TacticalFocus {
             );
         }
         menu.push(div().flex_1().into_any_element());
-        let dossier_id = p.id.clone();
-        menu.push(
-            navb("tf-dossier", "DOSSIER >", false)
-                .border_1()
-                .border_color(c(tac::INK, 1.))
-                .text_color(c(tac::INK, 1.))
-                .on_click(cx.listener(move |_, _, _, cx| {
-                    cx.emit(TacFocusEvent::Dossier(dossier_id.clone()));
-                }))
-                .into_any_element(),
-        );
         menu.push(back);
 
         // ---- the intercept log -------------------------------------------------------------
@@ -278,14 +315,35 @@ impl Render for TacticalFocus {
         let mut log = div()
             .id("tf-log")
             .flex_1()
-            .min_h(px(0.))
+            .min_h(px(96.))
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .flex()
             .flex_col()
             .gap(px(6.))
             .pr(px(12.));
-        for d in rows.iter().filter(|d| d.kind != DKind::Meta) {
+        let media_style = MediaStyle {
+            card: gpui::rgba(tac::PANEL << 8 | 0xFF),
+            text: gpui::rgba(tac::TEXT << 8 | 0xFF),
+            muted: gpui::rgba(tac::LABEL << 8 | 0xFF),
+            radius: 0.,
+        };
+        for (n, d) in rows.iter().enumerate() {
+            if d.kind == DKind::Meta {
+                let found = p
+                    .tail
+                    .iter()
+                    .rev()
+                    .find(|l| l.media.is_some() && l.text.trim_end() == d.text);
+                if let Some(m) = found.and_then(|l| l.media.as_ref()) {
+                    log = log.child(div().flex_none().pl(px(64.)).child(media::preview(
+                        m,
+                        ("tf-media", n),
+                        media_style,
+                    )));
+                }
+                continue;
+            }
             let verb = match (d.first, d.kind) {
                 (false, _) => String::new(),
                 (true, DKind::You) => "ORD".to_string(),
@@ -387,7 +445,10 @@ impl Render for TacticalFocus {
                 _ => ask.text.clone(),
             };
             div()
+                .id("tf-ask")
                 .flex_none()
+                .max_h(px((vh * 0.22).clamp(96., 300.)))
+                .overflow_y_scroll()
                 .flex()
                 .flex_col()
                 .gap(px(10.))
@@ -407,77 +468,104 @@ impl Render for TacticalFocus {
         });
 
         // ---- the composer ------------------------------------------------------------------
-        let (mode_prefs, effort_prefs) = (prefs.clone(), prefs.clone());
-        let composer = div()
-            .flex_none()
+        self.controls.sync(&p);
+        let providers = self.model.read(cx).providers.clone();
+        let style = ControlStyle::console(tac::PANEL, tac::TEXT, tac::INK, Some(tac::MONO.into()));
+        let palette = compose::Palette {
+            text: tac::TEXT << 8 | 0xFF,
+            dim: tac::LABEL << 8 | 0xFF,
+            line: tac::DIM << 8 | 0xFF,
+            chip_bg: tac::PANEL << 8 | 0xFF,
+            hover: tac::DEEP << 8 | 0xFF,
+            fail: tac::WHITE << 8 | 0xFF,
+            ok: tac::INK << 8 | 0xFF,
+        };
+        let chips = compose::chips(&self.tools, "tf", palette, |i| {
+            Box::new(cx.listener(move |this, _, _, cx| {
+                this.tools.remove(i);
+                cx.notify();
+            }))
+        });
+        let field = div()
+            .min_h(px(52.))
             .flex()
-            .flex_col()
-            .gap(px(10.))
+            .flex_wrap()
+            .items_center()
+            .gap(px(12.))
+            .px(px(14.))
+            .py(px(6.))
+            .border_1()
+            .border_color(c(tac::DIM, 1.))
+            .child(label(if waits { "ANSWER:" } else { "ORDER:" }))
+            .child(div().flex_1().min_w(px(160.)).child(self.input.clone()))
             .child(
-                div()
-                    .min_h(px(52.))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .px(px(14.))
-                    .py(px(6.))
-                    .border_1()
-                    .border_color(c(tac::DIM, 1.))
-                    .child(label(if waits { "ANSWER:" } else { "ORDER:" }))
-                    .child(div().flex_1().min_w(px(0.)).child(self.input.clone()))
-                    .child(
-                        tac::order("tf-send", "SEND", Btn::Plain)
-                            .on_click(cx.listener(|this, _, window, cx| this.send(window, cx))),
-                    ),
+                tac::order("tf-attach", "ATTACH", Btn::Plain).on_click(cx.listener(
+                    |_, _, window, cx| {
+                        compose::attach(|this: &mut Self| Some(&mut this.tools), window, cx)
+                    },
+                )),
             )
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .child(
-                        navb(
-                            "tf-mode",
-                            &format!("MODE: {}", format!("{:?}", prefs.mode).to_uppercase()),
-                            false,
-                        )
-                        .border_1()
-                        .border_color(c(tac::DIM, 1.))
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            let mut next = mode_prefs.clone();
-                            next.mode = next_mode(next.mode);
-                            this.prefs = Some(next);
-                            cx.notify();
-                        })),
-                    )
-                    .child(
-                        navb(
-                            "tf-effort",
-                            &format!("EFFORT: {}", format!("{:?}", prefs.effort).to_uppercase()),
-                            false,
-                        )
-                        .border_1()
-                        .border_color(c(tac::DIM, 1.))
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            let mut next = effort_prefs.clone();
-                            next.effort = next_effort(next.effort);
-                            this.prefs = Some(next);
-                            cx.notify();
-                        })),
-                    )
-                    .child(label(format!(
-                        "{} · {}",
-                        prefs.provider.to_uppercase(),
-                        dots(&prefs.model.to_uppercase(), 24)
-                    ))),
+                tac::order("tf-send", "SEND", Btn::Plain)
+                    .on_click(cx.listener(|this, _, window, cx| this.send(window, cx))),
             );
+        let composer =
+            div()
+                .flex_none()
+                .flex()
+                .flex_col()
+                .gap(px(10.))
+                .children(chips)
+                .child(field)
+                .child(div().flex().flex_wrap().items_center().gap(px(8.)).child(
+                    self.controls.row(
+                        "tf-ctl",
+                        &p,
+                        &providers,
+                        &style,
+                        |this: &mut Self| &mut this.controls,
+                        cx,
+                    ),
+                ));
 
+        let show_chat = narrow && self.show_chat;
+        let tabs = |cx: &mut Context<Self>| {
+            let mut row = div().flex_none().flex().flex_wrap().gap(px(8.));
+            if narrow {
+                row = row.child(navb("tf-t-chat", "CHAT", show_chat).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.show_chat = true;
+                        cx.notify();
+                    },
+                )));
+            }
+            row.child(
+                navb("tf-t-diff", "CHANGES", !show_chat && !self.show_console).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.show_chat = false;
+                        this.show_console = false;
+                        cx.notify();
+                    }),
+                ),
+            )
+            .child(
+                navb("tf-t-console", "CONSOLE", !show_chat && self.show_console).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.show_chat = false;
+                        this.show_console = true;
+                        cx.notify();
+                    }),
+                ),
+            )
+        };
         let mut left = tbox("INTERCEPT LOG")
             .flex_1()
-            .min_w(px(0.))
+            .min_w(px(if narrow { 0. } else { 380. }))
+            .min_h(px(0.))
             .p(px(24.))
             .pt(px(28.))
             .gap(px(14.))
+            .children(narrow.then(|| tabs(cx)))
             .child(
                 div()
                     .flex_none()
@@ -493,11 +581,17 @@ impl Render for TacticalFocus {
                         p.context_pct
                     ))),
             )
-            .child(log);
+            .child(crate::ui::with_thumb(
+                log,
+                &self.scroll,
+                gpui::rgba(0x39FF7A99),
+                3.,
+            ));
         if let Some(a) = ask_box {
             left = left.child(a);
         }
         let left = left.child(composer);
+        let left = compose::media_target(left, |this: &mut Self| Some(&mut this.tools), cx);
 
         // ---- the changes -------------------------------------------------------------------
         let files: Vec<DiffFile> = self
@@ -566,13 +660,27 @@ impl Render for TacticalFocus {
         }
         let open = cur.map(|f| f.path.clone());
         let sid = p.id.clone();
+        let right_w = (vw * 0.4 * if self.show_console { 1.15 } else { 1. }).clamp(320., 720.);
         let mut right = tbox(format!("CHANGES · {} FILES", files.len()))
-            .flex_none()
-            .w(px(460.))
+            .min_w(px(0.))
             .p(px(24.))
             .pt(px(28.))
-            .gap(px(12.));
-        if files.is_empty() {
+            .gap(px(12.))
+            .child(tabs(cx));
+        right = if narrow {
+            right.flex_1()
+        } else {
+            right.flex_none().w(px(right_w))
+        };
+        if self.show_console {
+            right = right.child(
+                div()
+                    .flex_1()
+                    .min_h(px(0.))
+                    .w_full()
+                    .child(self.console.clone()),
+            );
+        } else if files.is_empty() {
             right = right.child(entry("No file changed yet."));
         } else {
             right = right.child(list).child(diff_view).child(
@@ -590,7 +698,7 @@ impl Render for TacticalFocus {
         }
 
         frame(Frame {
-            title: "FOCUS",
+            title: "SESSION",
             kicker: format!(
                 "{} · ONE CONTACT IN FULL",
                 dots(&p.title.to_uppercase(), 60)
@@ -613,13 +721,31 @@ impl Render for TacticalFocus {
                 ),
             ],
             menu,
-            body: div()
-                .size_full()
-                .flex()
-                .gap(px(32.))
-                .child(left)
-                .child(right)
-                .into_any_element(),
+            body: if narrow {
+                if show_chat {
+                    div()
+                        .size_full()
+                        .flex()
+                        .flex_col()
+                        .child(left)
+                        .into_any_element()
+                } else {
+                    div()
+                        .size_full()
+                        .flex()
+                        .flex_col()
+                        .child(right)
+                        .into_any_element()
+                }
+            } else {
+                div()
+                    .size_full()
+                    .flex()
+                    .gap(px(32.))
+                    .child(left)
+                    .child(right)
+                    .into_any_element()
+            },
         })
     }
 }

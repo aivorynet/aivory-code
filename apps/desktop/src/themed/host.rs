@@ -469,6 +469,10 @@ pub struct ThemedView {
     pub(super) scrolls: HashMap<String, ScrollHandle>,
     pub(super) tabs: HashMap<String, usize>,
     pub(super) composers: HashMap<String, ComposerCfg>,
+    /// Mode, provider, model, and effort of the send composers.
+    pub(super) controls: crate::compose_controls::Controls,
+    /// The attachment chips of the send composers.
+    pub(super) tools: crate::compose::Tools,
     pub(super) confirm: Option<Confirm>,
     pub(super) binds: Vec<KeyBind>,
 }
@@ -488,6 +492,8 @@ impl ThemedView {
             scrolls: HashMap::new(),
             tabs: HashMap::new(),
             composers: HashMap::new(),
+            controls: Default::default(),
+            tools: Default::default(),
             confirm: None,
             binds: Vec::new(),
         }

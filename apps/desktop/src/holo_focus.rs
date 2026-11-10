@@ -5,6 +5,7 @@
 
 use std::time::Instant;
 
+use crate::ui;
 use aivory_protocol::Pane;
 use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::{DiffFile, DiffLineKind, SessionDiff};
@@ -16,9 +17,14 @@ use gpui::{
 use gpui_base::input::{InputEvent, InputState};
 
 use crate::actions::{Action, act};
+use crate::compose::{self, Tools};
+use crate::compose_controls::{ControlStyle, Controls};
 use crate::console::display;
 use crate::holo_kit::*;
+use crate::media::{self, MediaStyle};
 use crate::model::Model;
+use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole};
+use crate::theme::PaneTheme;
 use crate::warroom::bridge_data::{provider_name, test_lines, tests_of, turn_of, wait_text};
 
 /// How old a diff gets before the view asks again.
@@ -34,8 +40,6 @@ const DIFF_LINES: usize = 120;
 pub enum HoloFocusEvent {
     /// Show another session.
     Open(String),
-    /// The session view of the session.
-    Detail(String),
     /// Open a file of the session in the code lens.
     OpenFile { session: String, path: String },
 }
@@ -47,15 +51,21 @@ enum Side {
     Diff,
     Files,
     Tests,
+    Console,
 }
 
 pub struct HoloFocus {
     model: Entity<Model>,
     id: String,
     input: Entity<InputState>,
+    controls: Controls,
+    tools: Tools,
+    console: Entity<SessionConsole>,
     diff: Option<(Option<SessionDiff>, Instant)>,
     busy: bool,
     side: Side,
+    /// Narrow window: the chat tab is on. Else the details tabs show.
+    chat_tab: bool,
     /// The path of the file that the diff shows. The first file when `None`.
     file: Option<String>,
     scroll: ScrollHandle,
@@ -80,18 +90,42 @@ impl HoloFocus {
                 this.send(window, cx);
             }
         });
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            {
+                let weak = cx.entity().downgrade();
+                move |cx| weak.upgrade().map(|v| v.read(cx).id.clone())
+            },
+            |_| (None, None),
+            cx,
+        );
+        let console = cx.new(|cx| SessionConsole::new(model.clone(), id.clone(), cx));
+        console.update(cx, |c, _| c.set_look(console_look()));
+        let opened = cx.subscribe(&console, |_, _, e: &ConsoleEvent, cx| {
+            let ConsoleEvent::OpenFile { session, path } = e;
+            cx.emit(HoloFocusEvent::OpenFile {
+                session: session.clone(),
+                path: path.clone(),
+            });
+        });
+        let _ = crate::session_console::take_want_code(&id);
         Self {
             model,
             id,
             input,
+            console,
+            controls: Controls::default(),
+            tools: Tools::default(),
             diff: None,
             busy: false,
             side: Side::Diff,
+            chat_tab: true,
             file: None,
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
             opened: Instant::now(),
-            _subs: vec![observe, events],
+            _subs: vec![observe, events, opened],
         }
     }
 
@@ -104,8 +138,14 @@ impl HoloFocus {
     pub fn show(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.id != id {
             self.id = id.to_string();
+            self.console.update(cx, |c, cx| c.show(id, cx));
+            if crate::session_console::take_want_code(id) {
+                self.side = Side::Diff;
+            }
             self.diff = None;
             self.file = None;
+            self.controls = Controls::default();
+            self.tools = Tools::default();
             self.scrolled.clear();
             self.opened = Instant::now();
             cx.notify();
@@ -123,11 +163,13 @@ impl HoloFocus {
 
     /// Send the field: an answer to the open ask, else a message to the agent.
     fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let text = self.input.read(cx).value().trim().to_string();
+        let typed = self.input.read(cx).value().trim().to_string();
         let Some(pane) = self.pane(cx) else {
             return;
         };
-        if text.is_empty() {
+        let images = self.tools.images();
+        let text = self.tools.message(&typed, None);
+        if text.trim().is_empty() && images.is_empty() {
             return;
         }
         let action = match &pane.ask {
@@ -137,13 +179,16 @@ impl HoloFocus {
                 option: None,
                 text: Some(text),
             },
-            _ => Action::Send {
-                id: pane.id.clone(),
-                text,
-                composer: None,
-            },
+            _ => {
+                let prefs = self.controls.current(&pane);
+                crate::compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+                self.tools.sent();
+                self.input.update(cx, |s, cx| s.clean(window, cx));
+                return;
+            }
         };
         act(&self.model, action, cx);
+        self.tools.sent();
         self.input.update(cx, |s, cx| s.clean(window, cx));
     }
 
@@ -172,6 +217,24 @@ impl HoloFocus {
     }
 }
 
+/// The console in the colors of the glass: no fill, light cyan text.
+fn console_look() -> ConsoleLook {
+    let theme = PaneTheme {
+        bg: 0x00000000,
+        top: 0x00000000,
+        text: (TXT << 8) | 0xFF,
+        dim: (MUTED << 8) | 0xFF,
+        accent: (PK << 8) | 0xFF,
+        ..PaneTheme::NAVY
+    };
+    ConsoleLook {
+        theme: Some(theme),
+        size: 13.,
+        pad_x: 4.,
+        max_w: None,
+    }
+}
+
 /// A scroll box that fills the rest of its parent.
 fn scroll_box(id: &'static str) -> gpui::Stateful<Div> {
     div()
@@ -186,12 +249,15 @@ fn scroll_box(id: &'static str) -> gpui::Stateful<Div> {
 impl Render for HoloFocus {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let art = Art::of(window);
+        let vw = f32::from(window.viewport_size().width);
+        let vh = f32::from(window.viewport_size().height);
+        let narrow = vw < 1100.;
         let Some(p) = self.pane(cx) else {
             return island(
                 art,
                 Island {
                     stats: Vec::new(),
-                    left_title: "Focus",
+                    left_title: "Session",
                     left_color: PK,
                     left_tabs: Vec::new(),
                     left: big("This session is gone").into_any_element(),
@@ -232,7 +298,7 @@ impl Render for HoloFocus {
 
         // ---- left: the session column and the chat ------------------------------------------
         let mut left_tabs: Vec<AnyElement> = Vec::new();
-        let sessions: Vec<(String, String, u32)> = self
+        let sessions: Vec<(String, String, u32, String)> = self
             .model
             .read(cx)
             .war
@@ -242,19 +308,26 @@ impl Render for HoloFocus {
                     .iter()
                     .map(|s| {
                         let name = if s.title.is_empty() { &s.id } else { &s.title };
-                        (s.id.clone(), name.clone(), state_color(s))
+                        // A tab shows at most 24 characters; a long title (a whole prompt)
+                        // would run out of the panel. The full title shows on hover.
+                        let short = if name.chars().count() > 24 {
+                            let cut: String = name.chars().take(23).collect();
+                            format!("{}…", cut.trim_end())
+                        } else {
+                            name.clone()
+                        };
+                        (s.id.clone(), short, state_color(s), name.clone())
                     })
                     .collect()
             })
             .unwrap_or_default();
         // Full names only: as many tabs as the menu holds, the open session always among
         // them, and a "+N" tab for the rest.
-        let vw = f32::from(window.viewport_size().width);
         let menu_w = 0.46 * (vw - 2. * MARGIN - GAP) - 2. * PAD;
         let width_of = |name: &str| name.chars().count() as f32 * 8.5 + 28.;
         let mut shown: Vec<usize> = Vec::new();
         let mut used = 0.;
-        for (k, (_, name, _)) in sessions.iter().enumerate() {
+        for (k, (_, name, _, _)) in sessions.iter().enumerate() {
             let w = width_of(name);
             if used + w + width_of("+99") > menu_w && !shown.is_empty() {
                 break;
@@ -262,7 +335,7 @@ impl Render for HoloFocus {
             used += w;
             shown.push(k);
         }
-        let open_at = sessions.iter().position(|(sid, _, _)| *sid == self.id);
+        let open_at = sessions.iter().position(|(sid, _, _, _)| *sid == self.id);
         if let Some(at) = open_at
             && !shown.contains(&at)
             && let Some(last) = shown.last_mut()
@@ -270,10 +343,11 @@ impl Render for HoloFocus {
             *last = at;
         }
         for &k in &shown {
-            let (sid, name, c) = &sessions[k];
+            let (sid, name, c, full) = &sessions[k];
             let sid = sid.clone();
             left_tabs.push(
                 tab(format!("lf-s-{k}"), name, *c, *sid == self.id)
+                    .tooltip(ui::tip(full.clone()))
                     .on_click(cx.listener(move |_, _, _, cx| {
                         cx.emit(HoloFocusEvent::Open(sid.clone()));
                     }))
@@ -293,8 +367,8 @@ impl Render for HoloFocus {
         }
 
         let lines = p.tail.clone();
-        let rows = display_rows(&display::last(&lines, CHAT_ITEMS));
-        let key = format!("{}:{}", p.id, rows.len());
+        let shown = display::last(&lines, CHAT_ITEMS);
+        let key = format!("{}:{}", p.id, shown.len());
         if self.scrolled != key {
             self.scroll.scroll_to_bottom();
             if self.opened.elapsed() > std::time::Duration::from_millis(1200) {
@@ -303,14 +377,39 @@ impl Render for HoloFocus {
             window.request_animation_frame();
         }
         let mut chat = scroll_box("lf-chat")
+            .min_h(px(96.))
             .track_scroll(&self.scroll)
             .gap(px(2.))
             .pr(px(16.))
             .pb(px(18.));
-        if rows.is_empty() {
+        if shown.is_empty() {
             chat = chat.child(th("No rows yet"));
         }
-        chat = chat.children(rows);
+        let media_style = MediaStyle {
+            card: ink(PK, 0.08).into(),
+            text: gpui::rgb(TXT),
+            muted: gpui::rgb(MUTED),
+            radius: 8.,
+        };
+        for (n, d) in shown.iter().enumerate() {
+            if d.kind == display::DKind::Meta {
+                let found = lines
+                    .iter()
+                    .rev()
+                    .find(|l| l.media.is_some() && l.text.trim_end() == d.text);
+                if let Some(m) = found.and_then(|l| l.media.as_ref()) {
+                    chat = chat.child(
+                        div()
+                            .flex_none()
+                            .pl(px(84.))
+                            .py(px(4.))
+                            .child(media::preview(m, ("lf-media", n), media_style)),
+                    );
+                }
+                continue;
+            }
+            chat = chat.children(display_rows(std::slice::from_ref(d)));
+        }
 
         let mut meta = provider_name(&p.provider);
         if !p.model.is_empty() {
@@ -322,7 +421,7 @@ impl Render for HoloFocus {
         }
 
         let ask_card = p.ask.as_ref().map(|ask| {
-            let mut buttons = div().flex().gap(px(8.));
+            let mut buttons = div().flex().flex_wrap().gap(px(8.));
             if p.controlled {
                 let n = ask.options.len();
                 for (k, option) in ask.options.iter().enumerate() {
@@ -352,7 +451,10 @@ impl Render for HoloFocus {
                 buttons = buttons.child(th("Answer it in its terminal"));
             }
             div()
+                .id("lf-ask")
                 .flex_none()
+                .max_h(px((vh * 0.22).clamp(96., 300.)))
+                .overflow_y_scroll()
                 .border_1()
                 .border_color(ink(OR, 0.45))
                 .bg(ink(OR, 0.08))
@@ -362,24 +464,38 @@ impl Render for HoloFocus {
                 .gap(px(14.))
                 .child(
                     div()
-                        .max_h(px(54.))
-                        .overflow_hidden()
                         .font_family(CODE)
-                        .text_size(px(S_BODY))
-                        .line_height(px(24.))
+                        .text_size(ui::ts(S_BODY))
+                        .line_height(ui::ts(24.))
                         .text_color(rgb(WARM))
                         .child(ask.text.clone()),
                 )
                 .child(buttons)
         });
 
-        let composer = div()
+        let palette = compose::Palette {
+            text: TXT << 8 | 0xFF,
+            dim: MUTED << 8 | 0xFF,
+            line: PK << 8 | 0x66,
+            chip_bg: PK << 8 | 0x14,
+            hover: PK << 8 | 0x33,
+            fail: RD << 8 | 0xFF,
+            ok: PK << 8 | 0xFF,
+        };
+        let chips = compose::chips(&self.tools, "lf", palette, |i| {
+            Box::new(cx.listener(move |this, _, _, cx| {
+                this.tools.remove(i);
+                cx.notify();
+            }))
+        });
+        let field = div()
             .flex_none()
-            .h(px(40.))
+            .min_h(px(40.))
             .flex()
+            .flex_wrap()
             .gap(px(8.))
             .child(
-                div().flex_1().min_w(px(0.)).flex().child(
+                div().flex_1().min_w(px(160.)).flex().child(
                     div()
                         .flex_1()
                         .min_w(px(0.))
@@ -387,20 +503,61 @@ impl Render for HoloFocus {
                         .border_color(ink(PK, 0.4))
                         .bg(ink(PK, 0.04))
                         .px(px(16.))
+                        .py(px(6.))
                         .flex()
                         .items_center()
                         .font_family(BODY)
-                        .text_size(px(S_BODY))
+                        .text_size(ui::ts(S_BODY))
                         .text_color(rgb(TXT))
                         .child(div().flex_1().min_w(px(0.)).child(self.input.clone())),
                 ),
             )
             .child(
+                pill("lf-attach", PU, "Attach")
+                    .min_h(px(40.))
+                    .min_w(ui::sw(88.))
+                    .on_click(cx.listener(|_, _, window, cx| {
+                        compose::attach(|this: &mut Self| Some(&mut this.tools), window, cx)
+                    })),
+            )
+            .child(
                 pill("lf-send", PK, "Send")
-                    .h(px(40.))
-                    .w(px(88.))
+                    .min_h(px(40.))
+                    .min_w(ui::sw(88.))
                     .on_click(cx.listener(|this, _, window, cx| this.send(window, cx))),
             );
+
+        self.controls.sync(&p);
+        let providers = self.model.read(cx).providers.clone();
+        // See-through glass: faint cyan fills, light text, a dark glass menu.
+        let style = ControlStyle {
+            pill: gpui::rgba(0x4FD8FF14),
+            pill_hover: gpui::rgba(0x4FD8FF2E),
+            pill_text: rgb(TXT),
+            on: gpui::rgba(0x4FD8FF4D),
+            on_text: rgb(PA),
+            menu: gpui::rgba(0x03172AE6),
+            menu_text: rgb(TXT),
+            menu_hover: gpui::rgba(0x4FD8FF33),
+            font: Some(BODY.into()),
+            radius: None,
+            text: None,
+        };
+        let composer = div()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(self.controls.row(
+                "lf-ctl",
+                &p,
+                &providers,
+                &style,
+                |this: &mut Self| &mut this.controls,
+                cx,
+            ))
+            .children(chips)
+            .child(field);
 
         let left = div()
             .size_full()
@@ -417,16 +574,22 @@ impl Render for HoloFocus {
                         div()
                             .truncate()
                             .font_family(BODY)
-                            .text_size(px(S_BIG))
-                            .line_height(px(36.))
+                            .text_size(ui::ts(S_BIG))
+                            .line_height(ui::ts(36.))
                             .text_color(rgb(TXT))
                             .child(p.title.clone()),
                     )
                     .child(th(meta)),
             )
-            .child(chat)
+            .child(ui::with_thumb(
+                chat,
+                &self.scroll,
+                gpui::rgba(0x4FD8FF8C),
+                4.,
+            ))
             .children(ask_card)
             .child(composer);
+        let left = compose::media_target(left, |this: &mut Self| Some(&mut this.tools), cx);
 
         // ---- right: the details -------------------------------------------------------------
         let files: Vec<DiffFile> = self
@@ -457,7 +620,7 @@ impl Render for HoloFocus {
                             div()
                                 .truncate()
                                 .font_family(CODE)
-                                .text_size(px(S_CODE))
+                                .text_size(ui::ts(S_CODE))
                                 .text_color(rgb(TXT))
                                 .child(f.path.clone()),
                         )
@@ -492,8 +655,8 @@ impl Render for HoloFocus {
                                 .flex_none()
                                 .truncate()
                                 .font_family(CODE)
-                                .text_size(px(S_CODE))
-                                .line_height(px(24.))
+                                .text_size(ui::ts(S_CODE))
+                                .line_height(ui::ts(24.))
                                 .text_color(rgb(c))
                                 .child(text),
                         );
@@ -559,6 +722,15 @@ impl Render for HoloFocus {
                 }
                 right = right.child(list);
             }
+            Side::Console => {
+                right = right.child(
+                    div()
+                        .flex_1()
+                        .min_h(px(0.))
+                        .w_full()
+                        .child(self.console.clone()),
+                );
+            }
             Side::Tests => {
                 let counts = tests_of(&lines);
                 let label = match counts {
@@ -586,8 +758,8 @@ impl Render for HoloFocus {
                                 .flex_none()
                                 .truncate()
                                 .font_family(CODE)
-                                .text_size(px(S_CODE))
-                                .line_height(px(24.))
+                                .text_size(ui::ts(S_CODE))
+                                .line_height(ui::ts(24.))
                                 .text_color(rgb(MUTED))
                                 .child(l),
                         );
@@ -604,17 +776,13 @@ impl Render for HoloFocus {
                 }))
                 .into_any_element()
         };
-        let (sid, detail_id) = (p.id.clone(), p.id.clone());
+        let sid = p.id.clone();
         let open_path = current.map(|f| f.path.clone());
         let right_tabs = vec![
             side_tab("lf-diff-tab", "Diff", Side::Diff, cx),
             side_tab("lf-files-tab", "Files", Side::Files, cx),
             side_tab("lf-tests-tab", "Tests", Side::Tests, cx),
-            tab(SharedString::from("lf-session"), "Session ›", PK, false)
-                .on_click(cx.listener(move |_, _, _, cx| {
-                    cx.emit(HoloFocusEvent::Detail(detail_id.clone()));
-                }))
-                .into_any_element(),
+            side_tab("lf-console-tab", "Console", Side::Console, cx),
             tab(SharedString::from("lf-lens"), "Open in Lens ›", PK, false)
                 .on_click(cx.listener(move |_, _, _, cx| {
                     if let Some(path) = &open_path {
@@ -627,15 +795,68 @@ impl Render for HoloFocus {
                 .into_any_element(),
         ];
 
+        let right_title = format!("Changes · {}", files.len());
+        let color = if waits { RD } else { PK };
+        if narrow {
+            // One panel: the chat and the details are tabs of the same column.
+            let on_chat = self.chat_tab;
+            let mut tabs: Vec<AnyElement> = vec![
+                tab("lf-chat-tab", "Chat", PE, on_chat)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.chat_tab = true;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            ];
+            for t in right_tabs {
+                tabs.push(t);
+            }
+            // A click on a details tab also leaves the chat.
+            let tabs = tabs
+                .into_iter()
+                .enumerate()
+                .map(|(k, t)| {
+                    if k == 0 {
+                        t
+                    } else {
+                        div()
+                            .on_mouse_down(
+                                gpui::MouseButton::Left,
+                                cx.listener(|this, _, _, _| this.chat_tab = false),
+                            )
+                            .child(t)
+                            .into_any_element()
+                    }
+                })
+                .collect();
+            return island_with(
+                art,
+                Island {
+                    stats,
+                    left_title: "Session",
+                    left_color: color,
+                    left_tabs: tabs,
+                    left: if on_chat {
+                        left.into_any_element()
+                    } else {
+                        right.into_any_element()
+                    },
+                    right_title,
+                    right_tabs: Vec::new(),
+                    right: div().into_any_element(),
+                },
+                true,
+            );
+        }
         island(
             art,
             Island {
                 stats,
-                left_title: "Focus",
-                left_color: if waits { RD } else { PK },
+                left_title: "Session",
+                left_color: color,
                 left_tabs,
                 left: left.into_any_element(),
-                right_title: format!("Changes · {}", files.len()),
+                right_title,
                 right_tabs,
                 right: right.into_any_element(),
             },

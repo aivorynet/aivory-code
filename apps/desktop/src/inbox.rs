@@ -1,25 +1,23 @@
 //! The Inbox screen (`Inbox.dc.html`): every waiting ask in one list, answered without the war
 //! room. Left the item cards, right the detail of the selected item with its ask card.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
-use aivory_protocol::rpc::{
-    HandoffParams, InboxAnswerParams, InboxListParams, InboxSnoozeParams, SendParams, method,
-};
+use aivory_protocol::rpc::{InboxAnswerParams, InboxListParams, InboxSnoozeParams, method};
 use aivory_protocol::{
-    AgentRef, ComposerPrefs, Effort, GateState, InboxFilter, InboxItem, InboxKind, InboxList, Line,
-    MINUTE_MS, Mode, PROVIDERS, UnixMs,
+    AgentRef, GateState, InboxFilter, InboxItem, InboxKind, InboxList, Line, MINUTE_MS, UnixMs,
 };
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, BoxShadow, Context, Div, Entity, EventEmitter, FontWeight, ListAlignment,
-    ScrollHandle, SharedString, Subscription, Window, deferred, div, linear_color_stop,
-    linear_gradient, list, point, px, relative, rgb, rgba,
+    ScrollHandle, SharedString, Subscription, Window, div, linear_color_stop, linear_gradient,
+    list, point, px, relative, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, TextareaState};
 
 use crate::compose;
+use crate::compose_controls::{self, ControlStyle, Controls};
 use crate::console::{self, BlockList, Frame, Hooks, Pending, Style};
 use crate::model::Model;
 use crate::theme::*;
@@ -98,10 +96,8 @@ pub struct InboxScreen {
     answer_error: Option<(String, SharedString)>,
     /// The composer tools of the selected item: chips, the dictation, the last result.
     tools: compose::Tools,
-    /// The chip menu that is open (mode, agent, effort).
-    menu: Option<Chip>,
-    /// The mode, agent and effort that the user picked, per session.
-    picks: HashMap<String, Picks>,
+    /// The composer controls: mode, provider, model, effort.
+    controls: Controls,
     /// A list call is in flight.
     refreshing: bool,
     /// A delta came while a list call was in flight.
@@ -140,8 +136,7 @@ impl InboxScreen {
             answering: HashSet::new(),
             answer_error: None,
             tools: compose::Tools::default(),
-            menu: None,
-            picks: HashMap::new(),
+            controls: Controls::default(),
             refreshing: false,
             dirty: false,
             generation: 0,
@@ -201,7 +196,7 @@ impl InboxScreen {
         if self.selected.as_ref() != Some(&id) && !self.tools.busy() {
             self.tools = compose::Tools::default();
         }
-        self.menu = None;
+        self.controls = Controls::default();
         self.selected = Some(id);
         cx.notify();
     }
@@ -287,26 +282,6 @@ impl InboxScreen {
         cx.notify();
     }
 
-    /// The mode, agent and effort that the session has now (the composer of its pane).
-    fn base_prefs(&self, item: &InboxItem, cx: &gpui::App) -> ComposerPrefs {
-        let pane = self
-            .model
-            .read(cx)
-            .war
-            .as_ref()
-            .and_then(|w| w.session(&item.session))
-            .map(|p| p.composer.clone());
-        pane.unwrap_or_else(|| {
-            let agent = item.agents.first();
-            ComposerPrefs {
-                mode: Mode::Edit,
-                provider: agent.map_or_else(|| "claude".to_string(), |a| a.provider.clone()),
-                model: agent.map(|a| a.model.clone()).unwrap_or_default(),
-                effort: Effort::High,
-            }
-        })
-    }
-
     /// Send the composer text and the chips as the answer of the selected item. A new agent
     /// hands the session off, and the text goes to the new session.
     fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -328,12 +303,27 @@ impl InboxScreen {
         let text = self
             .tools
             .message(&typed, self.cwd_of(&item, cx).as_deref());
-        let base = self.base_prefs(&item, cx);
-        let picks = self.picks.get(&item.session).cloned().unwrap_or_default();
-        match plan(&base, &picks) {
-            Plan::Answer { prefs_changed } => {
+        let pane = self
+            .model
+            .read(cx)
+            .war
+            .as_ref()
+            .and_then(|w| w.session(&item.session))
+            .cloned();
+        match pane {
+            Some(pane) if self.controls.current(&pane).provider != pane.provider => {
+                let prefs = self.controls.current(&pane);
+                let images = self.tools.images();
+                compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+                self.generation += 1;
+                self.refresh(cx);
+            }
+            pane => {
+                let changed = pane
+                    .as_ref()
+                    .is_some_and(|p| self.controls.current(p) != compose_controls::state_of(p));
                 self.answer(id, None, Some(text), cx);
-                if prefs_changed {
+                if changed {
                     self.model.update(cx, |m, cx| {
                         m.notify_user(
                             crate::notice::Draft::info(
@@ -344,53 +334,10 @@ impl InboxScreen {
                     });
                 }
             }
-            Plan::Handoff(prefs) => self.handoff(&item.session, prefs, text, cx),
         }
         self.tools.sent();
         input.update(cx, |s, cx| s.clean(window, cx));
         cx.notify();
-    }
-
-    /// Hand the session off to the picked agent, send the text there, and open the new session.
-    fn handoff(
-        &mut self,
-        session: &str,
-        prefs: ComposerPrefs,
-        text: String,
-        cx: &mut Context<Self>,
-    ) {
-        let call = self.model.read(cx).call_notify::<method::SessionHandoff>(
-            HandoffParams {
-                id: session.to_string(),
-                provider: prefs.provider.clone(),
-                model: Some(prefs.model.clone()),
-            },
-            cx,
-        );
-        let model = self.model.clone();
-        cx.spawn(async move |this, cx| {
-            if let Some(created) = call.await {
-                let new_id = created.id.clone();
-                cx.update(|cx| {
-                    model.read(cx).send::<method::SessionSend>(
-                        SendParams {
-                            id: created.id,
-                            text,
-                            subagent: None,
-                            attachments: Vec::new(),
-                            composer: Some(prefs),
-                        },
-                        cx,
-                    )
-                });
-                let _ = this.update(cx, |this, cx| {
-                    this.generation += 1;
-                    this.refresh(cx);
-                    cx.emit(InboxEvent::OpenSession(new_id));
-                });
-            }
-        })
-        .detach();
     }
 
     /// The folder of the codebase of an item, for the `@path` references.
@@ -452,39 +399,6 @@ impl InboxScreen {
         );
     }
 
-    /// Open or close a chip menu.
-    fn toggle_menu(&mut self, chip: Chip, cx: &mut Context<Self>) {
-        self.menu = if self.menu == Some(chip) {
-            None
-        } else {
-            Some(chip)
-        };
-        cx.notify();
-    }
-
-    /// Take a value of a chip menu.
-    fn pick(&mut self, item: &InboxItem, chip: Chip, value: &str, cx: &mut Context<Self>) {
-        let base = self.base_prefs(item, cx);
-        let picks = self.picks.entry(item.session.clone()).or_default();
-        match chip {
-            Chip::Mode => {
-                let mode = mode_from(value);
-                picks.mode = (mode != base.mode).then_some(mode);
-            }
-            Chip::Effort => {
-                let effort = effort_from(value);
-                picks.effort = (effort != base.effort).then_some(effort);
-            }
-            Chip::Agent => {
-                let (provider, model) = value.split_once(" · ").unwrap_or((value, ""));
-                let same = provider == base.provider && model == base.model;
-                picks.agent = (!same).then(|| (provider.to_string(), model.to_string()));
-            }
-        }
-        self.menu = None;
-        cx.notify();
-    }
-
     fn snooze_all(&mut self, cx: &mut Context<Self>) {
         let call = self.model.read(cx).call::<method::InboxSnooze>(
             InboxSnoozeParams {
@@ -524,6 +438,24 @@ impl InboxScreen {
                 .submit_on_enter(true)
                 .auto_grow(1, 4)
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            self.model.clone(),
+            move |cx| {
+                let this = weak.upgrade()?;
+                let this = this.read(cx);
+                let id = this.selected.as_ref()?;
+                this.data
+                    .as_ref()?
+                    .items
+                    .iter()
+                    .find(|i| &i.id == id)
+                    .map(|i| i.session.clone())
+            },
+            |_| (None, None),
+            cx,
+        );
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
             if let InputEvent::PressEnter { shift: false, .. } = event {
                 this.submit(window, cx);
@@ -1123,92 +1055,24 @@ impl InboxScreen {
                 .hover(|s| s.bg(rgb(icon_hover())))
                 .child(ui::icon(icon, 15., rgb(tk().ink_3)))
         };
-        let prefs = self
+        let pane = self
             .model
             .read(cx)
             .war
             .as_ref()
             .and_then(|w| w.session(&item.session))
-            .map(|p| p.composer.clone());
-        let mode = prefs.as_ref().map_or("Edit", |p| match p.mode {
-            aivory_protocol::Mode::Plan => "Plan",
-            aivory_protocol::Mode::Edit => "Edit",
-            aivory_protocol::Mode::Auto => "Auto",
+            .cloned();
+        let providers = self.model.read(cx).providers.clone();
+        let chips = pane.map(|pane| {
+            self.controls.row(
+                "inbox-ctl",
+                &pane,
+                &providers,
+                &ControlStyle::page(),
+                |this: &mut Self| &mut this.controls,
+                cx,
+            )
         });
-        let effort = prefs.as_ref().map_or("high", |p| match p.effort {
-            aivory_protocol::Effort::Low => "low",
-            aivory_protocol::Effort::Medium => "medium",
-            aivory_protocol::Effort::High => "high",
-            aivory_protocol::Effort::Max => "max",
-        });
-        let agent = item
-            .agents
-            .first()
-            .map(|a| format!("{} · {}", a.provider, a.model))
-            .unwrap_or_default();
-        let _ = (mode, agent, effort);
-        let base = self.base_prefs(item, cx);
-        let picks = self.picks.get(&item.session).cloned().unwrap_or_default();
-        let eff = picks.apply(&base);
-        let mut chips = div()
-            .flex()
-            .items_center()
-            .gap(px(2.))
-            .ml(px(-4.))
-            .min_w(px(0.));
-        for (chip, label, changed) in [
-            (
-                Chip::Mode,
-                mode_label(eff.mode).to_string(),
-                picks.mode.is_some(),
-            ),
-            (
-                Chip::Agent,
-                format!("{} · {}", eff.provider, eff.model),
-                picks.agent.is_some(),
-            ),
-            (
-                Chip::Effort,
-                effort_label(eff.effort).to_string(),
-                picks.effort.is_some(),
-            ),
-        ] {
-            let open = self.menu == Some(chip);
-            let tip = match chip {
-                Chip::Mode => "Mode",
-                Chip::Agent => "Agent: a new agent takes over the session",
-                Chip::Effort => "Effort",
-            };
-            chips = chips.child(
-                div()
-                    .relative()
-                    .flex_none()
-                    .child(
-                        div()
-                            .id(SharedString::from(format!("chip-{chip:?}")))
-                            .h(px(22.))
-                            .px(px(6.))
-                            .flex()
-                            .items_center()
-                            .rounded(px(4.))
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
-                            .text_color(rgb(if open || changed {
-                                tk().ink
-                            } else {
-                                tk().ink_2
-                            }))
-                            .when(changed, |d| d.font_weight(FontWeight::MEDIUM))
-                            .when(open, |d| d.bg(rgb(icon_hover())))
-                            .whitespace_nowrap()
-                            .cursor_pointer()
-                            .hover(|s| s.bg(rgb(icon_hover())).text_color(rgb(tk().ink)))
-                            .tooltip(ui::tip(tip))
-                            .on_click(cx.listener(move |this, _, _, cx| this.toggle_menu(chip, cx)))
-                            .child(format!("{label} ▾")),
-                    )
-                    .when(open, |d| d.child(self.chip_menu(chip, item, &eff, cx))),
-            );
-        }
         let field = div()
             .flex()
             .rounded(tk().r_card)
@@ -1252,7 +1116,7 @@ impl InboxScreen {
                             .line_height(relative(1.45))
                             .child(input),
                     )
-                    .child(chips),
+                    .children(chips),
             )
             .child(
                 div()
@@ -1300,112 +1164,64 @@ impl InboxScreen {
                             )),
                     ),
             );
-        div()
-            .flex_none()
-            .flex()
-            .flex_col()
-            .gap(px(6.))
-            .px(px(12.))
-            .pt(px(6.))
-            .pb(px(12.))
-            .border_t_1()
-            .border_color(rgba(tk().line))
-            .child(
-                div()
-                    .flex()
-                    .justify_between()
-                    .gap(px(12.))
-                    .px(px(2.))
-                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
-                    .child(
-                        div()
-                            .text_color(rgb(AGENT_ACCENT))
-                            .child(activity_text(item, now)),
-                    )
-                    .child(
-                        div()
-                            .text_color(rgb(tk().ink_3))
-                            .child(format!("ctx {}% · ${:.2}", item.context_pct, item.cost)),
-                    ),
-            )
-            .when(!done, |d| {
-                d.children(compose::chips(
-                    &self.tools,
-                    "inbox",
-                    compose::Palette::page(),
-                    |i| {
-                        Box::new(cx.listener(move |this, _, _, cx| {
-                            this.tools.remove(i);
-                            cx.notify();
-                        }))
-                    },
-                ))
-                .children(compose::status(
-                    &self.tools,
-                    "inbox",
-                    compose::Palette::page(),
-                    |action| {
-                        Box::new(cx.listener(move |this, _, window, cx| {
-                            this.tool_action(action, window, cx)
-                        }))
-                    },
-                ))
-                .child(field)
-            })
-    }
-
-    /// The menu of a chip, over the chip.
-    fn chip_menu(
-        &self,
-        chip: Chip,
-        item: &InboxItem,
-        eff: &ComposerPrefs,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let entries: Vec<(String, bool)> = match chip {
-            Chip::Mode => [Mode::Plan, Mode::Edit, Mode::Auto]
-                .into_iter()
-                .map(|m| (mode_label(m).to_string(), m == eff.mode))
-                .collect(),
-            Chip::Effort => [Effort::Low, Effort::Medium, Effort::High, Effort::Max]
-                .into_iter()
-                .map(|e| (effort_label(e).to_string(), e == eff.effort))
-                .collect(),
-            Chip::Agent => PROVIDERS
-                .iter()
-                .flat_map(|p| provider_models(p).iter().map(move |m| format!("{p} · {m}")))
-                .map(|label| {
-                    let on = label == format!("{} · {}", eff.provider, eff.model);
-                    (label, on)
-                })
-                .collect(),
-        };
-        let mut menu = ui::menu(160.);
-        for (i, (label, on)) in entries.into_iter().enumerate() {
-            let (item, value) = (item.clone(), label.clone());
-            menu = menu.child(ui::menu_item(
-                SharedString::from(format!("cm-{chip:?}-{i}")),
-                on,
-                div().child(label).into_any_element(),
-                None,
-                Box::new(cx.listener(move |this, _, _, cx| this.pick(&item, chip, &value, cx))),
-            ));
-        }
-        deferred(
+        compose::media_target(
             div()
-                .absolute()
-                .bottom(relative(1.))
-                .mb(px(6.))
-                .left_0()
-                .child(menu)
-                .occlude()
-                .on_mouse_down_out(cx.listener(|this, _, _, cx| {
-                    this.menu = None;
-                    cx.notify();
-                })),
+                .flex_none()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .px(px(12.))
+                .pt(px(6.))
+                .pb(px(12.))
+                .border_t_1()
+                .border_color(rgba(tk().line)),
+            |this: &mut Self| Some(&mut this.tools),
+            cx,
         )
-        .with_priority(1)
-        .into_any_element()
+        .child(
+            div()
+                .flex()
+                .justify_between()
+                .gap(px(12.))
+                .px(px(2.))
+                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                .child(
+                    div()
+                        .text_color(rgb(AGENT_ACCENT))
+                        .child(activity_text(item, now)),
+                )
+                .child(
+                    div()
+                        .text_color(rgb(tk().ink_3))
+                        .child(format!("ctx {}% · ${:.2}", item.context_pct, item.cost)),
+                ),
+        )
+        .when(!done, |d| {
+            d.children(compose::chips(
+                &self.tools,
+                "inbox",
+                compose::Palette::page(),
+                |i| {
+                    Box::new(cx.listener(move |this, _, _, cx| {
+                        this.tools.remove(i);
+                        cx.notify();
+                    }))
+                },
+            ))
+            .children(compose::status(
+                &self.tools,
+                "inbox",
+                compose::Palette::page(),
+                |action| {
+                    Box::new(
+                        cx.listener(move |this, _, window, cx| {
+                            this.tool_action(action, window, cx)
+                        }),
+                    )
+                },
+            ))
+            .child(field)
+        })
     }
 
     fn detail(
@@ -1670,81 +1486,6 @@ impl Render for InboxScreen {
 
 // ---- Pure parts ----
 
-/// The chips over the field of the composer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Chip {
-    Mode,
-    Agent,
-    Effort,
-}
-
-/// What the user picked in the chip menus of one session. A value that equals the session's
-/// own value is not a pick.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct Picks {
-    mode: Option<Mode>,
-    /// Provider and model.
-    agent: Option<(String, String)>,
-    effort: Option<Effort>,
-}
-
-impl Picks {
-    /// The prefs that the next message uses: the session's own with the picks over them.
-    fn apply(&self, base: &ComposerPrefs) -> ComposerPrefs {
-        let mut prefs = base.clone();
-        if let Some(mode) = self.mode {
-            prefs.mode = mode;
-        }
-        if let Some((provider, model)) = &self.agent {
-            prefs.provider.clone_from(provider);
-            prefs.model.clone_from(model);
-        }
-        if let Some(effort) = self.effort {
-            prefs.effort = effort;
-        }
-        prefs
-    }
-}
-
-/// What a send does with the picks.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Plan {
-    /// Answer the item. `prefs_changed`: a mode or effort pick that the answer cannot carry.
-    Answer { prefs_changed: bool },
-    /// Another provider takes the session over: hand off, then send there.
-    Handoff(ComposerPrefs),
-}
-
-fn plan(base: &ComposerPrefs, picks: &Picks) -> Plan {
-    let eff = picks.apply(base);
-    if eff.provider != base.provider {
-        Plan::Handoff(eff)
-    } else {
-        Plan::Answer {
-            prefs_changed: eff != *base,
-        }
-    }
-}
-
-fn mode_from(label: &str) -> Mode {
-    match label {
-        "Plan" => Mode::Plan,
-        "Auto" => Mode::Auto,
-        _ => Mode::Edit,
-    }
-}
-
-fn effort_from(label: &str) -> Effort {
-    match label {
-        "low" => Effort::Low,
-        "medium" => Effort::Medium,
-        "max" => Effort::Max,
-        _ => Effort::High,
-    }
-}
-
-use crate::warroom::{effort_label, mode_label, provider_models};
-
 /// The item counts of the filter segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct Counts {
@@ -1995,81 +1736,6 @@ fn answer_error_text(e: &anyhow::Error) -> String {
 mod tests {
     use super::*;
     use aivory_protocol::demo::Demo;
-
-    fn prefs() -> ComposerPrefs {
-        ComposerPrefs {
-            mode: Mode::Edit,
-            provider: "claude".into(),
-            model: "opus-5.5".into(),
-            effort: Effort::High,
-        }
-    }
-
-    #[test]
-    fn no_pick_is_a_plain_answer() {
-        assert_eq!(
-            plan(&prefs(), &Picks::default()),
-            Plan::Answer {
-                prefs_changed: false
-            }
-        );
-    }
-
-    #[test]
-    fn a_mode_or_effort_pick_is_noted_and_the_answer_stays() {
-        let picks = Picks {
-            mode: Some(Mode::Plan),
-            effort: Some(Effort::Max),
-            ..Picks::default()
-        };
-        assert_eq!(
-            plan(&prefs(), &picks),
-            Plan::Answer {
-                prefs_changed: true
-            }
-        );
-    }
-
-    #[test]
-    fn another_provider_hands_the_session_off_with_all_picks() {
-        let picks = Picks {
-            agent: Some(("codex".into(), "gpt-5.2-codex".into())),
-            effort: Some(Effort::Low),
-            ..Picks::default()
-        };
-        let Plan::Handoff(eff) = plan(&prefs(), &picks) else {
-            panic!("a handoff");
-        };
-        assert_eq!(eff.provider, "codex");
-        assert_eq!(eff.model, "gpt-5.2-codex");
-        assert_eq!(eff.effort, Effort::Low);
-        assert_eq!(eff.mode, Mode::Edit);
-    }
-
-    #[test]
-    fn another_model_of_the_same_provider_is_no_handoff() {
-        let picks = Picks {
-            agent: Some(("claude".into(), "haiku-5.5".into())),
-            ..Picks::default()
-        };
-        assert_eq!(
-            plan(&prefs(), &picks),
-            Plan::Answer {
-                prefs_changed: true
-            }
-        );
-        assert_eq!(picks.apply(&prefs()).model, "haiku-5.5");
-    }
-
-    #[test]
-    fn the_menu_words_map_back_to_the_values() {
-        for m in [Mode::Plan, Mode::Edit, Mode::Auto] {
-            assert_eq!(mode_from(mode_label(m)), m);
-        }
-        for e in [Effort::Low, Effort::Medium, Effort::High, Effort::Max] {
-            assert_eq!(effort_from(effort_label(e)), e);
-        }
-    }
 
     fn item(id: &str, kind: InboxKind, minutes_ago: i64) -> InboxItem {
         InboxItem {

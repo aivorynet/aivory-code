@@ -634,30 +634,6 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32, tint: u32)
     .into_any_element()
 }
 
-/// A ring dial: `frac` (0 to 1) of the ring is lit.
-pub fn dial(frac: f32) -> AnyElement {
-    canvas(
-        |_, _, _| (),
-        move |bounds, _, window, cx| {
-            let (x, y) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
-            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-            let c = [x + w / 2., y + h / 2.];
-            let r = w.min(h) / 2. - 12.;
-            painter(window, cx, |p| {
-                p.arc(c, r, (0., TAU), 14., BLUE_DIM, 1., &|q| q);
-                if frac > 0.005 {
-                    let end = -FRAC_PI_2 + TAU * frac.min(1.);
-                    p.arc(c, r, (-FRAC_PI_2, end), 22., BLUE_RING, 0.25, &|q| q);
-                    p.arc(c, r, (-FRAC_PI_2, end), 14., BLUE, 1., &|q| q);
-                }
-            });
-        },
-    )
-    .absolute()
-    .inset_0()
-    .into_any_element()
-}
-
 /// A radar: a ring and a line that sweeps round once in 3 seconds, with a fading fan.
 pub fn radar(t: f32) -> AnyElement {
     canvas(
@@ -841,6 +817,7 @@ fn snow_frames() -> &'static [std::sync::Arc<gpui::RenderImage>] {
 
 /// The empty center screen: no input, like a monitor that shows snow. One pre-made snow frame
 /// per draw (24 frames a second), a slow dark hum bar that rolls down, and darker edges.
+#[allow(dead_code, reason = "the idle screen replaced the snow")]
 pub fn interference(t: f32) -> AnyElement {
     let frames = snow_frames();
     let frame = frames[(t * 24.) as usize % frames.len()].clone();
@@ -887,6 +864,40 @@ pub fn interference(t: f32) -> AnyElement {
         )
         .child(shade)
         .into_any_element()
+}
+
+/// The idle center screen: dark green, faint scanlines, and a slow noise band. Cheap: about a
+/// hundred rectangles per frame.
+pub fn idle(t: f32) -> AnyElement {
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, cx| {
+            let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
+            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
+            let band = (t / 14.).fract() * (h + 120.) - 60.;
+            let step = ((t * 6.) as u32) % 64;
+            painter(window, cx, |p| {
+                p.rect((x0, y0, w, h), 0x021208, 1.0);
+                let mut y = 0.;
+                while y < h {
+                    p.rect((x0, y0 + y, w, 1.), 0x000000, 0.22);
+                    y += 4.;
+                }
+                p.rect((x0, y0 + band - 30., w, 60.), GREEN_DIM, 0.05);
+                for i in 0..40u32 {
+                    let hx = hash(i, step);
+                    let fx = (hx % 997) as f32 / 997. * w;
+                    let fy = band - 30. + (hash(hx, 7) % 60) as f32;
+                    if fy >= 0. && fy < h {
+                        p.rect((x0 + fx, y0 + fy, 2. + (hx % 14) as f32, 1.), GREEN, 0.10);
+                    }
+                }
+            });
+        },
+    )
+    .absolute()
+    .inset_0()
+    .into_any_element()
 }
 
 /// Where the line of an agent starts: above its screen on the bottom row, or for an agent on

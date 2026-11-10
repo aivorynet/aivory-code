@@ -3,7 +3,6 @@
 //! The mockups `BridgeIslands` and `BridgeDetail` give the positions; `Art` moves the right and
 //! the bottom edge when the window is larger than the art.
 
-use std::f32::consts::TAU;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -11,9 +10,7 @@ use aivory_protocol::{Pane, SessionState, WarRoom};
 
 use crate::console::display::{DKind, DLine};
 use gpui::prelude::*;
-use gpui::{
-    AnyElement, App, Div, PathBuilder, SharedString, Stateful, Window, canvas, div, point, px, rgb,
-};
+use gpui::{AnyElement, App, Div, SharedString, Stateful, Window, div, px, rgb};
 
 /// Navigation and actions.
 pub const OR: u32 = 0xFF9C00;
@@ -45,7 +42,6 @@ pub const DIM: u32 = 0xBDB6AD;
 
 /// Antonio 600 for labels, Antonio 700 for figures (see `assets.rs`).
 pub const LABEL: &str = "Antonio SB";
-pub const FIGURE: &str = "Antonio SB";
 /// Chat and questions.
 pub const BODY: &str = "Barlow Semi Condensed";
 /// Code, commands, paths.
@@ -81,6 +77,16 @@ pub fn ease(elapsed: Duration, ms: f32) -> f32 {
 pub const ART_W: f32 = 1440.;
 pub const ART_H: f32 = 900.;
 
+/// A text size or a text height of the look, scaled like the interface text.
+pub fn tsz(size: f32) -> gpui::Pixels {
+    crate::ui::ts(size)
+}
+
+/// The scale factor of the interface text (the setting and the window fit).
+pub fn kf() -> f32 {
+    f32::from(crate::ui::sw(1.))
+}
+
 /// The window against the 1440x900 art. A left edge stays; a right edge moves with `dx`, a
 /// bottom edge with `dy`.
 #[derive(Debug, Clone, Copy)]
@@ -97,7 +103,7 @@ impl Art {
 
     pub fn sized(w: f32, h: f32) -> Self {
         Self {
-            dx: (w - ART_W).max(-300.),
+            dx: (w - ART_W).max(-480.),
             dy: (h - ART_H).max(-300.),
         }
     }
@@ -180,8 +186,8 @@ pub fn ibtn_flow(id: impl Into<SharedString>, c: u32, label: &str) -> Stateful<D
         .pr(px(16.))
         .pb(px(8.))
         .font_family(LABEL)
-        .text_size(px(S_SMALL))
-        .line_height(px(S_SMALL))
+        .text_size(tsz(S_SMALL))
+        .line_height(tsz(S_SMALL))
         .text_color(rgb(BLACK))
         .whitespace_nowrap()
         .overflow_hidden()
@@ -195,7 +201,7 @@ pub fn pill(id: impl Into<SharedString>, c: u32, label: &str) -> Stateful<Div> {
     div()
         .id(id.into())
         .flex_none()
-        .h(px(28.))
+        .min_h(tsz(28.))
         .px(px(14.))
         .rounded_full()
         .bg(rgb(c))
@@ -204,8 +210,8 @@ pub fn pill(id: impl Into<SharedString>, c: u32, label: &str) -> Stateful<Div> {
         .justify_center()
         .pt(px(2.))
         .font_family(LABEL)
-        .text_size(px(S_SMALL))
-        .line_height(px(S_SMALL))
+        .text_size(tsz(S_SMALL))
+        .line_height(tsz(S_SMALL))
         .text_color(rgb(BLACK))
         .whitespace_nowrap()
         .cursor_pointer()
@@ -218,8 +224,8 @@ pub fn th(text: impl Into<SharedString>) -> Div {
     let text: SharedString = text.into();
     div()
         .font_family(LABEL)
-        .text_size(px(S_SMALL))
-        .line_height(px(S_SMALL + 2.))
+        .text_size(tsz(S_SMALL))
+        .line_height(tsz(S_SMALL + 2.))
         .text_color(rgb(MUTED))
         .whitespace_nowrap()
         .overflow_hidden()
@@ -232,94 +238,13 @@ pub fn sec(text: impl Into<SharedString>) -> Div {
     let text: SharedString = text.into();
     div()
         .font_family(LABEL)
-        .text_size(px(S_SECTION))
-        .line_height(px(S_SECTION + 6.))
+        .text_size(tsz(S_SECTION))
+        .line_height(tsz(S_SECTION + 6.))
         .text_color(rgb(MUTED))
         .whitespace_nowrap()
         .overflow_hidden()
         .text_ellipsis()
         .child(SharedString::from(text.to_uppercase()))
-}
-
-/// A header block of a list: a round cap, then a bar with a label and a value.
-pub fn head(c: u32, left: &str, right: &str) -> Div {
-    div()
-        .flex_none()
-        .h(px(30.))
-        .flex()
-        .gap(px(4.))
-        .child(div().w(px(20.)).h_full().bg(rgb(c)).rounded_l(px(15.)))
-        .child(
-            div()
-                .flex_1()
-                .min_w(px(0.))
-                .h_full()
-                .bg(rgb(c))
-                .px(px(16.))
-                .flex()
-                .items_center()
-                .justify_between()
-                .font_family(LABEL)
-                .text_size(px(S_SECTION - 2.))
-                .text_color(rgb(BLACK))
-                .whitespace_nowrap()
-                .overflow_hidden()
-                .child(left.to_uppercase())
-                .child(right.to_uppercase()),
-        )
-}
-
-/// A ring chart: a dark track and an arc for `pct` percent, from the top, with the figure in
-/// the middle.
-pub fn ring(size: f32, shown: f32, pct: u8, c: u32) -> Div {
-    let frac = (shown / 100.).clamp(0., 1.);
-    div()
-        .relative()
-        .size(px(size))
-        .child(
-            canvas(
-                |_, _, _| (),
-                move |bounds, _, window, _| {
-                    let cx = f32::from(bounds.origin.x) + f32::from(bounds.size.width) / 2.;
-                    let cy = f32::from(bounds.origin.y) + f32::from(bounds.size.height) / 2.;
-                    let width = size * 0.118;
-                    let r = size / 2. - width / 2.;
-                    for (frac, color) in [(1., RULE), (frac, c)] {
-                        if frac <= 0. {
-                            continue;
-                        }
-                        let steps = ((frac * 64.) as usize).max(2);
-                        let mut path = PathBuilder::stroke(px(width));
-                        for i in 0..=steps {
-                            let a = -TAU / 4. + TAU * frac * i as f32 / steps as f32;
-                            let p = point(px(cx + a.cos() * r), px(cy + a.sin() * r));
-                            if i == 0 {
-                                path.move_to(p);
-                            } else {
-                                path.line_to(p);
-                            }
-                        }
-                        if let Ok(path) = path.build() {
-                            window.paint_path(path, rgb(color));
-                        }
-                    }
-                },
-            )
-            .absolute()
-            .inset_0(),
-        )
-        .child(
-            div()
-                .absolute()
-                .inset_0()
-                .flex()
-                .items_center()
-                .justify_center()
-                .font_family(FIGURE)
-                .text_size(px(S_BIG))
-                .text_color(rgb(TXT))
-                .child(format!("{pct}%")),
-        )
 }
 
 /// What a click on a nav segment does: the index 0 to 4 of War room to Settings.
@@ -469,7 +394,7 @@ fn display_lines(d: &DLine, chars: usize) -> usize {
 
 /// The height of a display line, with the gap above a message.
 pub fn display_h(d: &DLine, chars: usize) -> f32 {
-    display_lines(d, chars) as f32 * LH_BODY + if d.first { MSG_GAP } else { 0. }
+    display_lines(d, chars) as f32 * LH_BODY * kf() + if d.first { MSG_GAP } else { 0. }
 }
 
 /// The lines that fit in `avail` px, newest at the end. The list starts at a message when one
@@ -524,19 +449,19 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
         (true, Some(name)) => Some(name),
         _ => None,
     };
-    let mut cell = div().flex_none().w(px(label_w)).h(px(LH_BODY));
+    let mut cell = div().flex_none().w(px(label_w)).h(tsz(LH_BODY));
     if let Some(name) = label {
         cell = if pill {
             cell.child(
                 div()
-                    .h(px(LH_BODY))
+                    .h(tsz(LH_BODY))
                     .px(px(10.))
                     .rounded_l(px(12.))
                     .bg(rgb(c))
                     .flex()
                     .items_center()
                     .font_family(LABEL)
-                    .text_size(px(S_SMALL))
+                    .text_size(tsz(S_SMALL))
                     .text_color(rgb(BLACK))
                     .whitespace_nowrap()
                     .overflow_hidden()
@@ -546,7 +471,7 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
             cell.flex()
                 .items_center()
                 .font_family(LABEL)
-                .text_size(px(S_SMALL))
+                .text_size(tsz(S_SMALL))
                 .text_color(rgb(c))
                 .whitespace_nowrap()
                 .overflow_hidden()
@@ -556,53 +481,53 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
     let text = div()
         .flex_1()
         .min_w(px(0.))
-        .max_h(px(n as f32 * LH_BODY))
+        .max_h(tsz(n as f32 * LH_BODY))
         .overflow_hidden()
-        .line_height(px(LH_BODY));
+        .line_height(tsz(LH_BODY));
     let text = match d.kind {
         DKind::You => text
             .font_family(BODY)
-            .text_size(px(S_BODY))
+            .text_size(tsz(S_BODY))
             .text_color(rgb(WHITE)),
         DKind::Agent | DKind::Bullet => text
             .font_family(BODY)
-            .text_size(px(S_BODY))
+            .text_size(tsz(S_BODY))
             .text_color(rgb(DIM)),
         DKind::Heading => text
             .truncate()
             .font_family(LABEL)
-            .text_size(px(S_SECTION - 4.))
+            .text_size(tsz(S_SECTION - 4.))
             .text_color(rgb(PK)),
         DKind::Code => text
             .truncate()
             .font_family(CODE)
-            .text_size(px(S_CODE))
+            .text_size(tsz(S_CODE))
             .text_color(rgb(PA)),
         DKind::Table => text
             .truncate()
             .font_family(CODE)
-            .text_size(px(S_CODE))
+            .text_size(tsz(S_CODE))
             .text_color(rgb(if d.first { PK } else { DIM })),
         DKind::Tool => text
             .truncate()
             .font_family(CODE)
-            .text_size(px(S_CODE))
+            .text_size(tsz(S_CODE))
             .text_color(rgb(DIM)),
         DKind::Output => text
             .truncate()
             .pl(px(16.))
             .font_family(CODE)
-            .text_size(px(S_CODE))
+            .text_size(tsz(S_CODE))
             .text_color(rgb(MUTED)),
         DKind::Error => text
             .truncate()
             .font_family(CODE)
-            .text_size(px(S_CODE))
+            .text_size(tsz(S_CODE))
             .text_color(rgb(RD)),
         DKind::Meta => text
             .truncate()
-            .font_family(LABEL)
-            .text_size(px(S_SMALL))
+            .font_family(CODE)
+            .text_size(tsz(S_CODE))
             .text_color(rgb(MUTED)),
     };
     let shown = if d.kind == DKind::Heading {

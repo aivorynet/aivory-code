@@ -141,7 +141,7 @@ mod tests {
         let b = get(&store, "my-theme", DisplayClass::Desktop).unwrap();
         assert_eq!(b.id, "my-theme");
         assert_eq!(b.tokens["colors"]["bg"], "#ffffff");
-        assert_eq!(b.layouts.len(), 8);
+        assert_eq!(b.layouts.len(), 7);
         assert_eq!(b.strings["en"]["title"], "Fleet");
         assert!(
             get(&store, "my-theme", DisplayClass::Phone)

@@ -917,6 +917,7 @@ fn tasks(panes: &[Pane]) -> Vec<Task> {
                         title: s(title),
                         role: s(role),
                         state: state(*st),
+                        native: None,
                     })
                     .collect(),
                 (Some(id), Some(p)) => vec![TaskSession {
@@ -930,6 +931,7 @@ fn tasks(panes: &[Pane]) -> Vec<Task> {
                     } else {
                         SessionState::Working
                     },
+                    native: None,
                 }],
                 _ => Vec::new(),
             };

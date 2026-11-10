@@ -84,7 +84,7 @@ impl Action {
     pub fn screen(&self) -> Option<crate::shell::Screen> {
         use crate::shell::Screen;
         match self {
-            Self::Focus(id) => Some(Screen::Focus(id.clone())),
+            Self::Focus(id) => Some(Screen::Session(id.clone())),
             Self::Open(Open::WarRoom) => Some(Screen::WarRoom),
             Self::Open(Open::Inbox) => Some(Screen::Inbox),
             Self::Open(Open::Tasks) => Some(Screen::Tasks),
@@ -182,6 +182,7 @@ pub fn act(model: &Entity<Model>, action: Action, cx: &mut App) {
                 prompt: text,
                 composer,
                 task: None,
+                attachments: Vec::new(),
             },
             cx,
         ),

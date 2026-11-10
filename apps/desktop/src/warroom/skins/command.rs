@@ -1519,7 +1519,9 @@ pub fn last_lines(tail: &[Line], n: usize) -> Vec<Line> {
     let mut out: Vec<Line> = tail
         .iter()
         .rev()
-        .filter(|l| matches!(l.kind, LineKind::User | LineKind::Agent | LineKind::Tool))
+        .filter(|l| {
+            l.media.is_some() || matches!(l.kind, LineKind::User | LineKind::Agent | LineKind::Tool)
+        })
         .take(n)
         .cloned()
         .collect();

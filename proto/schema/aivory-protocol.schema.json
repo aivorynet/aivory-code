@@ -1138,6 +1138,133 @@
       ],
       "type": "object"
     },
+    "CompleteItem": {
+      "description": "One suggestion.",
+      "properties": {
+        "detail": {
+          "description": "One short line: the description of a command, the folder of a file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "insert": {
+          "description": "The text that replaces the typed word, for example `/review ` or `@src/main.rs `.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CompleteItemKind"
+        },
+        "label": {
+          "description": "The text of the row, for example `/review` or `src/main.rs`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "label",
+        "insert"
+      ],
+      "type": "object"
+    },
+    "CompleteItemKind": {
+      "description": "The kind of one suggestion.",
+      "oneOf": [
+        {
+          "const": "command",
+          "description": "A built-in command of the agent CLI.",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "A custom command or prompt file of the user or the project.",
+          "type": "string"
+        },
+        {
+          "const": "skill",
+          "description": "A skill.",
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "A file or a folder of the codebase.",
+          "type": "string"
+        },
+        {
+          "const": "agent",
+          "description": "A subagent.",
+          "type": "string"
+        }
+      ]
+    },
+    "CompleteKind": {
+      "description": "What the typed word asks for.",
+      "oneOf": [
+        {
+          "const": "command",
+          "description": "A word that starts with `/` at the start of the message.",
+          "type": "string"
+        },
+        {
+          "const": "mention",
+          "description": "A word that starts with `@`.",
+          "type": "string"
+        }
+      ]
+    },
+    "CompleteList": {
+      "description": "The suggestions, best first.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/CompleteItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "CompleteParams": {
+      "description": "`compose/complete`.",
+      "properties": {
+        "cwd": {
+          "description": "The folder when there is no session yet.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/CompleteKind"
+        },
+        "provider": {
+          "description": "The agent when there is no session yet (`claude`, `codex`, `gemini`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "description": "The typed word without its `/` or `@`.",
+          "type": "string"
+        },
+        "session": {
+          "description": "The session of the chat field: it gives the agent and the folder.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "query"
+      ],
+      "type": "object"
+    },
     "ComposerPrefs": {
       "description": "The dropdowns of a composer. A provider change is a handoff to a new session.",
       "properties": {
@@ -1929,6 +2056,17 @@
             }
           ],
           "description": "The effort of the session (default: the provider setting)."
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The permission mode of the session (default: the provider setting)."
         },
         "model": {
           "description": "The model of the session (default: the provider setting).",
@@ -3041,6 +3179,17 @@
             "null"
           ]
         },
+        "media": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Media"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "An image, a video, a PDF, or a link that the line previews. `text` names it for a\nclient without previews."
+        },
         "text": {
           "type": "string"
         }
@@ -3320,6 +3469,80 @@
       ],
       "type": "object"
     },
+    "Media": {
+      "description": "One media item. `src` is an absolute file path on the daemon machine or an `http(s)` URL.\nA remote client reads a file through `media/get`.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MediaKind"
+        },
+        "mime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "src": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "src"
+      ],
+      "type": "object"
+    },
+    "MediaData": {
+      "description": "The bytes of a media file, as base64.",
+      "properties": {
+        "data": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "size": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mime",
+        "data",
+        "size"
+      ],
+      "type": "object"
+    },
+    "MediaGetParams": {
+      "description": "`media/get`: read a media file of the daemon machine (a remote client shows a preview).",
+      "properties": {
+        "src": {
+          "description": "The absolute path of [`Media::src`].",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src"
+      ],
+      "type": "object"
+    },
+    "MediaKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "image",
+            "video",
+            "pdf"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "link",
+          "description": "A web page.",
+          "type": "string"
+        }
+      ]
+    },
     "MemSample": {
       "properties": {
         "agentsMb": {
@@ -3414,6 +3637,13 @@
     },
     "NewSessionParams": {
       "properties": {
+        "attachments": {
+          "description": "Files of the first turn. Images (png, jpeg, gif, webp) go to the agent as images;\nthe client names other files in the prompt.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "codebase": {
           "type": "string"
         },
@@ -3517,11 +3747,57 @@
             "null"
           ]
         },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerPrefs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mode, provider, model, and effort of the organizer session. Default: Auto, claude,\nthe default model, medium effort."
+        },
         "mode": {
           "$ref": "#/$defs/OrganizerMode",
           "default": "memoryAndSessions"
         }
       },
+      "type": "object"
+    },
+    "OsEntry": {
+      "description": "The state of the entry in the scheduler of the operating system.",
+      "properties": {
+        "at": {
+          "description": "The fire time that the entry holds.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "error": {
+          "description": "Why the entry could not be written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "The name of the entry, for example `AIVory\\s1731150000000`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scheduler": {
+          "description": "`windows`, `systemd`, `crontab`, `launchd`, or `none` (the daemon fires it while it\nruns).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scheduler"
+      ],
       "type": "object"
     },
     "OutlineNode": {
@@ -4677,6 +4953,171 @@
       ],
       "type": "object"
     },
+    "Schedule": {
+      "properties": {
+        "cron": {
+          "description": "Five fields in local time: minute, hour, day of month, month, day of week (0 = Sunday).\nEach field: `*`, a number, a range `1-5`, a list `1,15`, and a step `*/15`.",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lastFired": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lastTask": {
+          "description": "The task of the last fire.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "nextFire": {
+          "description": "`None` when the schedule is off or the expression never matches.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "osEntry": {
+          "$ref": "#/$defs/OsEntry",
+          "default": {
+            "scheduler": ""
+          }
+        },
+        "template": {
+          "$ref": "#/$defs/TaskTemplate"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "cron",
+        "enabled",
+        "template"
+      ],
+      "type": "object"
+    },
+    "ScheduleCreateParams": {
+      "properties": {
+        "cron": {
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Default: `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "template": {
+          "$ref": "#/$defs/TaskTemplate"
+        }
+      },
+      "required": [
+        "name",
+        "cron",
+        "template"
+      ],
+      "type": "object"
+    },
+    "ScheduleFireParams": {
+      "description": "`schedules/fire`: the entry of the operating system calls it. `due` is the fire time that\nthe entry was for: a fire that the daemon did already is not repeated.",
+      "properties": {
+        "due": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ScheduleList": {
+      "properties": {
+        "schedules": {
+          "items": {
+            "$ref": "#/$defs/Schedule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schedules"
+      ],
+      "type": "object"
+    },
+    "ScheduleRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ScheduleUpdateParams": {
+      "properties": {
+        "cron": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "SendParams": {
       "properties": {
         "attachments": {
@@ -5520,6 +5961,17 @@
         "codebase": {
           "type": "string"
         },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerPrefs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mode, provider, model, and effort of the first session. It wins over `provider` and\n`mode`. Default: the provider defaults of Settings."
+        },
         "mode": {
           "anyOf": [
             {
@@ -5613,6 +6065,13 @@
     "TaskSession": {
       "description": "A session of a task, as the task panel lists it.",
       "properties": {
+        "native": {
+          "description": "The native session id, when `session` is the id of a run (`run-…`). The task follows\nthe native id after the run exits.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "role": {
           "description": "`main · opus-5.5`, `sub · running`.",
           "type": "string"
@@ -5633,6 +6092,71 @@
         "title",
         "role",
         "state"
+      ],
+      "type": "object"
+    },
+    "TaskStartParams": {
+      "description": "Start the first session of a planned task now.",
+      "properties": {
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerPrefs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: the provider defaults of Settings."
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "TaskTemplate": {
+      "description": "What a fire creates: a task with its first session.",
+      "properties": {
+        "codebase": {
+          "type": "string"
+        },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerPrefs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: the provider defaults of Settings."
+        },
+        "part": {
+          "description": "Default: `general`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "playbook": {
+          "$ref": "#/$defs/Playbook",
+          "default": "feature"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "codebase",
+        "prompt"
       ],
       "type": "object"
     },
@@ -6371,6 +6895,14 @@
         "$ref": "#/$defs/SymbolPage"
       }
     },
+    "compose/complete": {
+      "params": {
+        "$ref": "#/$defs/CompleteParams"
+      },
+      "result": {
+        "$ref": "#/$defs/CompleteList"
+      }
+    },
     "daemon/info": {
       "params": {
         "$ref": "#/$defs/Empty"
@@ -6507,6 +7039,14 @@
         "$ref": "#/$defs/MapFile"
       }
     },
+    "media/get": {
+      "params": {
+        "$ref": "#/$defs/MediaGetParams"
+      },
+      "result": {
+        "$ref": "#/$defs/MediaData"
+      }
+    },
     "organizer/start": {
       "params": {
         "$ref": "#/$defs/OrganizerStartParams"
@@ -6633,6 +7173,54 @@
       },
       "result": {
         "$ref": "#/$defs/Memory"
+      }
+    },
+    "schedules/create": {
+      "params": {
+        "$ref": "#/$defs/ScheduleCreateParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Schedule"
+      }
+    },
+    "schedules/delete": {
+      "params": {
+        "$ref": "#/$defs/ScheduleRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "schedules/fire": {
+      "params": {
+        "$ref": "#/$defs/ScheduleFireParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Schedule"
+      }
+    },
+    "schedules/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/ScheduleList"
+      }
+    },
+    "schedules/run": {
+      "params": {
+        "$ref": "#/$defs/ScheduleRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Schedule"
+      }
+    },
+    "schedules/update": {
+      "params": {
+        "$ref": "#/$defs/ScheduleUpdateParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Schedule"
       }
     },
     "session/answer": {
@@ -6785,6 +7373,14 @@
       },
       "result": {
         "$ref": "#/$defs/TaskList"
+      }
+    },
+    "tasks/start": {
+      "params": {
+        "$ref": "#/$defs/TaskStartParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Task"
       }
     },
     "tasks/update": {

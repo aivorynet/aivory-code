@@ -21,10 +21,12 @@
 mod acp;
 mod any;
 mod codex;
+mod input;
 mod rpc;
 mod stream;
 
 pub use any::AnyRun;
+pub use input::{IMAGE_MAX_BYTES, Image, Input, image_mime};
 pub use rpc::RpcRun;
 
 use std::fs::{self, OpenOptions};
@@ -81,6 +83,11 @@ pub struct StartOptions {
     /// Codex and Gemini: how long the CLI may take to open the session before the run fails.
     /// The default is 90 seconds.
     pub open_timeout: Option<Duration>,
+    /// Claude `--effort`, Codex `effort` of each turn (`low`, `medium`, `high`, `xhigh`,
+    /// `max`). Gemini has no effort level.
+    pub effort: Option<String>,
+    /// Image files of the first user turn (png, jpeg, gif, webp).
+    pub images: Vec<PathBuf>,
 }
 
 /// What a run reports. The channel closes after [`RunEvent::Exited`].
@@ -228,6 +235,9 @@ impl LiveRun {
         if let Some(model) = &opts.model {
             cmd.args(["--model", model]);
         }
+        if let Some(effort) = &opts.effort {
+            cmd.args(["--effort", effort]);
+        }
         cmd.current_dir(&opts.cwd)
             .env(TOKEN_ENV, mcp.token())
             .stdin(Stdio::piped())
@@ -285,7 +295,7 @@ impl LiveRun {
             .spawn(move || read_loop(&reader_shared, stdout, trace.as_ref(), &tail))?;
 
         let run = Self { shared };
-        if run.send(&opts.prompt).is_err() {
+        if run.send_input(&Input::first(&opts)).is_err() {
             return Err(std::io::Error::other("the agent process closed its input").into());
         }
         Ok((run, rx))
@@ -315,20 +325,66 @@ impl LiveRun {
 
     /// Send the next user turn. The text also appears as a user line in the transcript.
     pub fn send(&self, text: &str) -> Result<(), LiveError> {
+        self.send_input(&Input::text(text))
+    }
+
+    /// Send the next user turn with its images. A new mode, model, or effort goes first as a
+    /// control request; it stays for the turns after this one.
+    pub fn send_input(&self, input: &Input) -> Result<(), LiveError> {
         if lock(&self.shared.exited).is_some() {
             return Err(LiveError::NotRunning);
         }
+        if let Some(mode) = &input.permission_mode {
+            self.control(json!({ "subtype": "set_permission_mode", "mode": mode }))?;
+        }
+        if let Some(model) = &input.model {
+            self.control(json!({ "subtype": "set_model", "model": model }))?;
+        }
+        if let Some(effort) = &input.effort {
+            self.control(json!({
+                "subtype": "apply_flag_settings",
+                "settings": { "effortLevel": effort },
+            }))?;
+        }
+        let (images, skipped) = input.load_images();
+        let content = if images.is_empty() {
+            json!(input.text)
+        } else {
+            let mut blocks: Vec<Value> = images
+                .iter()
+                .map(|i| {
+                    json!({
+                        "type": "image",
+                        "source": { "type": "base64", "media_type": i.mime, "data": i.base64() },
+                    })
+                })
+                .collect();
+            blocks.push(json!({ "type": "text", "text": input.text }));
+            Value::Array(blocks)
+        };
         let message = json!({
             "type": "user",
-            "message": { "role": "user", "content": text },
+            "message": { "role": "user", "content": content },
         });
         self.shared.open_turns.fetch_add(1, Ordering::SeqCst);
         if let Err(e) = self.push(message.to_string()) {
             self.shared.open_turns.fetch_sub(1, Ordering::SeqCst);
             return Err(e);
         }
-        send_event(&self.shared.events, RunEvent::Line(Line::user(text)));
+        for line in input.lines(&skipped) {
+            send_event(&self.shared.events, RunEvent::Line(line));
+        }
         Ok(())
+    }
+
+    fn control(&self, request: Value) -> Result<(), LiveError> {
+        let seq = self.shared.control_seq.fetch_add(1, Ordering::SeqCst);
+        let line = json!({
+            "type": "control_request",
+            "request_id": format!("aivory-{seq}"),
+            "request": request,
+        });
+        self.push(line.to_string())
     }
 
     /// Answer an open ask.

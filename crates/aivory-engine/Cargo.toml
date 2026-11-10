@@ -10,7 +10,7 @@ publish.workspace = true
 [dependencies]
 aivory-protocol.workspace = true
 # MIT. `bundled` compiles SQLite (public domain) into the binary.
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["float_roundtrip"] }
 thiserror.workspace = true

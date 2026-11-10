@@ -2,21 +2,20 @@
 //! turn number on every tool row, the ask card with all answers, and the full composer.
 
 use aivory_protocol::rpc::{SessionRef, method};
-use aivory_protocol::{Ask, AskKind, ComposerPrefs, Effort, Mode, Pane, SessionState};
+use aivory_protocol::{Ask, AskKind, Pane, SessionState};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Context, Div, Focusable, FontWeight, SharedString, Window, deferred, div, list, px,
-    relative, rgb, rgba,
+    AnyElement, Context, Div, Focusable, FontWeight, SharedString, Window, div, list, px, relative,
+    rgb, rgba,
 };
 
+use super::FocusScreen;
 use super::items::{self, EditRow, Item};
-use super::{FocusEvent, FocusScreen, Menu};
 use crate::compose;
 use crate::console::blocks::{Pending, ToolState};
 use crate::console::todo::TodoState;
 use crate::theme::*;
 use crate::ui;
-use crate::warroom::{effort_label, mode_label, provider_models};
 
 /// The orange of the agent: the turn tag and the live dot (`--claude`).
 pub(super) const CLAUDE: u32 = 0xD97757;
@@ -62,26 +61,38 @@ fn state_label(state: SessionState) -> &'static str {
 impl FocusScreen {
     pub(super) fn chat(&mut self, pane: &Pane, window: &mut Window, cx: &mut Context<Self>) -> Div {
         self.sync_items(pane);
-        let body = div().flex_1().min_h(px(0.)).px(px(18.)).child(
-            list(
-                self.list.clone(),
-                cx.processor(|this, ix: usize, _, cx| this.chat_item(ix, cx)),
-            )
-            .size_full(),
-        );
-        div()
+        let body = div()
+            .relative()
             .flex_1()
-            .min_w(px(400.))
-            .h_full()
-            .flex()
-            .flex_col()
-            .bg(rgb(tk().card))
-            .border_r_1()
-            .border_color(rgba(tk().line))
-            .child(self.chat_head(pane, cx))
-            .children(self.plan(pane))
-            .child(body)
-            .child(self.composer(pane, window, cx))
+            .min_h(px(96.))
+            .px(px(18.))
+            .child(
+                list(
+                    self.list.clone(),
+                    cx.processor(|this, ix: usize, _, cx| this.chat_item(ix, cx)),
+                )
+                .size_full(),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .child(gpui_base::Scrollbar::vertical(&self.list)),
+            );
+        compose::media_target(
+            div().flex_1().min_w(ui::sw(380.)).h_full(),
+            |this: &mut Self| Some(&mut this.tools),
+            cx,
+        )
+        .flex()
+        .flex_col()
+        .bg(rgb(tk().card))
+        .border_r_1()
+        .border_color(rgba(tk().line))
+        .child(self.chat_head(pane, cx))
+        .children(self.plan(pane))
+        .child(body)
+        .child(self.composer(pane, window, cx))
     }
 
     /// Bring the list in line with the transcript of the pane.
@@ -153,7 +164,7 @@ impl FocusScreen {
             div()
                 .id(id)
                 .flex_none()
-                .size(px(30.))
+                .size(ui::sw(30.))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -180,7 +191,6 @@ impl FocusScreen {
         let session = SessionRef {
             id: pane.id.clone(),
         };
-        let deep = pane.id.clone();
         div()
             .flex_none()
             .px(px(18.))
@@ -196,7 +206,7 @@ impl FocusScreen {
                     .gap(px(8.))
                     .child(
                         div()
-                            .h(px(24.))
+                            .h(ui::sw(24.))
                             .px(px(10.))
                             .flex()
                             .items_center()
@@ -229,14 +239,7 @@ impl FocusScreen {
                                 }),
                             ),
                         )
-                    })
-                    .child(
-                        ui::button_sm("focus-deep", "Deep dive", false)
-                            .tooltip(ui::tip("Open the full transcript of the session"))
-                            .on_click(cx.listener(move |_, _, _, cx| {
-                                cx.emit(FocusEvent::DeepDive(deep.clone()))
-                            })),
-                    ),
+                    }),
             )
             .child(
                 div()
@@ -254,6 +257,9 @@ impl FocusScreen {
                     .font_family(tk().mono)
                     .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .child(meta),
             )
     }
@@ -497,6 +503,16 @@ impl FocusScreen {
                 .child(text.clone())
                 .into_any_element(),
             Item::Meta(_) => div().into_any_element(),
+            Item::Media(m) => div()
+                .w_full()
+                .flex()
+                .justify_end()
+                .child(crate::media::preview(
+                    m,
+                    ("focus-media", ix),
+                    crate::media::page_style(),
+                ))
+                .into_any_element(),
         }
     }
 
@@ -634,13 +650,13 @@ impl FocusScreen {
     // ---- the composer -------------------------------------------------------------------
 
     fn composer(&mut self, pane: &Pane, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        let prefs = self.prefs.clone().unwrap_or_else(|| pane.composer.clone());
+        self.controls.sync(pane);
         let focused = self.input.focus_handle(cx).is_focused(window);
         let ibtn = |id: &'static str, icon: &'static str, tip: &'static str| {
             div()
                 .id(id)
                 .flex_none()
-                .size(px(30.))
+                .size(ui::sw(30.))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -782,6 +798,7 @@ impl FocusScreen {
             );
         let mut dr = div()
             .flex()
+            .flex_wrap()
             .items_center()
             .gap(px(6.))
             .pl(px(50.))
@@ -789,27 +806,14 @@ impl FocusScreen {
             .pb(px(10.))
             .text_size(ui::ts(T_CAPTION))
             .text_color(rgb(tk().ink_3));
-        for mode in [Mode::Plan, Mode::Edit, Mode::Auto] {
-            let on = prefs.mode == mode;
-            let base = prefs.clone();
-            dr = dr.child(
-                dd(("mode", mode as usize), mode_label(mode), on).on_click(cx.listener(
-                    move |this, _, _, cx| {
-                        let mut p = base.clone();
-                        p.mode = mode;
-                        this.prefs = Some(p);
-                        cx.notify();
-                    },
-                )),
-            );
-        }
+        let providers = self.model.read(cx).providers.clone();
         dr = dr
-            .child(self.picker(Menu::Model, format!("{} ▾", prefs.model), pane, &prefs, cx))
-            .child(self.picker(
-                Menu::Effort,
-                format!("{} ▾", effort_label(prefs.effort)),
+            .child(self.controls.row(
+                "focus-ctl",
                 pane,
-                &prefs,
+                &providers,
+                &crate::compose_controls::ControlStyle::page(),
+                |this: &mut Self| &mut this.controls,
                 cx,
             ))
             .child(div().flex_1())
@@ -851,91 +855,6 @@ impl FocusScreen {
             .children(status)
             .child(cb)
             .child(dr)
-    }
-
-    /// A pill with a menu of values above it.
-    fn picker(
-        &mut self,
-        menu: Menu,
-        label: String,
-        pane: &Pane,
-        prefs: &ComposerPrefs,
-        cx: &mut Context<Self>,
-    ) -> Div {
-        let open = self.menu == Some(menu);
-        let mut wrap =
-            div()
-                .relative()
-                .flex_none()
-                .child(
-                    dd(("menu", menu as usize), label, open).on_click(cx.listener(
-                        move |this, _, _, cx| {
-                            this.menu = if this.menu == Some(menu) {
-                                None
-                            } else {
-                                Some(menu)
-                            };
-                            cx.notify();
-                        },
-                    )),
-                );
-        if open {
-            let values: Vec<(String, bool)> = match menu {
-                Menu::Model => provider_models(&pane.provider)
-                    .iter()
-                    .map(|m| (m.to_string(), *m == prefs.model))
-                    .collect(),
-                Menu::Effort => [Effort::Low, Effort::Medium, Effort::High, Effort::Max]
-                    .iter()
-                    .map(|e| (effort_label(*e).to_string(), *e == prefs.effort))
-                    .collect(),
-            };
-            let mut m = ui::menu(120.);
-            for (i, (value, on)) in values.into_iter().enumerate() {
-                let base = prefs.clone();
-                let v = value.clone();
-                m = m.child(ui::menu_item(
-                    SharedString::from(format!("focus-mi-{menu:?}-{i}")),
-                    on,
-                    div().child(value).into_any_element(),
-                    None,
-                    Box::new(cx.listener(move |this, _, _, cx| {
-                        let mut p = base.clone();
-                        match menu {
-                            Menu::Model => p.model = v.clone(),
-                            Menu::Effort => {
-                                p.effort = match v.as_str() {
-                                    "low" => Effort::Low,
-                                    "medium" => Effort::Medium,
-                                    "max" => Effort::Max,
-                                    _ => Effort::High,
-                                }
-                            }
-                        }
-                        this.prefs = Some(p);
-                        this.menu = None;
-                        cx.notify();
-                    })),
-                ));
-            }
-            wrap = wrap.child(
-                deferred(
-                    div()
-                        .absolute()
-                        .bottom_full()
-                        .mb(px(6.))
-                        .left_0()
-                        .occlude()
-                        .on_mouse_down_out(cx.listener(|this, _, _, cx| {
-                            this.menu = None;
-                            cx.notify();
-                        }))
-                        .child(m),
-                )
-                .with_priority(2),
-            );
-        }
-        wrap
     }
 
     /// The mic: dictate into the composer; a second click stops.
@@ -1011,7 +930,7 @@ fn chip(
     remove: impl Fn(&gpui::ClickEvent, &mut Window, &mut gpui::App) + 'static,
 ) -> Div {
     div()
-        .h(px(26.))
+        .h(ui::sw(26.))
         .pl(px(10.))
         .pr(px(4.))
         .flex()
@@ -1042,32 +961,6 @@ fn chip(
                 .on_click(remove)
                 .child("×"),
         )
-}
-
-/// A pill of the composer row (`.dd`).
-fn dd(id: (&'static str, usize), label: impl Into<SharedString>, on: bool) -> gpui::Stateful<Div> {
-    div()
-        .id(id)
-        .h(px(26.))
-        .px(px(10.))
-        .flex()
-        .flex_none()
-        .items_center()
-        .rounded_full()
-        .whitespace_nowrap()
-        .text_size(ui::ts(T_CAPTION))
-        .font_weight(FontWeight::MEDIUM)
-        .cursor_pointer()
-        .map(|d| {
-            if on {
-                d.bg(rgb(tk().dark)).text_color(rgb(0xFFFFFF))
-            } else {
-                d.bg(rgb(tk().track))
-                    .text_color(rgb(tk().ink_2))
-                    .hover(|s| s.bg(rgb(tk().track_2)))
-            }
-        })
-        .child(label.into())
 }
 
 #[cfg(test)]

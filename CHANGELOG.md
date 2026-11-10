@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (first public version)
+## 2026.1.0 (first public version)
 
 - A control room for Claude Code, Codex CLI, and Gemini CLI sessions: desktop app, daemon, phone app.
 - Eight looks: Minimal, Bridge, Operator, Neon, Navigator, Holo, Tactical, Command.

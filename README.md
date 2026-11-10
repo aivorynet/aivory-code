@@ -41,7 +41,16 @@ winget install Aivory.AivoryCode
 brew install aivorynet/tap/aivory-code
 ```
 
-Both install `aivory` (the desktop app) and `aivoryd` (the daemon). Start the app with `aivory`.
+**macOS and Linux** (script, no package manager):
+
+```sh
+curl -fsSL https://github.com/aivorynet/aivory-code/releases/latest/download/install.sh | sh
+```
+
+**Linux packages:** the `.deb` and the `.AppImage` on the
+[releases page](https://github.com/aivorynet/aivory-code/releases).
+
+All of them install `aivory` (the desktop app) and `aivoryd` (the daemon). Start the app with `aivory`.
 
 The builds have no code signature yet. The package managers avoid the warnings: winget installs
 without the SmartScreen prompt, and Homebrew formulas do not get the macOS quarantine flag.

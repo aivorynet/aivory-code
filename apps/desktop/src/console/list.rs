@@ -121,18 +121,6 @@ impl BlockList {
         }
     }
 
-    /// The list item that shows the line `ix` of [`Self::lines`].
-    pub fn item_of_line(&self, ix: usize) -> usize {
-        let mut seen = 0;
-        for (i, b) in self.blocks.iter().enumerate() {
-            seen += b.lines.len();
-            if ix < seen {
-                return 1 + i;
-            }
-        }
-        0
-    }
-
     /// The text of all lines, for the clipboard.
     pub fn text(&self) -> String {
         self.lines

@@ -117,6 +117,10 @@ pub struct TaskSession {
     /// `main · opus-5.5`, `sub · running`.
     pub role: String,
     pub state: SessionState,
+    /// The native session id, when `session` is the id of a run (`run-…`). The task follows
+    /// the native id after the run exits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native: Option<String>,
 }
 
 /// How soon a queued task starts when the autopilot order is `Priority`.

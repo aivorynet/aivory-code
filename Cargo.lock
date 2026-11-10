@@ -112,10 +112,11 @@ dependencies = [
 
 [[package]]
 name = "aivory-agents"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
  "aivory-sessions",
+ "base64 0.22.1",
  "getrandom 0.3.4",
  "serde",
  "serde_json",
@@ -124,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-coord"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-index",
  "aivory-syntax",
@@ -139,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-desktop"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
  "aivory-syntax",
@@ -167,7 +168,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-diag"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-syntax",
  "ast-grep-config",
@@ -192,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-engine"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
  "rusqlite",
@@ -205,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-index"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-syntax",
  "blake3",
@@ -222,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-link"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
@@ -240,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-map"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
  "globset",
@@ -250,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-protocol"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "schemars",
  "serde",
@@ -259,9 +260,10 @@ dependencies = [
 
 [[package]]
 name = "aivory-sessions"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
+ "base64 0.22.1",
  "rayon",
  "serde",
  "serde_json",
@@ -270,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-syntax"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "blake3",
  "serde",
@@ -301,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-theme"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-protocol",
  "serde",
@@ -315,7 +317,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-vcs"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "rusqlite",
  "tempfile",
@@ -324,7 +326,7 @@ dependencies = [
 
 [[package]]
 name = "aivoryd"
-version = "0.1.0"
+version = "2026.1.0"
 dependencies = [
  "aivory-agents",
  "aivory-coord",
@@ -342,6 +344,7 @@ dependencies = [
  "chrono",
  "clap",
  "getrandom 0.3.4",
+ "ignore",
  "rusqlite",
  "serde",
  "serde_json",
@@ -621,9 +624,9 @@ dependencies = [
 
 [[package]]
 name = "async-executor"
-version = "1.14.0"
+version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c96bf972d85afc50bf5ab8fe2d54d1586b4e0b46c97c50a0c9e71e2f7bcd812a"
+checksum = "f426a31126c735126297bc5ea7a521263c9faff4f63ca415267ee625651c4f37"
 dependencies = [
  "async-task",
  "concurrent-queue",
@@ -4282,9 +4285,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.38.2"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8"
+checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
  "cc",
  "pkg-config",
@@ -6856,9 +6859,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.40.2"
+version = "0.41.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f2a97da3e3873c73cb2a2e71b35c40ff95e0b1eefa8d72d8499a6928c3b5b3"
+checksum = "da9bba6f3506135e120a6586df05be18b48d18896600646a4bec8f993d91a594"
 dependencies = [
  "bitflags 2.13.2",
  "fallible-iterator",

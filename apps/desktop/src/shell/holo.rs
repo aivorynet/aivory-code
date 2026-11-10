@@ -19,6 +19,7 @@ use crate::holo_lens::{HoloLens, HoloLensEvent};
 use crate::holo_screens::{HoloEvent, HoloInbox, HoloRepos, HoloSettings, HoloTasks};
 use crate::look::LOOKS;
 use crate::theme::tk;
+use crate::ui;
 
 /// The Holo screens and their event subscriptions: made when they first show, then kept.
 #[derive(Default)]
@@ -75,14 +76,14 @@ impl Shell {
         let on = self.screen.rail() == screen;
         let mut el = div()
             .id(id)
-            .h(px(30.))
+            .min_h(px(30.))
             .px(px(4.))
             .flex()
             .items_center()
             .gap(px(6.))
             .font_family(LABEL)
             .font_weight(gpui::FontWeight::SEMIBOLD)
-            .text_size(px(15.))
+            .text_size(ui::ts(15.))
             .cursor_pointer()
             .border_b_2()
             .border_color(ink(PK, if on { 1. } else { 0. }))
@@ -99,9 +100,6 @@ impl Shell {
         el.on_click(cx.listener(move |this, _, _, cx| {
             this.look_menu = false;
             this.holo_screens.full_settings = false;
-            if screen == Screen::WarRoom {
-                this.war_room.update(cx, |w, cx| w.holo_close(cx));
-            }
             this.go(screen.clone(), cx);
         }))
     }
@@ -121,7 +119,7 @@ impl Shell {
                 .flex_none()
                 .font_family(LABEL)
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_size(px(S_SMALL))
+                .text_size(ui::ts(S_SMALL))
                 .text_color(rgb(color))
                 .whitespace_nowrap()
                 .child(format!("{n} {word}"))
@@ -129,16 +127,18 @@ impl Shell {
         let look_name = crate::look::name(tk().look);
         div()
             .flex_none()
-            .h(px(BAR_H))
+            .min_h(px(BAR_H))
             .px(px(MARGIN))
             .pt(px(20.))
             .flex()
+            .flex_wrap()
+            .gap_x(px(24.))
+            .gap_y(px(4.))
             .items_start()
             .font_family(LABEL)
             .child(
                 div()
                     .flex_1()
-                    .min_w(px(0.))
                     .flex()
                     .items_center()
                     .gap(px(12.))
@@ -147,32 +147,65 @@ impl Shell {
                         div()
                             .font_family(LABEL)
                             .font_weight(gpui::FontWeight::BOLD)
-                            .text_size(px(S_BIG))
+                            .text_size(ui::ts(S_BIG))
                             .text_color(rgb(TXT))
                             .child("AIVORY"),
                     ),
             )
             .child(
+                // A solid page backing: the frame lines of the backdrop pass behind the
+                // navigation, never through its words.
                 div()
-                    .flex_none()
+                    .min_w(px(0.))
                     .flex()
+                    .flex_wrap()
                     .items_center()
-                    .gap(px(30.))
+                    .gap_x(px(30.))
+                    .px(px(12.))
+                    .bg(rgb(PAGE))
                     .child(self.holo_entry("holo-war", "War room", Screen::WarRoom, 0, cx))
                     .child(self.holo_entry("holo-inbox", "Inbox", Screen::Inbox, inbox, cx))
                     .child(self.holo_entry("holo-tasks", "Tasks", Screen::Tasks, 0, cx))
                     .child(self.holo_entry("holo-repos", "Repos", Screen::Repos, 0, cx))
-                    .child(self.holo_entry("holo-set", "Settings", Screen::Settings, 0, cx)),
+                    .child(self.holo_entry("holo-set", "Settings", Screen::Settings, 0, cx))
+                    .children(crate::new_session::launch_buttons("holo", |id, label| {
+                        div()
+                            .id(id)
+                            .flex_none()
+                            .min_h(px(30.))
+                            .px(px(10.))
+                            .flex()
+                            .items_center()
+                            .font_family(LABEL)
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .text_size(ui::ts(S_SMALL + 1.))
+                            // A glass button: a filled tint, so it reads as a button and
+                            // not as a nav entry.
+                            .text_color(ink(PA, 0.95))
+                            // Solid: PK at 16 % over PAGE, so no backdrop line shows through.
+                            .bg(rgb(0x0E2835))
+                            .border_1()
+                            .border_color(ink(PK, 0.45))
+                            .rounded(px(4.))
+                            .whitespace_nowrap()
+                            .cursor_pointer()
+                            .hover(|s| {
+                                s.text_color(rgb(TXT))
+                                    .bg(rgb(0x194657))
+                                    .border_color(ink(PK, 0.8))
+                            })
+                            .child(label)
+                    })),
             )
             .child(
                 div()
                     .flex_1()
-                    .min_w(px(0.))
-                    .h(px(30.))
+                    .min_h(px(30.))
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .justify_end()
-                    .gap(px(22.))
+                    .gap_x(px(22.))
                     .child(count(c.working, "working", MUTED))
                     .child(count(
                         c.needs_you + c.error,
@@ -184,13 +217,13 @@ impl Shell {
                         div()
                             .id("holo-look")
                             .flex_none()
-                            .h(px(30.))
+                            .min_h(px(30.))
                             .px(px(10.))
                             .flex()
                             .items_center()
                             .font_family(LABEL)
                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_size(px(S_SMALL + 1.))
+                            .text_size(ui::ts(S_SMALL + 1.))
                             .text_color(ink(MUTED, 0.9))
                             .border_1()
                             .border_color(ink(PK, 0.3))
@@ -230,13 +263,13 @@ impl Shell {
             list = list.child(
                 div()
                     .id(SharedString::from(format!("holo-look-{i}")))
-                    .h(px(34.))
+                    .min_h(px(34.))
                     .px(px(12.))
                     .flex()
                     .items_center()
                     .cursor_pointer()
                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_size(px(S_SMALL + 2.))
+                    .text_size(ui::ts(S_SMALL + 2.))
                     .text_color(if on { rgb(PK) } else { rgb(DIM) })
                     .hover(|s| s.bg(ink(PK, 0.12)))
                     .child(name.to_uppercase())
@@ -264,8 +297,7 @@ impl Shell {
         let bar = self.holo_bar(cx);
         let menu = self.holo_look_menu(cx);
         // A new screen, or a session view in the war room, opens with the pen's effect.
-        let open = self.war_room.read(cx).hud_open_id();
-        let key = format!("{:?}|{:?}", self.screen, open);
+        let key = format!("{:?}", self.screen);
         let mut fx = std::mem::take(&mut self.holo_screens.fx);
         fx.screen(key, window, cx, |s: &mut Shell| &mut s.holo_screens.fx);
         let area = fx.wrap(content, window);
@@ -278,7 +310,7 @@ impl Shell {
             .flex_col()
             .bg(rgb(PAGE))
             .font_family(BODY)
-            .text_size(px(S_BODY))
+            .text_size(ui::ts(S_BODY))
             .text_color(rgb(TXT))
             .child(backdrop(t))
             .child(bar)
@@ -308,14 +340,13 @@ impl Shell {
         let mut content = Some(content);
         let made: Option<AnyElement> =
             match self.screen.clone() {
-                Screen::Focus(id) => {
+                Screen::Session(id) => {
                     if let Some((v, _)) = &self.holo_screens.focus {
                         v.update(cx, |v, cx| v.show(&id, cx));
                     } else {
                         let v = cx.new(|cx| HoloFocus::new(model, id, window, cx));
                         let sub = cx.subscribe(&v, |t, _, e: &HoloFocusEvent, cx| match e {
-                            HoloFocusEvent::Open(id) => t.open_focus(id, cx),
-                            HoloFocusEvent::Detail(id) => t.open_session(id, cx),
+                            HoloFocusEvent::Open(id) => t.open_session(id, cx),
                             HoloFocusEvent::OpenFile { session, path } => {
                                 t.open_session_file(session, path, cx)
                             }

@@ -3,10 +3,11 @@
 //! daemon through `actions.rs`. "ALL FUNCTIONS" shows the full screen inside the window.
 
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use aivory_protocol::rpc::{AutopilotPatch, TaskListParams, method};
-use aivory_protocol::{Mode, Pane, SessionState, Task, TaskColumn, TaskList};
+use aivory_protocol::rpc::{AutopilotPatch, SessionRef, TaskListParams, method};
+use aivory_protocol::session::{DiffLineKind, SessionDiff};
+use aivory_protocol::{Pane, SessionState, Task, TaskColumn, TaskList};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, Stateful, Subscription, Task as GpuiTask,
@@ -15,10 +16,13 @@ use gpui::{
 use gpui_base::input::{InputEvent, TextareaState};
 
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::command_kit::{self as cmd, Btn, c};
 use crate::compose;
+use crate::compose_controls::{self, ControlStyle, Controls};
 use crate::model::Model;
 use crate::rts::{Sprite, sprites};
+use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole};
 use crate::ui;
 use crate::warroom::skins::command::{last_lines, line_head};
 
@@ -26,7 +30,11 @@ use crate::warroom::skins::command::{last_lines, line_head};
 #[derive(Debug, Clone)]
 pub enum CmdEvent {
     OpenSession(String),
-    Focus(String),
+    /// Open a file of a session in the code lens.
+    OpenFile {
+        session: String,
+        path: String,
+    },
     /// Show the full screen of this view inside the window.
     Full,
     NewUnit,
@@ -179,6 +187,12 @@ impl CommandTasks {
         })
         .detach();
     }
+
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
+    }
 }
 
 impl Render for CommandTasks {
@@ -251,7 +265,25 @@ impl Render for CommandTasks {
                             )
                             .child(cmd::label(t.codebase.clone())),
                     )
-                    .child(cmd::data(line, 18.).flex_none().text_color(c(col, 1.))),
+                    .child(cmd::data(line, 18.).flex_none().text_color(c(col, 1.)))
+                    .when_some(TaskAct::of(t.column), |d, a| {
+                        let id = t.id.clone();
+                        d.child(
+                            cmd::plate(
+                                format!("ct-act-{k}"),
+                                a.label().to_uppercase(),
+                                96.,
+                                36.,
+                                false,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    cx.stop_propagation();
+                                    task_act(&this.model, &id, a, Self::reload, cx);
+                                },
+                            )),
+                        )
+                    }),
             );
         }
         div()
@@ -652,13 +684,33 @@ pub struct CommandUnit {
     id: String,
     input: Entity<TextareaState>,
     tools: compose::Tools,
-    /// The mode for the next order; the mode of the session when `None`.
-    mode: Option<Mode>,
+    /// The composer controls: mode, provider, model, effort.
+    controls: Controls,
+    tab: UnitTab,
+    /// The radio (the last messages): its scroll bar follows the text.
+    radio_scroll: gpui::ScrollHandle,
+    console: Entity<SessionConsole>,
+    diff: Option<(Option<SessionDiff>, Instant)>,
+    busy: bool,
     _obs: Subscription,
     _events: Subscription,
+    _console_events: Subscription,
 }
 
 impl EventEmitter<CmdEvent> for CommandUnit {}
+
+/// The tabs of a Unit window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnitTab {
+    Orders,
+    Changes,
+    Console,
+}
+
+/// How old a diff gets before the window asks again.
+const DIFF_TTL: Duration = Duration::from_secs(8);
+/// The diff shows this many lines at most.
+const DIFF_LINES: usize = 400;
 
 fn fact(name: &str, value: String) -> Div {
     div()
@@ -683,19 +735,141 @@ impl CommandUnit {
                 .submit_on_enter(true)
         });
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { shift: false, .. } = event {
+            if let InputEvent::PressEnter { shift: false, .. } = event
+                && !crate::complete::is_open(cx)
+            {
                 this.send(window, cx);
             }
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            move |cx| weak.upgrade().map(|v| v.read(cx).id.clone()),
+            |_| (None, None),
+            cx,
+        );
+        let console = cx.new(|cx| SessionConsole::new(model.clone(), id.clone(), cx));
+        console.update(cx, |c, _| {
+            c.set_look(ConsoleLook {
+                theme: Some(crate::theme::PaneTheme {
+                    bg: cmd::WELL << 8 | 0xFF,
+                    text: cmd::INK << 8 | 0xFF,
+                    dim: cmd::HINT << 8 | 0xFF,
+                    ..crate::theme::PaneTheme::DARK
+                }),
+                size: 15.,
+                pad_x: 12.,
+                max_w: None,
+            })
+        });
+        let console_events = cx.subscribe(&console, |_, _, e: &ConsoleEvent, cx| {
+            let ConsoleEvent::OpenFile { session, path } = e;
+            cx.emit(CmdEvent::OpenFile {
+                session: session.clone(),
+                path: path.clone(),
+            });
+        });
+        let tab = if crate::session_console::take_want_code(&id) {
+            UnitTab::Changes
+        } else {
+            UnitTab::Orders
+        };
         Self {
             model,
             id,
             input,
             tools: compose::Tools::default(),
-            mode: None,
+            controls: Controls::default(),
+            tab,
+            radio_scroll: gpui::ScrollHandle::new(),
+            console,
+            diff: None,
+            busy: false,
             _obs: obs,
             _events: events,
+            _console_events: console_events,
         }
+    }
+
+    /// Read the diff again when the last read is old.
+    fn ensure_diff(&mut self, cx: &mut Context<Self>) {
+        if self.busy
+            || self
+                .diff
+                .as_ref()
+                .is_some_and(|(_, t)| t.elapsed() <= DIFF_TTL)
+        {
+            return;
+        }
+        self.busy = true;
+        let id = self.id.clone();
+        let task = self
+            .model
+            .read(cx)
+            .call::<method::SessionDiffMethod>(SessionRef { id: id.clone() }, cx);
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                this.busy = false;
+                if this.id == id {
+                    this.diff = Some((result.ok(), Instant::now()));
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// The code changes of the unit: every file with its lines.
+    fn changes(&self) -> AnyElement {
+        let files = self
+            .diff
+            .as_ref()
+            .and_then(|(d, _)| d.as_ref())
+            .map(|d| d.files.clone())
+            .unwrap_or_default();
+        let mut col = div()
+            .id("cu-diff")
+            .size_full()
+            .overflow_y_scroll()
+            .flex()
+            .flex_col();
+        if files.is_empty() {
+            let text = if self.diff.is_some() {
+                "NO CHANGES YET"
+            } else {
+                "READING CHANGES"
+            };
+            return col.child(cmd::label(text)).into_any_element();
+        }
+        let mut left = DIFF_LINES;
+        for f in &files {
+            col = col.child(div().flex_none().mt(px(8.)).child(cmd::entry(format!(
+                "{} +{} -{}",
+                f.path, f.added, f.removed
+            ))));
+            for l in f.lines.iter().take(left) {
+                let (mark, color) = match l.kind {
+                    DiffLineKind::Added => ("+ ", cmd::GREEN),
+                    DiffLineKind::Removed => ("- ", cmd::RED),
+                    DiffLineKind::Hunk => ("", cmd::HINT),
+                    DiffLineKind::Context => ("  ", cmd::INK_3),
+                };
+                col = col.child(
+                    cmd::data(format!("{mark}{}", l.text.trim_end()), 17.)
+                        .flex_none()
+                        .whitespace_nowrap()
+                        .overflow_hidden()
+                        .text_color(c(color, 1.)),
+                );
+            }
+            left = left.saturating_sub(f.lines.len());
+            if left == 0 {
+                break;
+            }
+        }
+        col.into_any_element()
     }
 
     fn pane(&self, cx: &Context<Self>) -> Option<Pane> {
@@ -707,20 +881,26 @@ impl CommandUnit {
         if text.is_empty() {
             return;
         }
-        let composer = self.mode.take().and_then(|mode| {
-            let mut prefs = self.pane(cx)?.composer;
-            prefs.mode = mode;
-            Some(prefs)
-        });
-        act(
-            &self.model,
-            Action::Send {
-                id: self.id.clone(),
-                text,
-                composer,
-            },
-            cx,
-        );
+        let Some(pane) = self.pane(cx) else {
+            return;
+        };
+        if let Some(ask) = &pane.ask {
+            act(
+                &self.model,
+                Action::Answer {
+                    id: self.id.clone(),
+                    ask: ask.id.clone(),
+                    option: None,
+                    text: Some(text),
+                },
+                cx,
+            );
+        } else {
+            let prefs = self.controls.current(&pane);
+            let images = self.tools.images();
+            compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+        }
+        self.tools.sent();
         self.input.update(cx, |s, cx| s.clean(window, cx));
         cx.notify();
     }
@@ -770,9 +950,7 @@ impl CommandUnit {
         } else {
             s.site(crate::rts::layout::hash(&p.id))
         };
-        let mode = self.mode.unwrap_or(p.composer.mode);
         let id = self.id.clone();
-        let focus = self.id.clone();
         let mut side = div()
             .w(px(280.))
             .flex_none()
@@ -804,35 +982,6 @@ impl CommandUnit {
                     .child(fact("COST", format!("${:.2}", p.cost)))
                     .child(fact("TOKENS", cmd::tokens(p.tokens)))
                     .child(fact("HELPERS", p.subagents.len().to_string())),
-            )
-            .child(
-                cmd::plate(
-                    "cu-mode",
-                    format!(
-                        "MODE · {}",
-                        match mode {
-                            Mode::Plan => "PLAN",
-                            Mode::Edit => "EDIT",
-                            Mode::Auto => "AUTO",
-                        }
-                    ),
-                    280.,
-                    40.,
-                    self.mode.is_some(),
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.mode = Some(match mode {
-                        Mode::Plan => Mode::Edit,
-                        Mode::Edit => Mode::Auto,
-                        Mode::Auto => Mode::Plan,
-                    });
-                    cx.notify();
-                })),
-            )
-            .child(
-                cmd::plate("cu-focus", "FOCUS VIEW", 280., 40., false).on_click(
-                    cx.listener(move |_, _, _, cx| cx.emit(CmdEvent::Focus(focus.clone()))),
-                ),
             );
         if p.state == SessionState::Parked {
             side = side.child(cmd::plate("cu-resume", "RESUME", 280., 40., true).on_click(
@@ -861,24 +1010,114 @@ impl CommandUnit {
 }
 
 impl Render for CommandUnit {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(p) = self.pane(cx) else {
             let empty: AnyElement = cmd::label("THIS UNIT IS GONE")
                 .p(px(12.))
                 .into_any_element();
             return div().size_full().child(empty);
         };
-        let side = self.side(&p, cx);
+        self.ensure_diff(cx);
+        let vp = window.viewport_size();
+        let (ww, _) = cmd::win_size(
+            f32::from(vp.width),
+            f32::from(vp.height),
+            crate::warroom::skins::command::SIDE_W,
+        );
+        // Under 980 px of window width the unit card hides and the chat takes the space.
+        let narrow = ww < 980.;
+        let side = if narrow {
+            None
+        } else {
+            Some(self.side(&p, cx))
+        };
+        let mut tabs = div()
+            .flex_none()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(px(8.));
+        for (id, label, tab) in [
+            ("cu-t-orders", "ORDERS", UnitTab::Orders),
+            ("cu-t-changes", "CHANGES", UnitTab::Changes),
+            ("cu-t-console", "CONSOLE", UnitTab::Console),
+        ] {
+            let kind = if self.tab == tab { Btn::Go } else { Btn::Plain };
+            tabs = tabs.child(cmd::button(id, label, kind).on_click(cx.listener(
+                move |this, _, _, cx| {
+                    this.tab = tab;
+                    cx.notify();
+                },
+            )));
+        }
+        if narrow {
+            let id = self.id.clone();
+            if p.state == SessionState::Parked {
+                tabs = tabs.child(cmd::button("cu-resume", "RESUME", Btn::Go).on_click(
+                    cx.listener(move |this, _, _, cx| {
+                        act(&this.model, Action::Resume(id.clone()), cx)
+                    }),
+                ));
+            } else if p.controlled && p.state.is_live() {
+                let (a, b) = (id.clone(), id);
+                tabs = tabs
+                    .child(
+                        cmd::button("cu-park", "PARK", Btn::Plain).on_click(cx.listener(
+                            move |this, _, _, cx| act(&this.model, Action::Park(a.clone()), cx),
+                        )),
+                    )
+                    .child(
+                        cmd::button("cu-stop", "STOP", Btn::Plain).on_click(cx.listener(
+                            move |this, _, _, cx| act(&this.model, Action::Stop(b.clone()), cx),
+                        )),
+                    );
+            }
+        }
+        if self.tab != UnitTab::Orders {
+            let body: AnyElement = if self.tab == UnitTab::Changes {
+                self.changes()
+            } else {
+                self.console.clone().into_any_element()
+            };
+            let main = cmd::well()
+                .flex_1()
+                .min_w(px(0.))
+                .h_full()
+                .p(px(14.))
+                .flex()
+                .flex_col()
+                .gap(px(10.))
+                .child(tabs)
+                .child(div().flex_1().min_h(px(0.)).child(body));
+            return div()
+                .size_full()
+                .flex()
+                .gap(px(cmd::GAP))
+                .children(side)
+                .child(main);
+        }
         let mut msgs = div()
             .id("cu-radio")
             .flex_1()
             .min_h(px(0.))
             .overflow_y_scroll()
+            .track_scroll(&self.radio_scroll)
             .flex()
             .flex_col()
             .gap(px(8.))
             .child(cmd::label("RADIO · THE LAST MESSAGES"));
         for (k, l) in last_lines(&p.tail, 24).into_iter().enumerate() {
+            if let Some(m) = &l.media {
+                let rgba = |v: u32| gpui::rgba(v << 8 | 0xFF);
+                let style = crate::media::MediaStyle {
+                    card: rgba(cmd::CARD),
+                    text: rgba(cmd::INK),
+                    muted: rgba(cmd::HINT),
+                    radius: 0.,
+                };
+                msgs = msgs.child(crate::media::preview(m, ("cu-media", k), style));
+                continue;
+            }
             let (who, col) = line_head(&l, &p.provider);
             msgs = msgs.child(
                 div()
@@ -886,7 +1125,7 @@ impl Render for CommandUnit {
                     .flex()
                     .gap(px(8.))
                     .child(cmd::data(who, 20.).flex_none().text_color(c(col, 1.)))
-                    .child(cmd::data(l.text.clone(), 20.).min_w(px(0.))),
+                    .child(cmd::data(l.text.clone(), 20.).flex_1().min_w(px(0.))),
             );
         }
         let mut main = cmd::well()
@@ -897,7 +1136,13 @@ impl Render for CommandUnit {
             .flex()
             .flex_col()
             .gap(px(10.))
-            .child(msgs);
+            .child(tabs)
+            .child(crate::ui::with_thumb(
+                msgs,
+                &self.radio_scroll,
+                gpui::rgba(0x7FCB4FB3),
+                4.,
+            ));
         if let Some(a) = &p.ask {
             main = main.child(
                 div()
@@ -928,6 +1173,34 @@ impl Render for CommandUnit {
             main = main.child(row);
         }
         let listening = self.tools.listening.is_some();
+        let rgba = |v: u32| v << 8 | 0xFF;
+        let palette = compose::Palette {
+            text: rgba(cmd::INK),
+            dim: rgba(cmd::HINT),
+            line: rgba(cmd::RULE_2),
+            chip_bg: rgba(cmd::CARD),
+            hover: rgba(cmd::ROW_HOVER),
+            fail: rgba(cmd::RED),
+            ok: rgba(cmd::GREEN),
+        };
+        let chips = compose::chips(&self.tools, "cu", palette, |i| {
+            Box::new(cx.listener(move |this, _, _, cx| {
+                this.tools.remove(i);
+                cx.notify();
+            }))
+        });
+        main = main.children(chips);
+        self.controls.sync(&p);
+        let providers = self.model.read(cx).providers.clone();
+        let style = ControlStyle::console(cmd::PANEL, cmd::INK, cmd::GREEN, Some(cmd::SANS.into()));
+        main = main.child(self.controls.row(
+            "cu-ctl",
+            &p,
+            &providers,
+            &style,
+            |this: &mut Self| &mut this.controls,
+            cx,
+        ));
         main = main.child(
             div()
                 .flex_none()
@@ -943,17 +1216,19 @@ impl Render for CommandUnit {
                 .text_size(ui::ts(cmd::S_ENTRY))
                 .text_color(c(cmd::INK, 1.))
                 .child(div().flex_1().min_w(px(0.)).child(self.input.clone()))
-                .child(cmd::label("ENTER").text_color(c(cmd::HINT, 1.)))
+                .children((!narrow).then(|| cmd::label("ENTER").text_color(c(cmd::HINT, 1.))))
                 .child(
                     cmd::mic("cu-mic", listening)
                         .on_click(cx.listener(|this, _, window, cx| this.dictate(window, cx))),
                 ),
         );
+        // A file dropped anywhere on the chat attaches.
+        let main = compose::media_target(main, |this: &mut Self| Some(&mut this.tools), cx);
         div()
             .size_full()
             .flex()
             .gap(px(cmd::GAP))
-            .child(side)
+            .children(side)
             .child(main)
     }
 }

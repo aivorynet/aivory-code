@@ -6,7 +6,9 @@
 use std::rc::Rc;
 use std::time::Duration;
 
-use aivory_protocol::rpc::{InboxListParams, TaskListParams, method};
+use aivory_protocol::rpc::{
+    InboxListParams, TaskListParams, TaskStartParams, TaskUpdateParams, method,
+};
 use aivory_protocol::{
     InboxFilter, InboxItem, InboxKind, InboxList, Pane, StepState, Task, TaskColumn, TaskList,
     rpc::AutopilotPatch,
@@ -732,6 +734,64 @@ enum TaskSide {
     Sessions,
 }
 
+/// A task action of a task screen: start a planned task, or move a task in Review to Done.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TaskAct {
+    Start,
+    Done,
+}
+
+impl TaskAct {
+    /// The action that fits the column of a task, if there is one.
+    pub(crate) fn of(column: TaskColumn) -> Option<Self> {
+        match column {
+            TaskColumn::Planned => Some(Self::Start),
+            TaskColumn::Review => Some(Self::Done),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Start => "Start",
+            Self::Done => "Done",
+        }
+    }
+}
+
+/// Call the daemon for a task action. A failure shows as a notice. Then `after` runs.
+pub(crate) fn task_act<V: 'static>(
+    model: &Entity<Model>,
+    id: &str,
+    act: TaskAct,
+    after: fn(&mut V, &mut Context<V>),
+    cx: &mut Context<V>,
+) {
+    let id = id.to_string();
+    let m = model.read(cx);
+    let call = match act {
+        TaskAct::Start => {
+            let p = TaskStartParams { id, composer: None };
+            let c = m.call_notify::<method::TasksStart>(p, cx);
+            cx.background_spawn(async move { c.await.map(|_| ()) })
+        }
+        TaskAct::Done => {
+            let p = TaskUpdateParams {
+                id,
+                column: Some(TaskColumn::Done),
+                ..Default::default()
+            };
+            let c = m.call_notify::<method::TasksUpdate>(p, cx);
+            cx.background_spawn(async move { c.await.map(|_| ()) })
+        }
+    };
+    cx.spawn(async move |this, cx| {
+        call.await;
+        let _ = this.update(cx, after);
+    })
+    .detach();
+}
+
 pub struct BridgeTasks {
     model: Entity<Model>,
     data: Option<Rc<TaskList>>,
@@ -783,6 +843,12 @@ impl BridgeTasks {
             });
         })
         .detach();
+    }
+
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
     }
 
     fn of(&self, tab: TaskTab) -> Vec<Task> {
@@ -1029,6 +1095,20 @@ impl Render for BridgeTasks {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.side = s;
                         cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        if let Some((t, a)) = cur
+            .as_ref()
+            .and_then(|t| TaskAct::of(t.column).map(|a| (t, a)))
+        {
+            let id = t.id.clone();
+            right_tabs.push(
+                tab("rt-act", &format!("{} ›", a.label()), GD, false)
+                    .h(px(40.))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        task_act(&this.model, &id, a, Self::reload, cx);
                     }))
                     .into_any_element(),
             );

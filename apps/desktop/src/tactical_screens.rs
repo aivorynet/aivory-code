@@ -19,6 +19,7 @@ use gpui::{
 };
 
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::model::Model;
 use crate::tactical_kit::{
     self as tac, Btn, Frame, c, code, dots, entry, frame, label, navb, section, tbox, trow,
@@ -527,6 +528,12 @@ impl TacticalTasks {
         .detach();
     }
 
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
+    }
+
     fn of(&self, tab: TaskTab) -> Vec<Task> {
         let Some(d) = &self.data else {
             return Vec::new();
@@ -681,6 +688,18 @@ impl Render for TacticalTasks {
                             cx.notify();
                         },
                     )),
+                );
+            }
+            if let Some(a) = TaskAct::of(t.column) {
+                let id = t.id.clone();
+                tabs = tabs.child(
+                    navb("tt-act", &format!("{} >", a.label().to_uppercase()), false)
+                        .border_1()
+                        .border_color(c(tac::INK, 1.))
+                        .text_color(c(tac::INK, 1.))
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            task_act(&this.model, &id, a, Self::reload, cx);
+                        })),
                 );
             }
             right = right.child(tabs);

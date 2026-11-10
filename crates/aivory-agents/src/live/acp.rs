@@ -15,9 +15,9 @@ use std::collections::HashMap;
 use aivory_protocol::{Ask, AskKind, Line};
 use serde_json::{Map, Value, json};
 
-use super::StartOptions;
 use super::rpc::{AskSlot, Dialect, Io, Tag};
 use super::stream::{MAX_LINE_CHARS, diff_lines, summarize};
+use super::{Input, StartOptions};
 use crate::mcp::{Answer, truncate};
 
 const INIT: Tag = "initialize";
@@ -46,11 +46,17 @@ pub(super) struct Acp {
     tools: HashMap<String, (String, bool)>,
     used: u64,
     window: u64,
+    /// The agent takes image blocks in a prompt (`promptCapabilities.image`).
+    images: bool,
+    /// The answer of `session/new` or `session/load` with the available modes.
+    modes: Value,
 }
 
 impl Acp {
     pub fn new(opts: &StartOptions) -> Self {
         Self {
+            images: false,
+            modes: Value::Null,
             opts: opts.clone(),
             session: None,
             load_supported: false,
@@ -107,8 +113,12 @@ impl Acp {
         }
     }
 
-    /// Choose the mode that fits the approval mode of the composer.
+    /// Choose the mode that fits the approval mode of the composer. `result` is the answer of
+    /// `session/new` or `session/load`; its modes stay for a mode change at a later turn.
     fn set_mode(&mut self, result: &Value, io: &Io<'_>) {
+        if result.get("modes").is_some() {
+            self.modes = result.clone();
+        }
         let Some(wanted) = self.opts.permission_mode.as_deref() else {
             return;
         };
@@ -405,6 +415,10 @@ impl Dialect for Acp {
                     .pointer("/agentCapabilities/loadSession")
                     .and_then(Value::as_bool)
                     .unwrap_or(false);
+                self.images = r
+                    .pointer("/agentCapabilities/promptCapabilities/image")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 self.auth_methods = r
                     .get("authMethods")
                     .and_then(Value::as_array)
@@ -500,16 +514,40 @@ impl Dialect for Acp {
         }
     }
 
-    fn start_turn(&mut self, text: &str, io: &Io<'_>) {
+    fn start_turn(&mut self, input: &Input, io: &Io<'_>) {
         let Some(session) = self.session.clone() else {
             io.line(Line::error("The Gemini session is not open."));
             io.turn_ended(0.0, 0);
             return;
         };
+        if let Some(mode) = &input.permission_mode
+            && self.opts.permission_mode.as_deref() != Some(mode.as_str())
+        {
+            self.opts.permission_mode = Some(mode.clone());
+            let modes = self.modes.clone();
+            self.set_mode(&modes, io);
+        }
+        let mut prompt = Vec::new();
+        let mut text = input.text.clone();
+        if self.images {
+            let (images, skipped) = input.load_images();
+            for i in &images {
+                prompt.push(json!({ "type": "image", "mimeType": i.mime, "data": i.base64() }));
+            }
+            for path in skipped {
+                text.push_str(&format!("\n@{}", path.display()));
+            }
+        } else {
+            // The agent reads image files by path when it cannot take image blocks.
+            for path in &input.images {
+                text.push_str(&format!("\n@{}", path.display()));
+            }
+        }
+        prompt.push(json!({ "type": "text", "text": text }));
         io.request(
             PROMPT,
             "session/prompt",
-            json!({ "sessionId": session, "prompt": [{ "type": "text", "text": text }] }),
+            json!({ "sessionId": session, "prompt": prompt }),
         );
     }
 

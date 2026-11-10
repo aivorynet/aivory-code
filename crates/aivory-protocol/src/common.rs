@@ -189,6 +189,10 @@ pub struct Line {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     pub text: String,
+    /// An image, a video, a PDF, or a link that the line previews. `text` names it for a
+    /// client without previews.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<crate::media::Media>,
 }
 
 impl Line {
@@ -197,6 +201,7 @@ impl Line {
             kind,
             label: None,
             text: text.into(),
+            media: None,
         }
     }
 
@@ -205,6 +210,23 @@ impl Line {
             kind,
             label: Some(label.into()),
             text: text.into(),
+            media: None,
+        }
+    }
+
+    /// A meta line that previews `media`: `image shot.png`.
+    pub fn media(media: crate::media::Media) -> Self {
+        let word = match media.kind {
+            crate::media::MediaKind::Image => "image",
+            crate::media::MediaKind::Video => "video",
+            crate::media::MediaKind::Pdf => "pdf",
+            crate::media::MediaKind::Link => "link",
+        };
+        Self {
+            kind: LineKind::Meta,
+            label: None,
+            text: format!("{word} {}", media.name()),
+            media: Some(media),
         }
     }
 

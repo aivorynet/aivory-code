@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 aivory-protocol.workspace = true
+base64 = "0.22"
 rayon.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }

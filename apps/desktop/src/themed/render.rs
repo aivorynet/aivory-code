@@ -685,6 +685,26 @@ impl ThemedView {
                 cx.emit(ThemedEvent::Screen(screen.clone()));
             })));
         }
+        let accent = f.tone("accent");
+        let (text_tone, size, radius) = (f.tone("text"), f.ty(node, sc, "md"), f.radius(node, sc));
+        d = d.children(crate::new_session::launch_buttons(
+            "themed",
+            |bid, label| {
+                let mut item = div()
+                    .id(bid)
+                    .px(px(12.))
+                    .py(px(5.))
+                    .cursor_pointer()
+                    .text_size(size)
+                    .text_color(rgba(text_tone))
+                    .hover(|s| s.bg(rgba(accent & 0xFFFFFF00 | 0x30)))
+                    .child(label);
+                if pill {
+                    item = item.rounded(px(radius.unwrap_or(14.)));
+                }
+                item
+            },
+        ));
         style(d, node, f, sc).into_any_element()
     }
 

@@ -56,6 +56,9 @@ struct Line {
     custom_title: Option<String>,
     #[serde(rename = "lastPrompt")]
     last_prompt: Option<Value>,
+    #[serde(rename = "permissionMode")]
+    permission_mode: Option<String>,
+    effort: Option<String>,
     message: Option<Message>,
 }
 
@@ -76,6 +79,8 @@ struct Collector {
     ai_title: Option<String>,
     last_prompt: Option<String>,
     model: Option<String>,
+    mode: Option<String>,
+    effort: Option<String>,
     git_branch: Option<String>,
     version: Option<String>,
 }
@@ -96,6 +101,12 @@ impl Collector {
         }
         if line.version.is_some() {
             self.version = line.version.clone();
+        }
+        if line.permission_mode.is_some() {
+            self.mode = line.permission_mode.clone();
+        }
+        if line.effort.is_some() {
+            self.effort = line.effort.clone();
         }
         match line.kind.as_deref() {
             Some("user") => {
@@ -190,6 +201,8 @@ impl SessionStore for ClaudeStore {
             git_branch: c.git_branch,
             cli_version: c.version,
             model: c.model,
+            mode: c.mode,
+            effort: c.effort,
             path: file.path.clone(),
             sidechains: Vec::new(),
         }))

@@ -135,6 +135,16 @@ pub fn panel(body: impl IntoElement, _inside: u32) -> Div {
     well().overflow_hidden().child(body)
 }
 
+/// The size of a window over the map: 92 % of the map width up to 1600, the map height minus
+/// margins up to 1000.
+pub fn win_size(vw: f32, vh: f32, side_w: f32) -> (f32, f32) {
+    let map_w = (vw - side_w).max(200.);
+    (
+        (map_w * 0.92).min(1600.).floor(),
+        (vh - 48.).clamp(300., 1000.).floor(),
+    )
+}
+
 /// A riveted steel window of a size with a title line (`right` at its end) and `body` below it.
 pub fn window(
     w: f32,
@@ -166,7 +176,7 @@ pub fn window(
                 .child(
                     div()
                         .flex_none()
-                        .h(px(44.))
+                        .min_h(px(44.))
                         .px(px(12.))
                         .flex()
                         .items_center()
@@ -216,6 +226,8 @@ pub fn plate(
                 .flex()
                 .items_center()
                 .justify_center()
+                .overflow_hidden()
+                .whitespace_nowrap()
                 .text_color(c(if on { 0xEEF8DE } else { INK }, 1.)),
         )
         .hover(|s| s.opacity(0.9))
@@ -246,7 +258,7 @@ pub fn button(
     div()
         .id(id.into())
         .relative()
-        .h(px(36.))
+        .min_h(px(36.))
         .px(px(12.))
         .flex()
         .items_center()

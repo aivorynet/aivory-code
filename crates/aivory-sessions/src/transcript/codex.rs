@@ -24,9 +24,9 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::common::{
-    Facts, ReadError, between, error_ask, for_each_line, main_arg, one_line, patch_lines,
-    permission_ask, plan_ask, push_diff, push_output, push_prompt, push_text, question_ask,
-    str_field, turn_line, with_tail,
+    Facts, ReadError, between, data_url_image, error_ask, for_each_line, main_arg, one_line,
+    patch_lines, permission_ask, plan_ask, push_diff, push_output, push_prompt, push_text,
+    question_ask, str_field, turn_line, with_tail,
 };
 use crate::timeutil::parse_rfc3339_ms;
 
@@ -181,6 +181,20 @@ impl Normalizer {
                 self.turns += 1;
                 self.out.push(turn_line(self.turns, at));
                 push_prompt(&mut self.out, message);
+                // Pasted images come as data URLs, attached files as paths.
+                let list = |k: &str| {
+                    p.get(k)
+                        .and_then(Value::as_array)
+                        .map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+                        .unwrap_or_default()
+                };
+                for url in list("images") {
+                    self.out.extend(data_url_image(url));
+                }
+                for path in list("local_images") {
+                    self.out
+                        .extend(aivory_protocol::Media::of(path).map(Line::media));
+                }
             }
             "agent_message" => push_text(&mut self.out, LineKind::Agent, message),
             "error" | "stream_error" => push_output(&mut self.out, message, true),

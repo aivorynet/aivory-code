@@ -758,6 +758,7 @@ impl ReposScreen {
                 effort: Effort::High,
             },
             task: None,
+            attachments: Vec::new(),
         };
         let call = self.model.read(cx).call::<method::SessionNew>(params, cx);
         cx.spawn(async move |this, cx| {

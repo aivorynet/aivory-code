@@ -227,10 +227,21 @@ fn meta(b: &Block, f: &Frame) -> Div {
         Some(label) => format!("{label} · {}", b.lines[0].text),
         None => b.lines[0].text.clone(),
     };
-    s.base()
-        .mt(px(8.))
-        .text_color(rgba(s.theme.dim))
-        .child(text)
+    let row = s.base().mt(px(8.)).text_color(rgba(s.theme.dim));
+    if let Some(m) = &b.lines[0].media {
+        let style = crate::media::MediaStyle {
+            card: rgba(s.theme.user_bg),
+            text: rgba(s.theme.text),
+            muted: rgba(s.theme.dim),
+            radius: 0.,
+        };
+        return row.child(crate::media::preview(
+            m,
+            ElementId::from((f.id.clone(), b.abs as usize)),
+            style,
+        ));
+    }
+    row.child(text)
 }
 
 fn turn(b: &Block, f: &Frame) -> Div {

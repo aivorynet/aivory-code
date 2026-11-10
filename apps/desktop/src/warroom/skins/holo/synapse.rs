@@ -127,8 +127,6 @@ pub(super) struct Cluster {
     junction: V3,
     pub name: String,
     pub nodes: Vec<usize>,
-    /// The ring radius of its neurons in pixels: the label keeps clear of it.
-    ring: f32,
 }
 
 /// The soma mesh: points, outward point normals (for smooth light), faces.
@@ -150,10 +148,6 @@ pub(super) struct Layout {
     radius: f32,
     /// The screen stretch in x: the region is wider than high.
     stretch: f32,
-    /// The region size, for the label clamps.
-    cw: f32,
-    bottom: f32,
-    s: f32,
     /// Dust motes in space.
     dust: Vec<(V3, u8)>,
     /// The soma as a 3D mesh: the pen's bumped sphere, in pixels around (0, 0, 0).
@@ -177,7 +171,7 @@ pub(in crate::warroom) struct Orbit {
     /// Yaw and pitch that the owner added by drag, in radians.
     pub yaw: f32,
     pub pitch: f32,
-    /// 1 is the start; the wheel goes from 0.5 to 3.
+    /// 1 is the start; the wheel and the zoom buttons go from 0.5 to 5.
     pub zoom: f32,
     /// The mouse position of the drag in progress.
     pub drag: Option<[f32; 2]>,
@@ -202,7 +196,15 @@ impl Orbit {
     }
     /// A wheel step of `dy` pixels (negative zooms in).
     pub fn wheel(&mut self, dy: f32) {
-        self.zoom = (self.zoom * (-dy * 0.0015).exp()).clamp(0.5, 3.);
+        self.zoom = (self.zoom * (-dy * 0.0015).exp()).clamp(0.5, 5.);
+    }
+    /// A zoom button: `factor` > 1 zooms in.
+    pub fn zoom_by(&mut self, factor: f32) {
+        self.zoom = (self.zoom * factor).clamp(0.5, 5.);
+    }
+    /// Back to the start view.
+    pub fn reset(&mut self) {
+        *self = Self::default();
     }
     /// The camera of this frame.
     pub fn cam(&self) -> Cam {
@@ -255,18 +257,6 @@ impl Layout {
     /// The neuron of node `n` on screen at time `t`, local to the centre region.
     pub(super) fn node_at(&self, n: usize, c: Cam) -> [f32; 2] {
         self.project(self.nodes[n].at, c).xy
-    }
-
-    /// The label of cluster `k` on screen at time `t`: in space beyond the end of its
-    /// dendrite, past the ring of its neurons, so it turns with the tree.
-    pub(super) fn label_at(&self, k: usize, cam: Cam) -> [f32; 2] {
-        let c = &self.clusters[k];
-        let out = add(
-            c.junction,
-            mul(norm(c.junction), c.ring * 1.2 + 30. * self.s),
-        );
-        let p = self.project(out, cam).xy;
-        [p[0].clamp(80., self.cw - 80.), p[1].clamp(14., self.bottom)]
     }
 }
 
@@ -595,9 +585,6 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
         unit,
         radius,
         stretch: (rx / ry).clamp(1., 1.2),
-        cw,
-        bottom: HEAD + avail + 20.,
-        s,
         dust: Vec::new(),
         soma: soma_mesh(soma_r),
         shell: Vec::new(),
@@ -718,7 +705,6 @@ fn build(list: &[Contact], books: &[String], cw: f32, ch: f32, s: f32, key: u64)
             junction,
             name: (*b).to_uppercase(),
             nodes: mine,
-            ring: rr,
         });
     }
 

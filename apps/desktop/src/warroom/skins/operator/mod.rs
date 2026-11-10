@@ -52,6 +52,10 @@ pub(in crate::warroom) struct OperatorState {
     /// The prompt line of the center screen, and the event subscription of its Enter key.
     steer: Option<Entity<InputState>>,
     steer_sub: Option<Subscription>,
+    /// The mode, model and effort of the prompt line, its attachments, and the pane it writes to.
+    controls: crate::compose_controls::Controls,
+    tools: crate::compose::Tools,
+    focus_pane: Option<Pane>,
     /// The session on the center screen: the target of the prompt line.
     focus_id: Option<String>,
     /// The prompt line has the keyboard: the keys of the wall stay quiet.
@@ -146,6 +150,10 @@ impl WarRoomScreen {
         let waits = focus.is_some_and(|f| queue.iter().any(|q| q.id == f.id));
         let steer = self.operator_steer(window, cx);
         self.operator.focus_id = focus.map(|p| p.id.clone());
+        self.operator.focus_pane = focus.cloned();
+        if let Some(p) = focus {
+            self.operator.controls.sync(p);
+        }
         let typing = gpui::Focusable::focus_handle(&steer, cx).is_focused(window);
         self.operator.typing = typing;
 
@@ -317,18 +325,34 @@ impl WarRoomScreen {
                 let Some(id) = this.operator.focus_id.clone() else {
                     return;
                 };
-                if text.is_empty() {
+                if text.is_empty() && this.operator.tools.attachments.is_empty() {
                     return;
                 }
-                act(
-                    &this.model,
-                    Action::Send {
-                        id,
-                        text,
-                        composer: None,
-                    },
-                    cx,
-                );
+                let text = this.operator.tools.message(&text, None);
+                let images = this.operator.tools.images();
+                this.operator.tools.sent();
+                match this.operator.focus_pane.clone().filter(|p| p.id == id) {
+                    Some(pane) => {
+                        let prefs = this.operator.controls.current(&pane);
+                        crate::compose_controls::submit(
+                            &this.model,
+                            &pane,
+                            text,
+                            images,
+                            prefs,
+                            cx,
+                        );
+                    }
+                    None => act(
+                        &this.model,
+                        Action::Send {
+                            id,
+                            text,
+                            composer: None,
+                        },
+                        cx,
+                    ),
+                }
                 input.update(cx, |s, cx| s.clean(window, cx));
                 this.operator.blur = true;
                 cx.notify();
@@ -428,9 +452,10 @@ impl WarRoomScreen {
             )
             .child(
                 div()
-                    .mt(px(10.))
+                    .mt(px(6.))
                     .text_size(ui::ts(T_ENTRY))
-                    .line_height(relative(1.5))
+                    .line_height(relative(1.35))
+                    .line_clamp(2)
                     .text_color(rgb(BLUE_HI))
                     .child(clip(&question(pane, ask), 110)),
             );
@@ -458,7 +483,7 @@ impl WarRoomScreen {
             menu = menu.child(
                 div()
                     .id(eid(format!("mx-opt-{i}")))
-                    .h(px(32.))
+                    .h(px(28.))
                     .flex_none()
                     .px(px(10.))
                     .flex()
@@ -484,7 +509,7 @@ impl WarRoomScreen {
         menu = menu.child(
             div()
                 .id("mx-opt-write")
-                .h(px(32.))
+                .h(px(28.))
                 .flex_none()
                 .px(px(10.))
                 .flex()
@@ -623,12 +648,43 @@ impl WarRoomScreen {
         cx: &mut Context<Self>,
     ) -> Div {
         let Some(pane) = pane else {
+            let mut list = div().flex().flex_col().gap(px(4.)).w(px(360.)).max_w_full();
+            for (k, a) in all.iter().take(6).enumerate() {
+                let id = a.id.clone();
+                let (col, word) = state_color(a.state);
+                list = list.child(
+                    div()
+                        .id(eid(format!("mx-idle-{k}")))
+                        .h(px(26.))
+                        .px(px(10.))
+                        .flex()
+                        .items_center()
+                        .gap(px(8.))
+                        .cursor_pointer()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .bg(hca(0x04170A, 200))
+                        .border_1()
+                        .border_color(hca(GREEN_DIM, 140))
+                        .text_size(ui::ts(MX_SMALL))
+                        .text_color(rgb(GREEN_PATH))
+                        .hover(|s| s.bg(hca(0x125A2A, 240)).border_color(rgb(GREEN)))
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.operator.active_at = Some(Instant::now());
+                            this.operator.active = Some(id.clone());
+                            this.operator.to_bottom = true;
+                            cx.notify();
+                        }))
+                        .child(div().text_color(rgb(col)).child(word.to_uppercase()))
+                        .child(format!("{} · {}", a.provider, name(a))),
+                );
+            }
             return bezel(GREEN_DIM)
                 .flex_1()
                 .min_h(px(0.))
                 .child(screen(
                     false,
-                    div().absolute().inset_0().child(interference(t)).child(
+                    div().absolute().inset_0().child(idle(t)).child(
                         div()
                             .absolute()
                             .inset_0()
@@ -636,28 +692,24 @@ impl WarRoomScreen {
                             .flex_col()
                             .items_center()
                             .justify_center()
-                            .gap(px(10.))
+                            .gap(px(14.))
                             .child(
                                 div()
-                                    .px(px(18.))
-                                    .py(px(8.))
-                                    .bg(hca(0x010603, 220))
-                                    .border_1()
-                                    .border_color(hca(GREEN_DIM, 160))
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(6.))
-                                    .text_size(ui::ts(MX_TITLE))
-                                    .text_color(rgb(GREEN))
-                                    .flex_col()
-                                    .child("No signal")
-                                    .child(
-                                        div()
-                                            .text_size(ui::ts(MX_SMALL))
-                                            .text_color(rgb(GREEN_MID))
-                                            .child("Pick an agent below to watch it here"),
-                                    ),
-                            ),
+                                    .text_size(ui::ts(MX_DISPLAY))
+                                    .text_color(rgb(GREEN_MID))
+                                    .child("NO SIGNAL"),
+                            )
+                            .child(
+                                div()
+                                    .text_size(ui::ts(MX_SMALL))
+                                    .text_color(rgb(GREEN_DIM))
+                                    .child(if all.is_empty() {
+                                        "No agent is live"
+                                    } else {
+                                        "Pick an agent to watch it here"
+                                    }),
+                            )
+                            .child(list),
                     ),
                 ))
                 .child(foot("-", FOOT, vec![], 30.));
@@ -713,10 +765,12 @@ impl WarRoomScreen {
                     PAD,
                 ))
         });
+        // The transcript ends above the chat block (prompt + status line, about 68 px), so no
+        // line runs under it.
         let body = div()
             .absolute()
             .inset_0()
-            .pb(px(30.))
+            .pb(px(76.))
             .child(
                 div()
                     .id("mx-center-scroll")
@@ -726,7 +780,7 @@ impl WarRoomScreen {
                     .pl(px(PAD))
                     .pr(px(PAD + 8.))
                     .pt(px(PAD + 40.))
-                    .pb(px(PAD + 56.))
+                    .pb(px(PAD))
                     .bg(hca(0x010A03, 200))
                     .text_size(ui::ts(MX_BODY))
                     .line_height(relative(1.55))
@@ -778,32 +832,97 @@ impl WarRoomScreen {
             );
         // The chat line: always open while an agent is on the center screen. It lies over the
         // foot of the transcript and never changes the size of the screen.
+        let providers = self.model.read(cx).providers.clone();
+        let style = crate::compose_controls::ControlStyle::operator(Some(FONT.into()));
+        // A key of the status line: dim text, inverse video when on (as the controls).
+        let chip = |id: String, text: String, on: bool| {
+            let (bg, fg) = if on {
+                (rgb(0x9BFFC0), rgb(0x020A04))
+            } else {
+                (gpui::rgba(0x00000000), rgb(0x6DB596))
+            };
+            div()
+                .id(eid(id))
+                .flex_none()
+                .h(px(20.))
+                .px(px(6.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .bg(bg)
+                .text_color(fg)
+                .text_size(ui::ts(MX_SMALL))
+                .hover(|h| h.bg(rgb(0x0F2A1C)).text_color(rgb(0xB8FFCC)))
+                .child(text)
+        };
+        let mut chips = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(px(2.))
+            .child(self.operator.controls.row(
+                "mx-ctl",
+                pane,
+                &providers,
+                &style,
+                |this: &mut Self| &mut this.operator.controls,
+                cx,
+            ))
+            .child(
+                chip("mx-attach".into(), "+ attach".to_string(), false).on_click(cx.listener(
+                    |_, _, window, cx| {
+                        crate::compose::attach(
+                            |this: &mut WarRoomScreen| Some(&mut this.operator.tools),
+                            window,
+                            cx,
+                        );
+                    },
+                )),
+            );
+        for (k, a) in self.operator.tools.attachments.iter().enumerate() {
+            let file = a
+                .path
+                .file_name()
+                .map_or(String::new(), |n| n.to_string_lossy().to_string());
+            chips = chips.child(
+                chip(format!("mx-chip-{k}"), format!("{file} ×"), true).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.operator.tools.remove(k);
+                        cx.notify();
+                    },
+                )),
+            );
+        }
+        // The chat block: the controls and the prompt line in one frame. It lies over the foot
+        // of the transcript and never changes the size of the screen.
         let overlay = div()
             .id("mx-chat")
             .absolute()
-            .left(px(0.))
-            .right(px(0.))
-            .bottom(px(0.))
-            .h(px(64.))
+            .left(px(14.))
+            // Clear of the scroll bar at the right edge (right 4, 10 wide).
+            .right(px(24.))
+            .bottom(px(10.))
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .pt(px(6.))
+            .border_t_1()
+            .border_color(hca(if typing { GREEN } else { GREEN_DIM }, 200))
+            .bg(hca(0x010A03, 250))
+            .text_size(ui::ts(T_ENTRY))
+            .text_color(rgb(GREEN_MID))
             .child(
+                // The prompt line of the console: no field box.
                 div()
-                    .absolute()
-                    .left(px(14.))
-                    .right(px(14.))
-                    .h(px(46.))
-                    .bottom(px(10.))
-                    // A clear band: a bright line on top, a darker field, a frame.
-                    .border_1()
-                    .border_t_2()
-                    .border_color(hca(if typing { GREEN_HI } else { GREEN }, 230))
-                    .px(px(14.))
+                    .h(px(28.))
                     .flex()
                     .items_center()
-                    .gap(px(10.))
-                    .bg(hca(0x03200E, 250))
-                    .text_size(ui::ts(T_ENTRY))
-                    .text_color(rgb(GREEN))
-                    .child("chat>")
+                    .gap(px(8.))
+                    .child(
+                        div()
+                            .flex_none()
+                            .child(format!("{}@{}:~$", pane.provider, pane.codebase)),
+                    )
                     .child(
                         div()
                             .flex_1()
@@ -813,11 +932,13 @@ impl WarRoomScreen {
                     )
                     .child(
                         div()
+                            .flex_none()
                             .text_size(ui::ts(T_LABEL))
                             .text_color(rgb(GREEN_DIM))
-                            .child("↵ send · esc back"),
+                            .child("↵ · esc back"),
                     ),
-            );
+            )
+            .child(chips);
         let mut parts = vec![(
             format!("{} · {} · {}", pane.provider, pane.codebase, name(pane)),
             GREEN_HI,
@@ -1041,7 +1162,7 @@ impl WarRoomScreen {
             .id("mx-center-track")
             .absolute()
             .top(px(46.))
-            .bottom(px(36.))
+            .bottom(px(84.))
             .right(px(4.))
             .w(px(10.))
             .bg(hca(0x0B2414, 230))
@@ -1075,6 +1196,11 @@ impl WarRoomScreen {
                     .left_0()
                     .size_full(),
             )
+            .child(crate::ui::scroll_watch(
+                &self.operator.center_scroll,
+                max,
+                -f32::from(self.operator.center_scroll.offset().y),
+            ))
             .child(
                 div()
                     .absolute()

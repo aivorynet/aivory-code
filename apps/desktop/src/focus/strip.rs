@@ -108,7 +108,7 @@ impl FocusScreen {
         let back = div()
             .id("focus-back")
             .flex_none()
-            .h(px(34.))
+            .h(ui::sw(34.))
             .pl(px(10.))
             .pr(px(12.))
             .flex()
@@ -185,7 +185,7 @@ impl FocusScreen {
         let _ = pane;
         div()
             .flex_none()
-            .h(px(52.))
+            .min_h(ui::sw(52.))
             .px(px(12.))
             .flex()
             .items_center()
@@ -234,7 +234,7 @@ impl FocusScreen {
             .child(
                 div()
                     .id(SharedString::from(format!("chip-{}", c.id)))
-                    .h(px(34.))
+                    .h(ui::sw(34.))
                     .max_w(px(230.))
                     .px(px(12.))
                     .flex()
@@ -407,7 +407,7 @@ impl FocusScreen {
         let open = self.new_input.is_some();
         let mut wrap = div().relative().flex_none().child(
             ui::dark_button("focus-new", "+ New session")
-                .h(px(34.))
+                .h(ui::sw(34.))
                 .on_click(cx.listener(|this, _, window, cx| this.toggle_new(window, cx))),
         );
         if let Some(input) = self.new_input.clone().filter(|_| open) {
@@ -516,6 +516,7 @@ impl FocusScreen {
                 prompt,
                 composer: pane.composer.clone(),
                 task: None,
+                attachments: Vec::new(),
             },
             cx,
         );

@@ -152,6 +152,12 @@ pub(in crate::warroom) struct BoardState {
     pub band: Rc<Cell<Option<Bounds<Pixels>>>>,
     pub dispatch: Option<Entity<InputState>>,
     pub dispatch_events: Option<Subscription>,
+    /// The scroll of each gate column: a column with more rows below shows a fade and a hint.
+    pub gate_scroll: [gpui::ScrollHandle; 4],
+    /// The scroll of the context of the ask card.
+    pub ask_scroll: gpui::ScrollHandle,
+    /// The scroll of the overview sidebar.
+    pub side_scroll: gpui::ScrollHandle,
     /// Activity per codebase, oldest first.
     bars: HashMap<String, VecDeque<f32>>,
     last_sample: u32,
@@ -181,6 +187,9 @@ impl Default for BoardState {
             band: Rc::new(Cell::new(None)),
             dispatch: None,
             dispatch_events: None,
+            gate_scroll: Default::default(),
+            ask_scroll: Default::default(),
+            side_scroll: Default::default(),
             bars: HashMap::new(),
             last_sample: 0,
             seen: HashMap::new(),

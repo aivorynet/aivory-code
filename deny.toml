@@ -27,6 +27,8 @@ exceptions = [
     # cbindgen is a macOS build-time header generator of gpui-pre-apple; no code of it
     # links into the app. Review with the owner.
     { allow = ["MPL-2.0"], crate = "cbindgen" },
+    # hexf-parse (float literal parser of naga, wgpu on Linux) is public domain (CC0-1.0).
+    { allow = ["CC0-1.0"], crate = "hexf-parse" },
 ]
 
 [bans]

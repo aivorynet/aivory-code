@@ -136,7 +136,13 @@ struct State {
     done: Vec<aivory_protocol::InboxItem>,
     /// All tasks, in creation order (saved in the store).
     tasks: Vec<aivory_protocol::Task>,
+    /// The scheduled tasks (saved in `schedules.json` of the cache folder).
+    schedules: Vec<aivory_protocol::schedules::Schedule>,
+    /// The OS entries were written for the schedules of the file (once after the start).
+    schedules_synced: bool,
     next_run: u32,
+    /// The start second of this daemon: run ids stay unique over a restart.
+    boot: u64,
     /// The open conflict items of the radar (pairs of 0.7 and up).
     conflicts: Vec<aivory_protocol::InboxItem>,
     /// The last detection of each ACP agent that a client added.
@@ -246,7 +252,12 @@ impl LiveBackend {
                 snoozed: HashMap::new(),
                 done: Vec::new(),
                 tasks,
+                schedules: crate::schedule::store_file()
+                    .map(|f| crate::schedule::load(&f))
+                    .unwrap_or_default(),
+                schedules_synced: false,
                 next_run: 1,
+                boot: now_ms().unsigned_abs() / 1000,
                 conflicts: Vec::new(),
                 acp_seen: HashMap::new(),
             }),
@@ -291,6 +302,7 @@ impl LiveBackend {
                 loop {
                     scan.tick(&scanner);
                     scanner.autopilot_tick();
+                    scanner.schedule_tick();
                     scanner.coord_tick();
                     thread::sleep(SCAN_EVERY);
                 }
@@ -397,6 +409,27 @@ impl LiveBackend {
             }),
             "tasks/create" => call::<method::TasksCreate>(params, |p| self.create_task(p)),
             "tasks/update" => call::<method::TasksUpdate>(params, |p| self.update_task(&p)),
+            "tasks/start" => call::<method::TasksStart>(params, |p| self.start_task_now(p)),
+            "schedules/list" => call::<method::SchedulesList>(params, |_| {
+                Ok(aivory_protocol::schedules::ScheduleList {
+                    schedules: self.lock().schedules.clone(),
+                })
+            }),
+            "schedules/create" => {
+                call::<method::SchedulesCreate>(params, |p| self.schedule_create(p))
+            }
+            "schedules/update" => {
+                call::<method::SchedulesUpdate>(params, |p| self.schedule_update(p))
+            }
+            "schedules/delete" => {
+                call::<method::SchedulesDelete>(params, |p| self.schedule_delete(&p.id))
+            }
+            "schedules/run" => {
+                call::<method::SchedulesRun>(params, |p| self.schedule_fire(&p.id, None, true))
+            }
+            "schedules/fire" => {
+                call::<method::SchedulesFire>(params, |p| self.schedule_fire(&p.id, p.due, false))
+            }
             "repos/list" => call::<method::ReposList>(params, |_| {
                 Ok(aivory_protocol::RepoList {
                     codebases: self.lock().view.codebases.clone(),
@@ -762,6 +795,7 @@ impl LiveBackend {
                     cwd,
                     prompt,
                     model: (!pane.composer.model.is_empty()).then(|| pane.composer.model.clone()),
+                    effort: effort_flag(&pane.provider, pane.composer.effort),
                     resume: Some(native),
                     session_id: claude_id.clone(),
                     fork: !claude,
@@ -774,7 +808,7 @@ impl LiveBackend {
         let mut st = self.lock();
         // A Codex fork has no native id yet: the pane gets a run id, and `Started` adds the id.
         let new_id = claude_id.clone().unwrap_or_else(|| {
-            let id = format!("run-{}", st.next_run);
+            let id = format!("run-{}-{}", st.boot, st.next_run);
             st.next_run += 1;
             id
         });
@@ -842,7 +876,7 @@ impl LiveBackend {
             Some(id) => id.clone(),
             None => {
                 let mut st = self.lock();
-                let id = format!("run-{}", st.next_run);
+                let id = format!("run-{}-{}", st.boot, st.next_run);
                 st.next_run += 1;
                 id
             }
@@ -883,6 +917,7 @@ impl LiveBackend {
                     cwd: workspace.path.clone(),
                     prompt: prompt.clone(),
                     model: (!composer.model.is_empty()).then(|| composer.model.clone()),
+                    effort: effort_flag(&provider, composer.effort),
                     session_id: claude_id.clone(),
                     binary: self.cli_binary(&provider),
                     ..StartOptions::default()
@@ -1020,8 +1055,15 @@ impl LiveBackend {
         self.lock().put_task(task);
         match p.when {
             StartWhen::Queue => {}
-            StartWhen::Now => self.start_task(&id, p.provider.clone(), p.mode)?,
-            StartWhen::PlanOnly => self.start_task(&id, p.provider.clone(), Some(Mode::Plan))?,
+            StartWhen::Now => {
+                self.start_task(&id, p.composer.clone(), p.provider.clone(), p.mode)?;
+            }
+            StartWhen::PlanOnly => self.start_task(
+                &id,
+                p.composer.clone(),
+                p.provider.clone(),
+                Some(Mode::Plan),
+            )?,
         }
         let st = self.lock();
         st.tasks
@@ -1031,14 +1073,31 @@ impl LiveBackend {
             .ok_or_else(|| RpcError::not_found("task", &id))
     }
 
-    /// Start the first session of a queued task (Start now, or the autopilot).
+    /// `tasks/start`: start the first session of a planned task now.
+    fn start_task_now(
+        &self,
+        p: aivory_protocol::rpc::TaskStartParams,
+    ) -> Result<aivory_protocol::Task, RpcError> {
+        self.start_task(&p.id, p.composer, None, None)?;
+        let st = self.lock();
+        st.tasks
+            .iter()
+            .find(|t| t.id == p.id)
+            .cloned()
+            .ok_or_else(|| RpcError::not_found("task", &p.id))
+    }
+
+    /// Start the first session of a planned task (Start now, or the autopilot). `composer`
+    /// wins over `provider`; `mode` wins over both. The rest comes from the provider defaults
+    /// of Settings. A task that is not planned: `INVALID_STATE` (no second session).
     fn start_task(
         &self,
         id: &str,
+        composer: Option<ComposerPrefs>,
         provider: Option<String>,
         mode: Option<Mode>,
     ) -> Result<(), RpcError> {
-        let (task, prefs) = {
+        let (task, composer) = {
             let st = self.lock();
             let task = st
                 .tasks
@@ -1046,22 +1105,16 @@ impl LiveBackend {
                 .find(|t| t.id == id)
                 .cloned()
                 .ok_or_else(|| RpcError::not_found("task", id))?;
-            let provider = provider.unwrap_or_else(|| "claude".into());
-            let prefs = st.settings.providers.get(&provider).cloned();
-            (task, (provider, prefs))
+            if task.column != aivory_protocol::TaskColumn::Planned {
+                return Err(RpcError::new(
+                    code::INVALID_STATE,
+                    format!("task '{id}' runs already; only a planned task starts"),
+                ));
+            }
+            let composer = task_composer(&st.settings, composer, provider, mode);
+            (task, composer)
         };
-        let (provider, prefs) = prefs;
-        let composer = ComposerPrefs {
-            mode: mode
-                .or(prefs.as_ref().map(|x| x.mode))
-                .unwrap_or(Mode::Edit),
-            provider: provider.clone(),
-            model: prefs
-                .as_ref()
-                .map(|x| x.model.clone())
-                .unwrap_or_else(|| default_model(&provider).to_string()),
-            effort: prefs.map_or(Effort::High, |x| x.effort),
-        };
+        let provider = composer.provider.clone();
         let created = self.new_session(NewSessionParams {
             codebase: task.codebase.clone(),
             part: Some(task.part.clone()),
@@ -1069,8 +1122,10 @@ impl LiveBackend {
             prompt: task.prompt.clone(),
             composer: composer.clone(),
             task: Some(task.id.clone()),
+            attachments: Vec::new(),
         })?;
         let mut st = self.lock();
+        let native = st.runs.get(&created.id).and_then(|e| e.session_id.clone());
         if let Some(t) = st.tasks.iter_mut().find(|t| t.id == id) {
             t.column = aivory_protocol::TaskColumn::Working;
             t.started = Some(now_ms());
@@ -1080,6 +1135,7 @@ impl LiveBackend {
                 title: task.title.clone(),
                 role: format!("main · {}", composer.model),
                 state: SessionState::Working,
+                native,
             }];
             t.steps = live_steps(t.playbook, t.column, t.step, false);
             let t = t.clone();
@@ -1108,7 +1164,7 @@ impl LiveBackend {
             p.column == Some(TaskColumn::Working) && t.column == TaskColumn::Planned
         };
         if start {
-            self.start_task(&p.id, None, None)?;
+            self.start_task(&p.id, None, None, None)?;
         }
         let mut st = self.lock();
         let mut t = st
@@ -1121,6 +1177,10 @@ impl LiveBackend {
             && !start
         {
             t.column = c;
+            if c == TaskColumn::Done {
+                t.step = t.playbook.steps().len() as u8;
+                t.waiting_for = None;
+            }
         }
         if let Some(x) = &p.title {
             t.title = x.clone();
@@ -1136,6 +1196,230 @@ impl LiveBackend {
         Ok(t)
     }
 
+    // ---- scheduled tasks ----
+
+    fn save_schedules(st: &State) {
+        if let Some(f) = crate::schedule::store_file()
+            && let Err(e) = crate::schedule::save(&f, &st.schedules)
+        {
+            eprintln!("aivoryd: cannot save the schedules: {e}");
+        }
+    }
+
+    fn schedule_of(st: &State, id: &str) -> Result<aivory_protocol::schedules::Schedule, RpcError> {
+        st.schedules
+            .iter()
+            .find(|s| s.id == id)
+            .cloned()
+            .ok_or_else(|| RpcError::not_found("schedule", id))
+    }
+
+    /// Check a schedule: the cron expression parses and the codebase is known.
+    fn schedule_check(
+        st: &State,
+        cron: &str,
+        template: &aivory_protocol::schedules::TaskTemplate,
+    ) -> Result<(), RpcError> {
+        crate::schedule::Cron::parse(cron).map_err(|e| RpcError::new(code::INVALID_PARAMS, e))?;
+        if st.view.codebase(&template.codebase).is_none() {
+            return Err(RpcError::not_found("codebase", &template.codebase));
+        }
+        Ok(())
+    }
+
+    /// Compute the next fire time of a schedule and write its OS entry (outside the lock: the
+    /// scheduler tools take a moment). An off schedule loses its entry.
+    fn schedule_commit(&self, id: &str) -> Result<aivory_protocol::schedules::Schedule, RpcError> {
+        let s = {
+            let mut st = self.lock();
+            let now = now_ms();
+            let s = st
+                .schedules
+                .iter_mut()
+                .find(|s| s.id == id)
+                .ok_or_else(|| RpcError::not_found("schedule", id))?;
+            s.next_fire = crate::schedule::next_fire(s, now);
+            s.clone()
+        };
+        let os = crate::schedule::OsScheduler::detect();
+        let entry = match s.next_fire {
+            Some(at) => {
+                let exe =
+                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("aivoryd"));
+                os.install(&exe, &s.id, at)
+            }
+            None => {
+                os.remove(&s.id);
+                aivory_protocol::schedules::OsEntry {
+                    scheduler: os.label().to_string(),
+                    ..Default::default()
+                }
+            }
+        };
+        let mut st = self.lock();
+        let out = match st.schedules.iter_mut().find(|x| x.id == id) {
+            Some(x) => {
+                x.os_entry = entry;
+                x.clone()
+            }
+            None => return Err(RpcError::not_found("schedule", id)),
+        };
+        Self::save_schedules(&st);
+        let queued = queued_count(&st.tasks);
+        let inbox_open = st.view.inbox_open;
+        st.publish(vec![Delta::Counts { queued, inbox_open }]);
+        Ok(out)
+    }
+
+    fn schedule_create(
+        &self,
+        p: aivory_protocol::schedules::ScheduleCreateParams,
+    ) -> Result<aivory_protocol::schedules::Schedule, RpcError> {
+        let id = {
+            let mut st = self.lock();
+            Self::schedule_check(&st, &p.cron, &p.template)?;
+            let mut stamp = now_ms();
+            while st.schedules.iter().any(|s| s.id == format!("s{stamp}")) {
+                stamp += 1;
+            }
+            let id = format!("s{stamp}");
+            st.schedules.push(aivory_protocol::schedules::Schedule {
+                id: id.clone(),
+                name: p.name,
+                cron: p.cron.trim().to_string(),
+                enabled: p.enabled.unwrap_or(true),
+                template: p.template,
+                last_fired: None,
+                last_task: None,
+                next_fire: None,
+                os_entry: Default::default(),
+            });
+            id
+        };
+        self.schedule_commit(&id)
+    }
+
+    fn schedule_update(
+        &self,
+        p: aivory_protocol::schedules::ScheduleUpdateParams,
+    ) -> Result<aivory_protocol::schedules::Schedule, RpcError> {
+        {
+            let mut st = self.lock();
+            let mut s = Self::schedule_of(&st, &p.id)?;
+            if let Some(v) = p.name {
+                s.name = v;
+            }
+            if let Some(v) = p.cron {
+                s.cron = v.trim().to_string();
+            }
+            if let Some(v) = p.enabled {
+                s.enabled = v;
+            }
+            if let Some(v) = p.template {
+                s.template = v;
+            }
+            Self::schedule_check(&st, &s.cron, &s.template)?;
+            if let Some(x) = st.schedules.iter_mut().find(|x| x.id == p.id) {
+                *x = s;
+            }
+        }
+        self.schedule_commit(&p.id)
+    }
+
+    fn schedule_delete(&self, id: &str) -> Result<Ack, RpcError> {
+        {
+            let mut st = self.lock();
+            Self::schedule_of(&st, id)?;
+            st.schedules.retain(|s| s.id != id);
+            Self::save_schedules(&st);
+        }
+        crate::schedule::OsScheduler::detect().remove(id);
+        Ok(Ack::OK)
+    }
+
+    /// Fire a schedule: create its task with `when: now`. `due` is the fire time of an OS
+    /// entry: when the daemon fired at or after it already, nothing happens. `force` (Run now)
+    /// fires also a schedule that is off.
+    fn schedule_fire(
+        &self,
+        id: &str,
+        due: Option<UnixMs>,
+        force: bool,
+    ) -> Result<aivory_protocol::schedules::Schedule, RpcError> {
+        let s = Self::schedule_of(&self.lock(), id)?;
+        let done = due.is_some_and(|d| s.last_fired.is_some_and(|f| f >= d));
+        if !force && (done || !s.enabled) {
+            return Ok(s);
+        }
+        // The fire counts before the task starts: a slow start never fires twice.
+        {
+            let mut st = self.lock();
+            if let Some(x) = st.schedules.iter_mut().find(|x| x.id == id) {
+                x.last_fired = Some(now_ms());
+            }
+        }
+        let t = &s.template;
+        let task = self.create_task(aivory_protocol::rpc::TaskCreateParams {
+            title: t.title.clone(),
+            codebase: t.codebase.clone(),
+            part: t.part.clone().unwrap_or_else(|| "general".into()),
+            playbook: t.playbook,
+            prompt: t.prompt.clone(),
+            when: aivory_protocol::rpc::StartWhen::Now,
+            provider: None,
+            mode: None,
+            priority: None,
+            composer: t.composer.clone(),
+        });
+        {
+            let mut st = self.lock();
+            if let Some(x) = st.schedules.iter_mut().find(|x| x.id == id) {
+                x.last_task = task.as_ref().ok().map(|t| t.id.clone());
+            }
+        }
+        if let Err(e) = &task {
+            eprintln!(
+                "aivoryd: schedule {id} cannot start its task: {}",
+                e.message
+            );
+        }
+        self.schedule_commit(id)
+    }
+
+    /// Fire the due schedules. The first tick after the start also writes the OS entries
+    /// of all schedules (a missed fire time fires once).
+    fn schedule_tick(&self) {
+        let now = now_ms();
+        let (due, sync): (Vec<String>, Vec<String>) = {
+            let mut st = self.lock();
+            let first = !std::mem::replace(&mut st.schedules_synced, true);
+            let due = st
+                .schedules
+                .iter()
+                .filter(|s| s.enabled && s.next_fire.is_some_and(|t| t <= now))
+                .map(|s| s.id.clone())
+                .collect();
+            let sync = if first {
+                st.schedules.iter().map(|s| s.id.clone()).collect()
+            } else {
+                Vec::new()
+            };
+            (due, sync)
+        };
+        for id in &due {
+            let at = self
+                .lock()
+                .schedules
+                .iter()
+                .find(|s| &s.id == id)
+                .and_then(|s| s.next_fire);
+            let _ = self.schedule_fire(id, at, false);
+        }
+        for id in sync.iter().filter(|id| !due.contains(id)) {
+            let _ = self.schedule_commit(id);
+        }
+    }
+
     /// Follow the task columns from their sessions, and let the autopilot park idle runs and
     /// start queued tasks. Runs on every scan.
     fn autopilot_tick(&self) {
@@ -1148,10 +1432,25 @@ impl LiveBackend {
                 let Some(main) = t.sessions.first_mut() else {
                     continue;
                 };
-                let Some(pane) = panes.iter().find(|p| p.id == main.session) else {
+                // A run pane ends with its process; the scanner then shows the native id.
+                let Some(pane) = panes.iter().find(|p| {
+                    p.id == main.session || main.native.as_deref() == Some(p.id.as_str())
+                }) else {
                     continue;
                 };
+                let was = main.state;
                 main.state = pane.state;
+                if pane.id != main.session {
+                    main.session = pane.id.clone();
+                }
+                // Each finished turn of the main session moves the playbook one step, up to
+                // Review. Review and Merge are steps of the user.
+                let stepped = was == SessionState::Working
+                    && pane.state == SessionState::Idle
+                    && t.step < REVIEW_STEP;
+                if stepped {
+                    t.step += 1;
+                }
                 let (column, waiting) = match pane.state {
                     SessionState::NeedsYou | SessionState::Error => {
                         (TaskColumn::Waiting, pane.ask.as_ref().map(|a| a.kind))
@@ -1160,7 +1459,8 @@ impl LiveBackend {
                     _ if t.column == TaskColumn::Done => (TaskColumn::Done, None),
                     _ => (TaskColumn::Review, None),
                 };
-                if t.column != column || t.waiting_for != waiting || t.cost != pane.cost {
+                if stepped || t.column != column || t.waiting_for != waiting || t.cost != pane.cost
+                {
                     t.column = column;
                     t.waiting_for = waiting;
                     t.cost = pane.cost;
@@ -1190,7 +1490,7 @@ impl LiveBackend {
                     let _ = self.end_run(&SessionRef { id: session }, SessionState::Parked);
                 }
                 aivory_engine::Action::Start { task } => {
-                    if let Err(e) = self.start_task(&task, None, None) {
+                    if let Err(e) = self.start_task(&task, None, None, None) {
                         eprintln!("aivoryd: autopilot cannot start task {task}: {}", e.message);
                     }
                 }
@@ -1203,7 +1503,7 @@ impl LiveBackend {
         &self,
         p: aivory_protocol::rpc::DispatchParams,
     ) -> Result<aivory_protocol::rpc::Dispatched, RpcError> {
-        use aivory_protocol::rpc::{Dispatched, StartWhen, TaskCreateParams};
+        use aivory_protocol::rpc::{Dispatched, StartWhen};
         let prompt = p.prompt.trim().to_string();
         if prompt.is_empty() {
             return Err(RpcError::new(code::INVALID_PARAMS, "the prompt is empty"));
@@ -1235,7 +1535,7 @@ impl LiveBackend {
             )
         };
         if !free {
-            let task = self.create_task(TaskCreateParams {
+            let task = self.create_task(aivory_protocol::rpc::TaskCreateParams {
                 title: short(&prompt, 80),
                 codebase,
                 part,
@@ -1245,6 +1545,7 @@ impl LiveBackend {
                 provider: Some(provider),
                 mode: None,
                 priority: None,
+                composer: None,
             })?;
             return Ok(Dispatched {
                 session: None,
@@ -1252,7 +1553,9 @@ impl LiveBackend {
             });
         }
         let composer = ComposerPrefs {
-            mode: prefs.as_ref().map_or(Mode::Edit, |x| x.mode),
+            mode: p
+                .mode
+                .unwrap_or_else(|| prefs.as_ref().map_or(Mode::Edit, |x| x.mode)),
             provider: provider.clone(),
             model: p.model.clone().unwrap_or_else(|| {
                 prefs
@@ -1269,6 +1572,7 @@ impl LiveBackend {
             prompt,
             composer,
             task: None,
+            attachments: Vec::new(),
         })?;
         Ok(Dispatched {
             session: Some(created.id),
@@ -1334,6 +1638,8 @@ impl LiveBackend {
                     cwd: cwd.clone(),
                     prompt,
                     model: (!p.composer.model.is_empty()).then(|| p.composer.model.clone()),
+                    effort: effort_flag(provider, p.composer.effort),
+                    images: image_paths(&p.attachments),
                     binary: self.cli_binary(provider),
                     ..StartOptions::default()
                 },
@@ -1342,7 +1648,7 @@ impl LiveBackend {
         .map_err(|e| RpcError::new(code::SERVER_ERROR, e.to_string()))?;
         let now = now_ms();
         let mut st = self.lock();
-        let id = format!("run-{}", st.next_run);
+        let id = format!("run-{}-{}", st.boot, st.next_run);
         st.next_run += 1;
         let pane = Pane {
             id: id.clone(),
@@ -1404,7 +1710,16 @@ impl LiveBackend {
             // The mail of the session goes in front of the input at this turn boundary.
             let text = coordm::with_mail(self.mail_for(&p.id).as_deref(), &p.text);
             return self.with_run(&SessionRef { id: p.id.clone() }, |e| {
-                e.run.send(&text).map_err(not_running)?;
+                let input = turn_input(&e.pane, text, p);
+                e.run.send_input(&input).map_err(not_running)?;
+                if let Some(c) = &p.composer
+                    && c.provider == e.pane.provider
+                {
+                    e.pane.composer = c.clone();
+                    if !c.model.is_empty() {
+                        e.pane.model.clone_from(&c.model);
+                    }
+                }
                 e.turn = TurnTrack::begin(&p.text, "human", e.lines.len(), e.pane.cost);
                 Ok(())
             });
@@ -1453,6 +1768,8 @@ impl LiveBackend {
                     cwd,
                     prompt,
                     model: (!composer.model.is_empty()).then(|| composer.model.clone()),
+                    effort: effort_flag(&pane.provider, composer.effort),
+                    images: image_paths(&p.attachments),
                     resume: Some(p.id.clone()),
                     binary: self.cli_binary(&pane.provider),
                     ..StartOptions::default()
@@ -1913,6 +2230,7 @@ impl LiveBackend {
                     provider: None,
                     mode: None,
                     priority: None,
+                    composer: None,
                 })
                 .is_ok()
             }
@@ -2136,6 +2454,24 @@ impl State {
         Ok(self.settings.clone())
     }
 
+    /// Note the native id of the run `run` in the sessions of `task`.
+    fn link_task_native(&mut self, task: &str, run: &str, native: &str) {
+        let Some(t) = self.tasks.iter_mut().find(|t| t.id == task) else {
+            return;
+        };
+        let mut changed = false;
+        for s in t.sessions.iter_mut().filter(|s| s.session == run) {
+            if s.native.as_deref() != Some(native) {
+                s.native = Some(native.to_string());
+                changed = true;
+            }
+        }
+        if changed {
+            let t = t.clone();
+            self.put_task(t);
+        }
+    }
+
     fn put_task(&mut self, task: aivory_protocol::Task) {
         if let Some(store) = &mut self.store
             && let Err(e) = store.put_task(&task)
@@ -2146,11 +2482,10 @@ impl State {
             Some(t) => *t = task,
             None => self.tasks.push(task),
         }
+        // Every change publishes: a client loads the board again on each delta.
         let queued = queued_count(&self.tasks);
-        if queued != self.view.queued {
-            let inbox_open = self.view.inbox_open;
-            self.publish(vec![Delta::Counts { queued, inbox_open }]);
-        }
+        let inbox_open = self.view.inbox_open;
+        self.publish(vec![Delta::Counts { queued, inbox_open }]);
     }
 
     fn save_settings(&mut self) {
@@ -2871,10 +3206,18 @@ impl Scanner {
             tail,
             lines_total,
             composer: ComposerPrefs {
-                mode: Mode::Edit,
+                mode: s
+                    .mode
+                    .as_deref()
+                    .and_then(|m| mode_of(&provider, m))
+                    .unwrap_or(Mode::Edit),
+                effort: s
+                    .effort
+                    .as_deref()
+                    .and_then(effort_of)
+                    .unwrap_or(Effort::High),
                 provider,
                 model,
-                effort: Effort::High,
             },
             task: None,
         })
@@ -3082,6 +3425,9 @@ fn pump(me: &Weak<LiveBackend>, id: &str, events: &Receiver<RunEvent>) {
         }
         let pane = entry.pane.clone();
         if let Some(sid) = owned {
+            if let Some(task) = &pane.task {
+                st.link_task_native(task, id, &sid);
+            }
             st.run_sessions.insert(sid);
         }
         st.publish(vec![Delta::Session {
@@ -3186,6 +3532,37 @@ fn queued_count(tasks: &[aivory_protocol::Task]) -> u32 {
         .count() as u32
 }
 
+/// The playbook step that a finished turn does not pass: Review is a step of the user.
+const REVIEW_STEP: u8 = 3;
+
+/// The composer of a task session: `composer` wins over `provider`, and `mode` wins over
+/// both. The rest comes from the provider defaults of Settings. An empty model takes the
+/// default model of the provider.
+fn task_composer(
+    settings: &aivory_protocol::Settings,
+    composer: Option<ComposerPrefs>,
+    provider: Option<String>,
+    mode: Option<Mode>,
+) -> ComposerPrefs {
+    let mut c = composer.unwrap_or_else(|| {
+        let provider = provider.unwrap_or_else(|| "claude".into());
+        let prefs = settings.providers.get(&provider).cloned();
+        ComposerPrefs {
+            mode: prefs.as_ref().map_or(Mode::Edit, |x| x.mode),
+            model: prefs.as_ref().map(|x| x.model.clone()).unwrap_or_default(),
+            effort: prefs.map_or(Effort::High, |x| x.effort),
+            provider,
+        }
+    });
+    if let Some(m) = mode {
+        c.mode = m;
+    }
+    if c.model.is_empty() {
+        c.model = default_model(&c.provider).to_string();
+    }
+    c
+}
+
 /// The five steps of a playbook for a task in `column` at `step`. No actors yet: the
 /// daemon does not track who did which step.
 fn live_steps(
@@ -3288,6 +3665,89 @@ fn mode_options(provider: &str, mode: Mode, mut opts: StartOptions) -> StartOpti
 }
 
 /// The Claude permission mode of a composer mode.
+/// The `--effort` word of a composer effort. Gemini has no effort level.
+fn effort_flag(provider: &str, effort: Effort) -> Option<String> {
+    if provider == "gemini" {
+        return None;
+    }
+    Some(
+        match effort {
+            Effort::Low => "low",
+            Effort::Medium => "medium",
+            Effort::High => "high",
+            Effort::Max => "max",
+        }
+        .into(),
+    )
+}
+
+/// The attachments that are images the agents take as data. Other files stay `@path` text.
+fn image_paths(attachments: &[String]) -> Vec<PathBuf> {
+    attachments
+        .iter()
+        .map(PathBuf::from)
+        .filter(|p| aivory_agents::live::image_mime(p).is_some())
+        .collect()
+}
+
+/// The next turn of a run: the text, the images, and each composer value that differs from
+/// the pane. A provider change is a handoff, not a turn setting, so it is ignored here.
+fn turn_input(pane: &Pane, text: String, p: &SendParams) -> aivory_agents::live::Input {
+    let mut input = aivory_agents::live::Input {
+        text,
+        images: image_paths(&p.attachments),
+        ..Default::default()
+    };
+    let Some(c) = p.composer.as_ref().filter(|c| c.provider == pane.provider) else {
+        return input;
+    };
+    let old = &pane.composer;
+    if c.mode != old.mode {
+        let opts = mode_options(&pane.provider, c.mode, StartOptions::default());
+        input.permission_mode = opts.permission_mode;
+        input.sandbox = opts.sandbox;
+    }
+    if !c.model.is_empty() && c.model != pane.model {
+        input.model = Some(c.model.clone());
+    }
+    if c.effort != old.effort {
+        input.effort = effort_flag(&pane.provider, c.effort);
+    }
+    input
+}
+
+/// The composer mode of a permission mode that a transcript names (see
+/// `SessionSummary::mode`). `None` for a word that this daemon does not know.
+fn mode_of(provider: &str, raw: &str) -> Option<Mode> {
+    if provider == "codex" {
+        let (approval, sandbox) = raw.split_once('/')?;
+        return Some(if sandbox == "read-only" {
+            Mode::Plan
+        } else if approval == "untrusted" {
+            Mode::Edit
+        } else {
+            Mode::Auto
+        });
+    }
+    match raw {
+        "plan" => Some(Mode::Plan),
+        "default" | "auto_edit_off" => Some(Mode::Edit),
+        "acceptEdits" | "auto" | "bypassPermissions" | "auto_edit" | "yolo" => Some(Mode::Auto),
+        _ => None,
+    }
+}
+
+/// The composer effort of an effort level that a transcript names.
+fn effort_of(raw: &str) -> Option<Effort> {
+    match raw {
+        "none" | "minimal" | "low" => Some(Effort::Low),
+        "medium" => Some(Effort::Medium),
+        "high" => Some(Effort::High),
+        "xhigh" | "max" => Some(Effort::Max),
+        _ => None,
+    }
+}
+
 fn permission_mode(mode: Mode) -> &'static str {
     match mode {
         Mode::Plan => "plan",
@@ -3649,6 +4109,69 @@ fn call<M: Method>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transcript_modes_and_efforts_map_to_the_composer() {
+        assert_eq!(mode_of("claude", "plan"), Some(Mode::Plan));
+        assert_eq!(mode_of("claude", "default"), Some(Mode::Edit));
+        assert_eq!(mode_of("claude", "auto"), Some(Mode::Auto));
+        assert_eq!(mode_of("claude", "acceptEdits"), Some(Mode::Auto));
+        assert_eq!(mode_of("claude", "odd"), None);
+        assert_eq!(mode_of("codex", "on-request/read-only"), Some(Mode::Plan));
+        assert_eq!(
+            mode_of("codex", "untrusted/workspace-write"),
+            Some(Mode::Edit)
+        );
+        assert_eq!(
+            mode_of("codex", "on-request/workspace-write"),
+            Some(Mode::Auto)
+        );
+        assert_eq!(effort_of("xhigh"), Some(Effort::Max));
+        assert_eq!(effort_of("minimal"), Some(Effort::Low));
+        assert_eq!(effort_flag("gemini", Effort::High), None);
+        assert_eq!(effort_flag("claude", Effort::Max).as_deref(), Some("max"));
+    }
+
+    #[test]
+    fn a_turn_carries_only_the_changed_composer_values() {
+        let mut pane = aivory_protocol::demo::Demo::new().war_room.sessions[0].clone();
+        pane.provider = "codex".into();
+        pane.model = "m1".into();
+        pane.composer = ComposerPrefs {
+            mode: Mode::Edit,
+            provider: "codex".into(),
+            model: "m1".into(),
+            effort: Effort::High,
+        };
+        let send = |composer: Option<ComposerPrefs>, files: &[&str]| SendParams {
+            id: pane.id.clone(),
+            text: "go".into(),
+            subagent: None,
+            attachments: files.iter().map(|f| f.to_string()).collect(),
+            composer,
+        };
+        let same = turn_input(&pane, "go".into(), &send(Some(pane.composer.clone()), &[]));
+        assert_eq!(same, aivory_agents::live::Input::text("go"));
+        let changed = ComposerPrefs {
+            mode: Mode::Plan,
+            model: "m2".into(),
+            effort: Effort::Max,
+            ..pane.composer.clone()
+        };
+        let input = turn_input(&pane, "go".into(), &send(Some(changed), &["a.png", "b.rs"]));
+        assert_eq!(input.permission_mode.as_deref(), Some("on-request"));
+        assert_eq!(input.sandbox.as_deref(), Some("read-only"));
+        assert_eq!(input.model.as_deref(), Some("m2"));
+        assert_eq!(input.effort.as_deref(), Some("max"));
+        assert_eq!(input.images, vec![PathBuf::from("a.png")]);
+        // Another provider is a handoff: no turn settings.
+        let other = ComposerPrefs {
+            provider: "claude".into(),
+            ..pane.composer.clone()
+        };
+        let input = turn_input(&pane, "go".into(), &send(Some(other), &[]));
+        assert_eq!(input.model, None);
+    }
 
     #[test]
     fn auto_mode_runs_tools_without_a_question() {

@@ -32,6 +32,9 @@ pub struct Model {
     pub background: ConsoleBackground,
     /// Display setting: the maximize button opens a borderless full screen.
     pub maximize_full_screen: bool,
+    /// The providers that the daemon can run, with their models (from `settings/get`). The
+    /// composer controls of every look list them.
+    pub providers: Vec<(String, Vec<String>)>,
     /// When the owner turned on `maximize_full_screen`: the shell shows the F11 hint for 5 s.
     pub full_screen_hint: Option<std::time::Instant>,
     /// `--stress N`: copy live sessions until N are live (performance checks).
@@ -134,6 +137,7 @@ impl Model {
             snapshot: Default::default(),
             background: Display::default().background,
             maximize_full_screen: false,
+            providers: Vec::new(),
             full_screen_hint: None,
             stress,
             demo_sessions: std::env::var("AIVORY_DEMO_SESSIONS")
@@ -166,6 +170,7 @@ impl Model {
             snapshot: Default::default(),
             background: Display::default().background,
             maximize_full_screen: false,
+            providers: Vec::new(),
             full_screen_hint: None,
             stress: 0,
             demo_sessions: None,
@@ -223,6 +228,12 @@ impl Model {
                     );
                     cx.refresh_windows();
                     this.maximize_full_screen = view.settings.display.maximize_full_screen;
+                    this.providers = view
+                        .providers
+                        .iter()
+                        .filter(|p| p.status != aivory_protocol::ProviderStatus::Off)
+                        .map(|p| (p.id.clone(), p.models.clone()))
+                        .collect();
                     if this.background != view.settings.display.background {
                         this.background = view.settings.display.background;
                         cx.notify();

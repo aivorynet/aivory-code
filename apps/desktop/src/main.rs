@@ -16,7 +16,9 @@ mod bridge_screens;
 mod command_inbox;
 mod command_kit;
 mod command_screens;
+mod complete;
 mod compose;
+mod compose_controls;
 mod console;
 mod daemon;
 mod focus;
@@ -28,13 +30,14 @@ mod holo_screens;
 mod inbox;
 mod lens;
 mod look;
+mod media;
 mod model;
 mod new_session;
 mod notice;
 mod radar;
 mod repos;
 mod rts;
-mod session;
+mod session_console;
 mod settings;
 mod shell;
 mod speech;
@@ -54,7 +57,7 @@ use std::process::ExitCode;
 
 use aivoryd::Endpoint;
 use clap::Parser;
-use gpui::{App, AppContext, Bounds, WindowBounds, WindowOptions, point, px, size};
+use gpui::{App, AppContext, Bounds, WindowBounds, WindowOptions, px, size};
 
 #[derive(Parser, Debug)]
 #[command(name = "aivory", version, about = "AIVory Code desktop app")]
@@ -83,9 +86,6 @@ struct Cli {
     scroll_row: Option<usize>,
 }
 
-/// The top left corner of the `--offscreen` window: no monitor reaches it.
-const OFFSCREEN_ORIGIN: f32 = -20_000.;
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let endpoint = match if cli.demo {
@@ -112,6 +112,7 @@ fn main() -> ExitCode {
             }
             // The text fields of the composers.
             gpui_base::init(cx);
+            complete::init(cx);
             // `AIVORY_WINDOW=900x640`: another window size for screenshot runs.
             let (w, h) = std::env::var("AIVORY_WINDOW")
                 .ok()
@@ -120,14 +121,10 @@ fn main() -> ExitCode {
                     Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
                 })
                 .unwrap_or((1440., 900.));
-            let bounds = if cli.offscreen {
-                Bounds::new(
-                    point(px(OFFSCREEN_ORIGIN), px(OFFSCREEN_ORIGIN)),
-                    size(px(w), px(h)),
-                )
-            } else {
-                Bounds::centered(None, size(px(w), px(h)), cx)
-            };
+            // `--offscreen`: the window opens without focus; a screenshot script moves it out of
+            // the screen at once. A window must start with its center on a display, or it gets
+            // a default size.
+            let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 focus: !cli.offscreen,

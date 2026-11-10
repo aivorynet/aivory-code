@@ -19,6 +19,7 @@ use gpui_base::input::{InputEvent, TextareaState};
 use crate::actions::{Action, act};
 use crate::command_kit::{self as cmd, Btn, c};
 use crate::compose;
+use crate::compose_controls::{self, ControlStyle, Controls};
 use crate::model::Model;
 use crate::ui;
 
@@ -54,6 +55,8 @@ pub struct CommandInbox {
     selected: Option<String>,
     input: Entity<TextareaState>,
     tools: compose::Tools,
+    /// The composer controls of the selected item.
+    controls: Controls,
     focus: FocusHandle,
     busy: bool,
     _tick: GpuiTask<()>,
@@ -123,6 +126,19 @@ impl CommandInbox {
                 .auto_grow(1, 3)
                 .submit_on_enter(true)
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            move |cx| {
+                let this = weak.upgrade()?;
+                let this = this.read(cx);
+                let items = this.items();
+                this.current(&items).map(|i| items[i].session.clone())
+            },
+            |_| (None, None),
+            cx,
+        );
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
             if let InputEvent::PressEnter { shift: false, .. } = event {
                 this.send(window, cx);
@@ -135,6 +151,7 @@ impl CommandInbox {
             selected: None,
             input,
             tools: compose::Tools::default(),
+            controls: Controls::default(),
             focus: cx.focus_handle(),
             busy: false,
             _tick: tick,
@@ -257,15 +274,30 @@ impl CommandInbox {
         let Some(it) = self.current(&items).map(|i| items[i].clone()) else {
             return;
         };
-        act(
-            &self.model,
-            Action::InboxAnswer {
-                id: it.id.clone(),
-                option: None,
-                text: Some(text),
-            },
-            cx,
-        );
+        let pane = self
+            .model
+            .read(cx)
+            .war
+            .as_ref()
+            .and_then(|w| w.session(&it.session))
+            .cloned();
+        match pane {
+            Some(pane) if self.controls.current(&pane).provider != pane.provider => {
+                let prefs = self.controls.current(&pane);
+                let images = self.tools.images();
+                compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+            }
+            _ => act(
+                &self.model,
+                Action::InboxAnswer {
+                    id: it.id.clone(),
+                    option: None,
+                    text: Some(text),
+                },
+                cx,
+            ),
+        }
+        self.tools.sent();
         self.input.update(cx, |s, cx| s.clean(window, cx));
         self.after_answer(&items, &it.id, cx);
     }
@@ -294,6 +326,9 @@ impl CommandInbox {
     }
 
     fn on_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::complete::is_open(cx) {
+            return;
+        }
         // The keys act only when the text field does not have the focus.
         if self.input.read(cx).focus_handle(cx).is_focused(window) {
             return;
@@ -575,27 +610,54 @@ impl Render for CommandInbox {
                 .child(div().flex_1());
         }
         let listening = self.tools.listening.is_some();
+        let sel_pane = cur.and_then(|k| {
+            self.model
+                .read(cx)
+                .war
+                .as_ref()
+                .and_then(|w| w.session(&items[k].session))
+                .cloned()
+        });
+        let ctl_row = sel_pane.map(|p| {
+            self.controls.sync(&p);
+            let providers = self.model.read(cx).providers.clone();
+            let style =
+                ControlStyle::console(cmd::PANEL, cmd::INK, cmd::GREEN, Some(cmd::SANS.into()));
+            self.controls.row(
+                "ci-ctl",
+                &p,
+                &providers,
+                &style,
+                |this: &mut Self| &mut this.controls,
+                cx,
+            )
+        });
         body = body
+            .child(div().mt(px(20.)).children(ctl_row))
             .child(
-                div()
-                    .mt(px(28.))
-                    .min_h(px(56.))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .pl(px(16.))
-                    .pr(px(10.))
-                    .py(px(9.))
-                    .bg(c(cmd::CARD, 1.))
-                    .font_family(cmd::SANS)
-                    .text_size(ui::ts(cmd::S_ENTRY))
-                    .text_color(c(cmd::INK, 1.))
-                    .child(div().flex_1().min_w(px(0.)).child(self.input.clone()))
-                    .child(cmd::label("ENTER").text_color(c(cmd::HINT, 1.)))
-                    .child(
-                        cmd::mic("cmd-mic", listening)
-                            .on_click(cx.listener(|this, _, window, cx| this.dictate(window, cx))),
-                    ),
+                crate::compose::media_target(
+                    div()
+                        .mt(px(8.))
+                        .min_h(px(56.))
+                        .flex()
+                        .items_center()
+                        .gap(px(12.))
+                        .pl(px(16.))
+                        .pr(px(10.))
+                        .py(px(9.))
+                        .bg(c(cmd::CARD, 1.))
+                        .font_family(cmd::SANS)
+                        .text_size(ui::ts(cmd::S_ENTRY))
+                        .text_color(c(cmd::INK, 1.)),
+                    |this: &mut Self| Some(&mut this.tools),
+                    cx,
+                )
+                .child(div().flex_1().min_w(px(0.)).child(self.input.clone()))
+                .child(cmd::label("ENTER").text_color(c(cmd::HINT, 1.)))
+                .child(
+                    cmd::mic("cmd-mic", listening)
+                        .on_click(cx.listener(|this, _, window, cx| this.dictate(window, cx))),
+                ),
             )
             .child(
                 div()

@@ -1,9 +1,9 @@
-//! The Bridge war room: the planet view (`planet.rs`) and the session view (`detail.rs`). The
+//! The Bridge war room: the planet view (`planet.rs`). The
 //! numbered navigation frame belongs to the shell (`shell/bridge.rs`).
 
 pub(crate) mod data;
-pub(crate) mod detail;
 mod planet;
+mod planetgen;
 
 use planet::Planet;
 

@@ -514,6 +514,7 @@ fn view_lines(s: &Pane, max: usize) -> Vec<(String, u32)> {
             DKind::You => (format!("> {text}"), 0x9EB4FF),
             DKind::Error => (format!("! {text}"), 0xF2C063),
             DKind::Heading => (text.to_uppercase(), 0xFFFFFF),
+            // Table rows come padded with capped columns (console/display.rs).
             DKind::Bullet | DKind::Agent | DKind::Code | DKind::Table => (text, SCREEN_TEXT),
             DKind::Meta => (text, 0x8A8A8A),
         };
@@ -548,10 +549,8 @@ fn lines_flow(lines: &[(String, u32)], size: f32, lh: f32) -> Div {
     for (text, color) in lines {
         col = col.child(
             div()
-                .h(ui::ts(lh))
+                .min_h(ui::ts(lh))
                 .flex_none()
-                .whitespace_nowrap()
-                .overflow_hidden()
                 .text_color(rgb(*color))
                 .child(if text.is_empty() {
                     " ".to_string()
@@ -1372,15 +1371,17 @@ impl WarRoomScreen {
                                 .text_color(rgb(*color))
                                 .child(cell(64., time.clone()))
                                 .child(cell(52., kind.to_string()))
-                                .child(cell(220., title.clone()))
+                                // Title and detail share the rest of the row; a narrow
+                                // window cuts both with an ellipsis, not the detail alone.
                                 .child(
                                     div()
                                         .flex_1()
                                         .min_w_0()
-                                        .whitespace_nowrap()
-                                        .overflow_hidden()
-                                        .child(detail.clone()),
-                                ),
+                                        .max_w(px(220.))
+                                        .truncate()
+                                        .child(title.clone()),
+                                )
+                                .child(div().flex_1().min_w_0().truncate().child(detail.clone())),
                         );
                     }
                     col

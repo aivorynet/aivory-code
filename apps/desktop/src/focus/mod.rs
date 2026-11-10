@@ -1,6 +1,7 @@
-//! The Focus view (`FocusEditor.dc.html`): one session with its code. The strip on top lists
-//! the live sessions, the chat is in the center, a full code editor with the hunks of the
-//! agent, each tagged with its turn, is on the right. Esc goes back to the war room.
+//! The session screen: one session with its chat, code, console and trace. The strip on top
+//! lists the live sessions, the chat is in the center. The right panel has three tabs: Code
+//! (a full editor with the hunks of the agent, each tagged with its turn), Console (the output
+//! of the session) and Trace (the span waterfall). Esc goes back to the war room.
 
 mod chat;
 mod editor;
@@ -8,6 +9,7 @@ mod highlight;
 mod items;
 mod rows;
 mod strip;
+mod trace;
 
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -16,11 +18,11 @@ use std::time::{Duration, Instant};
 use aivory_protocol::code::{CodeFileParams, LineRange};
 use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::SessionDiff;
-use aivory_protocol::{ComposerPrefs, Pane, SessionState, WarRoom};
+use aivory_protocol::{Pane, SessionState, WarRoom};
 use gpui::prelude::*;
 use gpui::{
     Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable, FollowMode, KeystrokeEvent,
-    ListAlignment, ListState, Pixels, Subscription, Task, Window, div, px, rgb,
+    ListAlignment, ListState, Pixels, Subscription, Task, Window, div, px, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, TextareaState};
 
@@ -39,8 +41,6 @@ pub enum FocusEvent {
     Back,
     /// Show another session in the Focus view.
     Open(String),
-    /// The deep dive of a session.
-    DeepDive(String),
     /// Open a file of a session in the code lens.
     OpenFile { session: String, path: String },
 }
@@ -56,11 +56,14 @@ pub(super) enum View {
     Split,
 }
 
-/// A menu of the composer.
+/// The tabs of the right panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Menu {
-    Model,
-    Effort,
+pub(super) enum Tab {
+    Code,
+    Console,
+    Trace,
+    /// Only in a narrow window: the chat takes the place of the right panel.
+    Chat,
 }
 
 /// The text of a file as the editor shows it.
@@ -152,8 +155,13 @@ pub struct FocusScreen {
     input: Entity<TextareaState>,
     tools: compose::Tools,
     refs: Vec<CodeRef>,
-    prefs: Option<ComposerPrefs>,
-    menu: Option<Menu>,
+    controls: crate::compose_controls::Controls,
+    // The right panel.
+    tab: Tab,
+    /// The window was narrow at the last frame: a change to narrow opens the chat tab.
+    was_narrow: bool,
+    console: Entity<crate::session_console::SessionConsole>,
+    trace: trace::TraceState,
     // The editor.
     diff: Option<(Option<SessionDiff>, Instant)>,
     diff_busy: bool,
@@ -173,6 +181,7 @@ pub struct FocusScreen {
     _keys: Subscription,
     _observe: Subscription,
     _input: Subscription,
+    _console: Subscription,
     _ticker: Task<()>,
 }
 
@@ -202,6 +211,28 @@ impl FocusScreen {
                 .submit_on_enter(true)
                 .auto_grow(2, 5)
         });
+        {
+            let weak = cx.entity().downgrade();
+            crate::complete::attach(
+                &input,
+                model.clone(),
+                move |cx| weak.upgrade().map(|v| v.read(cx).session().to_string()),
+                |_| (None, None),
+                cx,
+            );
+        }
+        let console = cx.new(|cx| {
+            crate::session_console::SessionConsole::new(model.clone(), session.clone(), cx)
+        });
+        let console_events = cx.subscribe(
+            &console,
+            |this, _, event: &crate::session_console::ConsoleEvent, cx| {
+                let crate::session_console::ConsoleEvent::OpenFile { path, .. } = event;
+                this.tab = Tab::Code;
+                this.open_file(path, Jump::Top, cx);
+            },
+        );
+        let want_code = crate::session_console::take_want_code(&session);
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
             if let InputEvent::PressEnter { shift: false, .. } = event {
                 this.submit(window, cx);
@@ -239,13 +270,17 @@ impl FocusScreen {
             input,
             tools: Default::default(),
             refs: Vec::new(),
-            prefs: None,
-            menu: None,
+            controls: Default::default(),
+            tab: Tab::Code,
+            was_narrow: false,
+            console,
+            trace: Default::default(),
             diff: None,
             diff_busy: false,
             file: None,
             view: match std::env::var("AIVORY_FOCUS_VIEW").as_deref() {
                 // Screenshot runs start in a view.
+                _ if want_code => View::Diff,
                 Ok("diff") => View::Diff,
                 Ok("split") => View::Split,
                 _ => View::File,
@@ -262,6 +297,7 @@ impl FocusScreen {
             _keys: keys,
             _observe: observe,
             _input: events,
+            _console: console_events,
             _ticker: ticker,
         };
         this.refresh_diff(true, cx);
@@ -278,6 +314,12 @@ impl FocusScreen {
             return;
         }
         self.session = session.to_string();
+        if crate::session_console::take_want_code(session) {
+            self.tab = Tab::Code;
+            self.view = View::Diff;
+        }
+        self.console.update(cx, |c, cx| c.show(session, cx));
+        self.trace = Default::default();
         self.strip_for = None;
         self.strip_tries = 0;
         self.diff = None;
@@ -291,8 +333,7 @@ impl FocusScreen {
         self.reviewed.clear();
         self.sel = None;
         self.refs.clear();
-        self.prefs = None;
-        self.menu = None;
+        self.controls = Default::default();
         self.items.clear();
         self.ask_card = None;
         self.list.reset(0);
@@ -419,7 +460,7 @@ impl FocusScreen {
         let text = self.input.read(cx).value().trim().to_string();
         let mut refs: Vec<String> = self.refs.iter().map(CodeRef::reference).collect();
         refs.extend(self.tools.references(None));
-        if text.is_empty() && refs.is_empty() {
+        if text.is_empty() && refs.is_empty() && self.tools.images().is_empty() {
             return None;
         }
         Some(match (text.is_empty(), refs.is_empty()) {
@@ -433,20 +474,12 @@ impl FocusScreen {
     pub(super) fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(pane) = self.pane(cx) else { return };
         let Some(text) = self.message(cx) else { return };
-        let prefs = self.prefs.clone().unwrap_or_else(|| pane.composer.clone());
+        let prefs = self.controls.current(&pane);
         if let Some(ask) = &pane.ask {
             self.answer(&pane.id, &ask.id, None, Some(text), cx);
         } else {
-            self.model.read(cx).send::<method::SessionSend>(
-                aivory_protocol::rpc::SendParams {
-                    id: pane.id.clone(),
-                    text,
-                    subagent: None,
-                    attachments: Vec::new(),
-                    composer: (prefs != pane.composer).then_some(prefs),
-                },
-                cx,
-            );
+            let images = self.tools.images();
+            crate::compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
         }
         self.tools.sent();
         self.refs.clear();
@@ -485,12 +518,15 @@ impl FocusScreen {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if crate::complete::is_open(cx) {
+            return;
+        }
         let key = event.keystroke.key.as_str();
         let plain = !event.keystroke.modifiers.modified();
         let typing = self.input.focus_handle(cx).is_focused(window);
         match key {
             "escape" => {
-                if self.menu.take().is_some()
+                if self.controls.close()
                     || self.pop_for.take().is_some()
                     || self.new_input.take().is_some()
                 {
@@ -592,9 +628,35 @@ impl Render for FocusScreen {
             return self.gone(cx).into_any_element();
         };
         let strip = self.strip(&pane, cx);
-        let chat = self.chat(&pane, window, cx);
-        let editor = self.editor(&pane, window, cx);
+        let narrow = f32::from(window.viewport_size().width) < ui::sw(1100.).into();
+        if narrow && !self.was_narrow {
+            self.tab = Tab::Chat;
+        }
+        self.was_narrow = narrow;
         let popup = self.popup(cx);
+        let body = if narrow {
+            if self.tab == Tab::Chat {
+                // The chat fills the window; the tabs sit above it.
+                let tabs = self.tab_bar(true, cx);
+                let chat = self.chat(&pane, window, cx).min_w(px(0.));
+                div()
+                    .flex_1()
+                    .min_h(px(0.))
+                    .flex()
+                    .flex_col()
+                    .child(tabs)
+                    .child(chat)
+            } else {
+                self.right_panel(&pane, true, window, cx)
+            }
+        } else {
+            if self.tab == Tab::Chat {
+                self.tab = Tab::Code;
+            }
+            let chat = self.chat(&pane, window, cx);
+            let right = self.right_panel(&pane, false, window, cx);
+            div().flex_1().min_h(px(0.)).flex().child(chat).child(right)
+        };
         div()
             .id("focus")
             .size_full()
@@ -604,20 +666,97 @@ impl Render for FocusScreen {
             .bg(rgb(tk().page))
             .track_focus(&self.focus)
             .child(strip)
-            .child(
-                div()
-                    .flex_1()
-                    .min_h(px(0.))
-                    .flex()
-                    .child(chat)
-                    .child(editor),
-            )
+            .child(body)
             .children(popup)
             .into_any_element()
     }
 }
 
 impl FocusScreen {
+    /// The tab bar of the right panel. `chat`: the Chat tab shows too (narrow window).
+    fn tab_bar(&mut self, chat: bool, cx: &mut Context<Self>) -> gpui::Div {
+        let mut bar = div()
+            .flex_none()
+            .min_h(ui::sw(36.))
+            .px(px(10.))
+            .py(px(3.))
+            .gap(px(4.))
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .border_b_1()
+            .border_color(rgba(tk().line))
+            .bg(rgb(tk().card));
+        let mut tabs = vec![];
+        if chat {
+            tabs.push((Tab::Chat, "Chat"));
+        }
+        tabs.extend([
+            (Tab::Code, "Code"),
+            (Tab::Console, "Console"),
+            (Tab::Trace, "Trace"),
+        ]);
+        for (tab, label) in tabs {
+            let on = self.tab == tab;
+            bar = bar.child(
+                div()
+                    .id(label)
+                    .px(px(10.))
+                    .py(px(4.))
+                    .rounded(px(8.))
+                    .text_size(ui::ts(T_SMALL))
+                    .cursor_pointer()
+                    .when(on, |d| d.bg(rgb(tk().track)).text_color(rgb(tk().ink)))
+                    .when(!on, |d| {
+                        d.text_color(rgb(tk().ink_3))
+                            .hover(|s| s.bg(rgb(tk().track)))
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.tab = tab;
+                        cx.notify();
+                    }))
+                    .child(label),
+            );
+        }
+        bar
+    }
+
+    /// The right panel: the tabs and the open tab. `narrow`: the panel fills the window.
+    fn right_panel(
+        &mut self,
+        pane: &Pane,
+        narrow: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::Div {
+        let bar = self.tab_bar(narrow, cx);
+        let body = match self.tab {
+            Tab::Code => self.editor(pane, window, cx),
+            Tab::Console => div()
+                .flex_1()
+                .min_w(px(0.))
+                .h_full()
+                .bg(rgb(tk().card))
+                .child(self.console.clone()),
+            Tab::Trace => self.trace_tab(cx),
+            Tab::Chat => div(),
+        };
+        let panel = if narrow {
+            div().flex_1().min_w(px(0.))
+        } else {
+            let vw = f32::from(window.viewport_size().width);
+            div().flex_none().w(px(
+                (vw * 0.45).clamp(ui::sw(420.).into(), ui::sw(900.).into())
+            ))
+        };
+        panel
+            .h_full()
+            .flex()
+            .flex_col()
+            .child(bar)
+            .child(div().flex_1().min_h(px(0.)).flex().child(body))
+    }
+
     /// The view of a session that left the war room.
     fn gone(&self, cx: &mut Context<Self>) -> impl IntoElement {
         div()

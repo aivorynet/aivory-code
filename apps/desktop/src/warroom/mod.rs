@@ -36,9 +36,8 @@ use gpui::{
 use gpui_base::input::{InputEvent, TextareaState};
 use serde_json::json;
 
-pub use pane::{effort_label, mode_label, models as provider_models};
+pub use pane::{effort_label, mode_label};
 pub(crate) use skins::bridge_data;
-pub use skins::{BridgeDetail, BridgeDetailEvent};
 
 use crate::actions::Action;
 use crate::compose;
@@ -281,6 +280,14 @@ impl WarRoomScreen {
         let display = Display::default();
         let weak = cx.entity().downgrade();
         let keys = cx.intercept_keystrokes(move |event, window, cx| {
+            if crate::complete::is_open(cx)
+                && matches!(
+                    event.keystroke.key.as_str(),
+                    "up" | "down" | "tab" | "enter" | "escape"
+                )
+            {
+                return;
+            }
             if let Some(view) = weak.upgrade() {
                 view.update(cx, |this, cx| this.on_keystroke(event, window, cx));
             }
@@ -852,6 +859,14 @@ impl WarRoomScreen {
                 .auto_grow(1, 4)
         });
         let id = pane.id.clone();
+        let sid = pane.id.clone();
+        crate::complete::attach(
+            &input,
+            self.model.clone(),
+            move |_| Some(sid.clone()),
+            |_| (None, None),
+            cx,
+        );
         let events = cx.subscribe_in(
             &input,
             window,
@@ -894,6 +909,11 @@ impl WarRoomScreen {
             Some(tools) => tools.message(&text, cwd.as_deref()),
             None => text,
         };
+        let images = self
+            .tools
+            .get(session)
+            .map(|t| t.images())
+            .unwrap_or_default();
         let prefs = self.composer_prefs(&pane);
         if let Some(ask) = &pane.ask {
             self.send::<method::SessionAnswer>(
@@ -924,7 +944,7 @@ impl WarRoomScreen {
                                 id: created.id,
                                 text,
                                 subagent: None,
-                                attachments: Vec::new(),
+                                attachments: images,
                                 composer: None,
                             },
                             cx,
@@ -947,7 +967,7 @@ impl WarRoomScreen {
                     id: pane.id.clone(),
                     text,
                     subagent,
-                    attachments: Vec::new(),
+                    attachments: images,
                     composer: (prefs != pane.composer).then_some(prefs),
                 },
                 cx,

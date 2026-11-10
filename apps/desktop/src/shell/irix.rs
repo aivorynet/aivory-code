@@ -109,6 +109,9 @@ impl Shell {
                         }
                     })),
             )
+            .children(crate::new_session::launch_buttons("irix", |id, label| {
+                entry(id, label.to_string(), false)
+            }))
             .child(div().flex_1())
             .child(
                 entry("tc-look", "Look ▾".into(), self.look_menu).on_click(cx.listener(
@@ -327,7 +330,7 @@ impl Shell {
         };
         // The Focus window carries the name of its session.
         let title = match &self.screen {
-            Screen::Focus(id) | Screen::Session(id) => {
+            Screen::Session(id) => {
                 let name = self
                     .model
                     .read(cx)

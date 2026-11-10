@@ -1,5 +1,5 @@
 //! The app frame in the Neon look (ADR 0022, `NeonGrid`): a neon header with the
-//! tabs in place of the rail and the status bar. The session screen is `neon_session`.
+//! tabs in place of the rail and the status bar. The session screen is `neon_focus`.
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Div, FontWeight, SharedString, div, px, rgb};
@@ -36,6 +36,8 @@ impl Shell {
                     .relative()
                     .flex_1()
                     .min_h(px(0.))
+                    .flex()
+                    .flex_col()
                     .child(content)
                     .when(self.screen != Screen::WarRoom, |d| d.child(scanlines())),
             )
@@ -86,6 +88,23 @@ impl Shell {
                     this.go(target.clone(), cx);
                 },
             )));
+        }
+        for tab in crate::new_session::launch_buttons("neon", |id, label| {
+            div()
+                .id(id)
+                .h(px(34.))
+                .px(px(16.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .font_weight(FontWeight::BOLD)
+                .text_size(ui::ts(T_SMALL))
+                .bg(rgb(PANEL))
+                .text_color(rgb(INK))
+                .hover(|h| h.bg(rgb(0x232C55)))
+                .child(label.to_uppercase())
+        }) {
+            nav = nav.child(tab);
         }
         let part = |text: String, color: u32| div().text_color(rgb(color)).child(text);
         let mut line = div()

@@ -53,6 +53,8 @@ pub enum Item {
     },
     Error(String),
     Meta(String),
+    /// A line with a preview: an image, a video, a PDF, or a link.
+    Media(aivory_protocol::Media),
 }
 
 /// The items of a transcript. `start` is the index of the first line in the full transcript.
@@ -68,7 +70,10 @@ pub fn items(lines: &[Line], start: u32, pending: Pending) -> Vec<Item> {
                 out.push(Item::User(join(b)));
             }
             BlockKind::Agent => out.push(Item::Agent(join(b))),
-            BlockKind::Meta => out.push(Item::Meta(join(b))),
+            BlockKind::Meta => match b.lines.first().and_then(|l| l.media.clone()) {
+                Some(m) => out.push(Item::Media(m)),
+                None => out.push(Item::Meta(join(b))),
+            },
             BlockKind::Error => out.push(Item::Error(join(b))),
             BlockKind::Turn => {}
             BlockKind::Subagent => {

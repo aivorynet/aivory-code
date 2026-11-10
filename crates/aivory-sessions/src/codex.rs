@@ -69,6 +69,8 @@ impl SessionStore for CodexStore {
         let mut cli_version = None;
         let mut branch = None;
         let mut model = None;
+        let mut mode = None;
+        let mut effort = None;
         let mut title = None;
         for raw in ht.head_lines().chain(ht.tail_lines()) {
             let Ok(line) = serde_json::from_slice::<Line>(raw) else {
@@ -96,6 +98,17 @@ impl SessionStore for CodexStore {
                     if let Some(m) = str_field(&payload, "model") {
                         model = Some(m);
                     }
+                    if let Some(e) = str_field(&payload, "effort") {
+                        effort = Some(e);
+                    }
+                    let sandbox = payload.get("sandbox_policy").and_then(|s| {
+                        s.as_str()
+                            .map(str::to_string)
+                            .or_else(|| str_field(s, "type"))
+                    });
+                    if let (Some(a), Some(s)) = (str_field(&payload, "approval_policy"), sandbox) {
+                        mode = Some(format!("{a}/{s}"));
+                    }
                 }
                 Some("event_msg")
                     if title.is_none()
@@ -120,6 +133,8 @@ impl SessionStore for CodexStore {
             git_branch: branch,
             cli_version,
             model,
+            mode,
+            effort,
             path: file.path.clone(),
             sidechains: Vec::new(),
         }))

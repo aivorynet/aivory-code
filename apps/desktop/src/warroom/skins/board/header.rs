@@ -78,6 +78,7 @@ impl WarRoomScreen {
                     effort: Effort::High,
                 },
                 task: None,
+                attachments: Vec::new(),
             },
             cx,
         );

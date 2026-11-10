@@ -17,6 +17,7 @@ use gpui::{
 };
 
 use crate::actions::{Action, act};
+use crate::bridge_screens::{TaskAct, task_act};
 use crate::model::Model;
 use crate::repos::ReposScreen;
 use crate::tasks::TasksScreen;
@@ -33,8 +34,6 @@ use crate::warroom::skins::navigator::panels::{
 pub enum IrixEvent {
     /// The deep dive of a session.
     OpenSession(String),
-    /// The Focus view of a session.
-    OpenFocus(String),
     /// The war room.
     WarRoom,
 }
@@ -251,6 +250,12 @@ impl IrixTasks {
         self.data
             .as_ref()
             .map_or(0, |d| d.tasks.iter().filter(|t| f.takes(t)).count())
+    }
+
+    /// Load the list again after a task action.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.refresh(cx);
     }
 
     /// Move a task to another column, then read the list again.
@@ -474,10 +479,13 @@ impl IrixTasks {
                 cx.listener(move |_, _, _, cx| cx.emit(IrixEvent::OpenSession(id.clone()))),
             ));
         }
-        if let Some(id) = first {
-            keys = keys.child(push("it-focus", "Focus view", false).on_click(
-                cx.listener(move |_, _, _, cx| cx.emit(IrixEvent::OpenFocus(id.clone()))),
-            ));
+        if t.column == TaskColumn::Planned {
+            let id = t.id.clone();
+            keys = keys.child(push("it-start", "Start", true).on_click(cx.listener(
+                move |this, _, _, cx| {
+                    task_act(&this.model, &id, TaskAct::Start, Self::reload, cx);
+                },
+            )));
         }
         for (k, to) in t.column.moves_to().iter().enumerate() {
             let (id, to) = (t.id.clone(), *to);
@@ -826,11 +834,6 @@ impl IrixRepos {
                 cx.listener(move |_, _, _, cx| cx.emit(IrixEvent::OpenSession(id.clone()))),
             ));
         }
-        if let Some(id) = target {
-            keys = keys.child(push("ir-focus", "Focus view", false).on_click(
-                cx.listener(move |_, _, _, cx| cx.emit(IrixEvent::OpenFocus(id.clone()))),
-            ));
-        }
         keys = keys.child(
             push("ir-war", "War room", false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(IrixEvent::WarRoom))),
@@ -910,7 +913,6 @@ impl super::Shell {
     fn irix_event(&mut self, event: &IrixEvent, cx: &mut Context<Self>) {
         match event {
             IrixEvent::OpenSession(id) => self.open_session(id, cx),
-            IrixEvent::OpenFocus(id) => self.open_focus(id, cx),
             IrixEvent::WarRoom => self.go(super::Screen::WarRoom, cx),
         }
     }
@@ -950,7 +952,7 @@ impl super::Shell {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         use super::irix_focus::{IrixFocus, IrixFocusEvent};
-        let super::Screen::Focus(id) = &self.screen else {
+        let super::Screen::Session(id) = &self.screen else {
             return div().into_any_element();
         };
         let id = id.clone();
@@ -963,8 +965,7 @@ impl super::Shell {
         let model = self.model.clone();
         let view = cx.new(|cx| IrixFocus::new(model, id, window, cx));
         let sub = cx.subscribe(&view, |this, _, e: &IrixFocusEvent, cx| match e {
-            IrixFocusEvent::Open(id) => this.open_focus(id, cx),
-            IrixFocusEvent::Detail(id) => this.open_session(id, cx),
+            IrixFocusEvent::Open(id) => this.open_session(id, cx),
             IrixFocusEvent::Back => this.go(super::Screen::WarRoom, cx),
             IrixFocusEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         });

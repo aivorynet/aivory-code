@@ -181,7 +181,7 @@ pub fn order(id: impl Into<SharedString>, text: &str, kind: Btn) -> Stateful<Div
     };
     let mut d = div()
         .id(id.into())
-        .h(px(36.))
+        .min_h(px(36.))
         .px(px(16.))
         .flex()
         .flex_none()
@@ -206,8 +206,9 @@ pub fn order(id: impl Into<SharedString>, text: &str, kind: Btn) -> Stateful<Div
 pub fn navb(id: impl Into<SharedString>, text: &str, on: bool) -> Stateful<Div> {
     div()
         .id(id.into())
-        .h(px(28.))
+        .min_h(px(28.))
         .px(px(12.))
+        .whitespace_nowrap()
         .flex()
         .flex_none()
         .items_center()
@@ -260,17 +261,20 @@ pub fn trow(
                         .truncate()
                         .font_family(SANS)
                         .text_size(ui::ts(S_ENTRY))
+                        .line_height(ui::ts(S_ENTRY) * 1.3)
                         .text_color(c(if on { INK } else { TEXT }, 1.))
                         .child(title.to_string()),
                 )
-                .child(
-                    div()
-                        .truncate()
-                        .font_family(MONO)
-                        .text_size(ui::ts(S_LABEL))
-                        .text_color(c(LABEL, 1.))
-                        .child(sub.to_string()),
-                ),
+                .when(!sub.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .truncate()
+                            .font_family(MONO)
+                            .text_size(ui::ts(S_LABEL))
+                            .text_color(c(LABEL, 1.))
+                            .child(sub.to_string()),
+                    )
+                }),
         )
         .child(
             div()
@@ -286,6 +290,7 @@ pub fn trow(
 pub fn readout(value: &str, text: &str, color: u32) -> Div {
     div()
         .flex()
+        .flex_none()
         .items_center()
         .border_1()
         .border_color(c(if color == WHITE { WHITE } else { DIM }, 1.))
@@ -349,7 +354,7 @@ pub struct Frame {
 /// The layer of a Tactical screen: a title with readouts, a menu row, and the body. Scanlines
 /// lie over it.
 pub fn frame(f: Frame) -> Div {
-    let mut stats = div().flex().gap(px(16.));
+    let mut stats = div().flex().flex_wrap().gap(px(16.));
     for (value, text, color) in f.stats {
         stats = stats.child(readout(&value, &text, color));
     }
@@ -365,37 +370,42 @@ pub fn frame(f: Frame) -> Div {
                 .flex()
                 .flex_col()
                 .px(px(32.))
-                .pt(px(28.))
-                .pb(px(28.))
-                .gap(px(20.))
+                .pt(px(if ui::short() { 12. } else { 28. }))
+                .pb(px(if ui::short() { 12. } else { 28. }))
+                .gap(px(if ui::short() { 10. } else { 20. }))
+                .when(!ui::short(), |d| {
+                    d.child(
+                        div()
+                            .flex_none()
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(12.))
+                            .items_end()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.))
+                                    .child(
+                                        div()
+                                            .font_family(SANS)
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_size(ui::ts(S_TITLE))
+                                            .line_height(ui::ts(S_TITLE) * 1.2)
+                                            .text_color(c(INK, 1.))
+                                            .child(f.title.to_string()),
+                                    )
+                                    .child(label(f.kicker)),
+                            )
+                            .child(stats),
+                    )
+                })
                 .child(
                     div()
                         .flex_none()
                         .flex()
-                        .items_end()
-                        .justify_between()
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(4.))
-                                .child(
-                                    div()
-                                        .font_family(SANS)
-                                        .font_weight(FontWeight::BOLD)
-                                        .text_size(ui::ts(S_TITLE))
-                                        .line_height(ui::ts(S_TITLE) * 1.2)
-                                        .text_color(c(INK, 1.))
-                                        .child(f.title.to_string()),
-                                )
-                                .child(label(f.kicker)),
-                        )
-                        .child(stats),
-                )
-                .child(
-                    div()
-                        .flex_none()
-                        .flex()
+                        .flex_wrap()
                         .items_center()
                         .gap(px(6.))
                         .pb(px(12.))
@@ -403,7 +413,7 @@ pub fn frame(f: Frame) -> Div {
                         .border_color(c(DEEP, 1.))
                         .children(f.menu),
                 )
-                .child(div().flex_1().min_h(px(0.)).child(f.body)),
+                .child(div().flex_1().min_h(px(0.)).flex().flex_col().child(f.body)),
         )
         .child(scan())
 }

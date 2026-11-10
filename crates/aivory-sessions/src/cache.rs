@@ -81,6 +81,11 @@ impl ScanCache {
 
 /// Default cache file: `$AIVORY_CACHE_DIR/sessions-cache.json`, else the per-user cache directory.
 pub fn default_cache_file() -> Option<PathBuf> {
+    Some(cache_dir()?.join("sessions-cache.json"))
+}
+
+/// The cache folder: `$AIVORY_CACHE_DIR`, else the per-user cache folder of AIVory Code.
+pub fn cache_dir() -> Option<PathBuf> {
     let dir = if let Some(d) = std::env::var_os("AIVORY_CACHE_DIR") {
         PathBuf::from(d)
     } else if cfg!(windows) {
@@ -97,5 +102,5 @@ pub fn default_cache_file() -> Option<PathBuf> {
     } else {
         std::env::home_dir()?.join(".cache").join("aivory-code")
     };
-    Some(dir.join("sessions-cache.json"))
+    Some(dir)
 }

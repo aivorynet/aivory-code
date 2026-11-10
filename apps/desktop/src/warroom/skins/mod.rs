@@ -22,7 +22,6 @@ use serde_json::json;
 pub(super) use board::{BoardState, WidthClass, side_width, width_class};
 pub(super) use bridge::BridgeState;
 pub(crate) use bridge::data as bridge_data;
-pub use bridge::detail::{BridgeDetail, BridgeDetailEvent};
 pub(super) use hud::HudState;
 pub(super) use navigator::NavigatorState;
 pub(super) use neon::NeonState;

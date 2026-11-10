@@ -231,11 +231,58 @@ fn text_rows(text: &str) -> impl Iterator<Item = &str> {
         .filter(|l| !l.trim().is_empty())
 }
 
-/// One line per non-empty row of an agent text.
+/// One line per non-empty row of an agent text, then a preview line per media that it names.
 pub(crate) fn push_text(out: &mut Vec<Line>, kind: LineKind, text: &str) {
     for row in text_rows(&clean_text(text)) {
         out.push(Line::new(kind, truncate(row, MAX_TEXT_CHARS)));
     }
+    push_media(out, text);
+}
+
+/// The most media previews that one text adds.
+const MAX_MEDIA: usize = 4;
+
+/// A preview line for each image, video, PDF, or media URL that `text` names.
+pub(crate) fn push_media(out: &mut Vec<Line>, text: &str) {
+    out.extend(
+        aivory_protocol::media::scan(text, MAX_MEDIA)
+            .into_iter()
+            .map(Line::media),
+    );
+}
+
+/// Save an image of a transcript (base64 data) in `<cache>/media/<hash>.<ext>` and return
+/// its preview line. The same image twice is one file. `None` for bad data or no cache.
+pub(crate) fn stored_image(mime: &str, data: &str) -> Option<Line> {
+    use base64::Engine as _;
+    use std::hash::{Hash, Hasher};
+    let ext = match mime {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => return None,
+    };
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    data.hash(&mut h);
+    let dir = crate::cache::cache_dir()?.join("media");
+    let path = dir.join(format!("{:016x}.{ext}", h.finish()));
+    if !path.is_file() {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data.trim())
+            .ok()?;
+        std::fs::create_dir_all(&dir).ok()?;
+        std::fs::write(&path, bytes).ok()?;
+    }
+    let media = aivory_protocol::Media::of(&path.to_string_lossy())?;
+    Some(Line::media(media))
+}
+
+/// The preview line of a `data:image/…;base64,…` URL (Codex `input_image`).
+pub(crate) fn data_url_image(url: &str) -> Option<Line> {
+    let rest = url.strip_prefix("data:")?;
+    let (mime, data) = rest.split_once(";base64,")?;
+    stored_image(mime, data)
 }
 
 /// A user prompt: the first `MAX_PROMPT_LINES` rows, then `… N more lines`.
@@ -248,6 +295,7 @@ pub(crate) fn push_prompt(out: &mut Vec<Line>, text: &str) {
     if rows.len() > MAX_PROMPT_LINES {
         out.push(Line::user(more_lines(rows.len() - MAX_PROMPT_LINES)));
     }
+    push_media(out, text);
 }
 
 /// A tool result: the first `MAX_OUTPUT_LINES` rows, then `… N more lines`. A failed
@@ -269,6 +317,7 @@ pub(crate) fn push_output(out: &mut Vec<Line>, text: &str, is_error: bool) {
     if rows.len() > MAX_OUTPUT_LINES {
         out.push(Line::new(kind, more_lines(rows.len() - MAX_OUTPUT_LINES)));
     }
+    push_media(out, text);
 }
 
 pub(crate) fn more_lines(n: usize) -> String {
@@ -686,5 +735,34 @@ mod tests {
             decide(Some(with_ask), now, old).state,
             SessionState::NeedsYou
         );
+    }
+}
+
+#[cfg(test)]
+mod media_tests {
+    use super::*;
+    use aivory_protocol::MediaKind;
+
+    #[test]
+    fn texts_get_a_preview_line_per_media() {
+        let mut out = Vec::new();
+        push_text(
+            &mut out,
+            LineKind::Agent,
+            "Saved the chart to C:/out/chart.png.\nThe demo: /tmp/demo.mp4",
+        );
+        let media: Vec<_> = out.iter().filter_map(|l| l.media.clone()).collect();
+        assert_eq!(media.len(), 2);
+        assert_eq!(media[0].kind, MediaKind::Image);
+        assert_eq!(media[1].kind, MediaKind::Video);
+        assert_eq!(out.last().unwrap().text, "video demo.mp4");
+        assert_eq!(out.last().unwrap().kind, LineKind::Meta);
+    }
+
+    #[test]
+    fn bad_image_data_gives_no_line() {
+        assert!(data_url_image("data:image/png;base64").is_none());
+        assert!(data_url_image("https://e.org/a.png").is_none());
+        assert!(stored_image("image/tiff", "AAAA").is_none());
     }
 }

@@ -20,7 +20,7 @@ mod text;
 pub mod timeutil;
 pub mod transcript;
 
-pub use cache::default_cache_file;
+pub use cache::{cache_dir, default_cache_file};
 pub use catalog::{FindError, ScanReport, ScanStats, SessionCatalog};
 pub use claude::ClaudeStore;
 pub use codex::CodexStore;

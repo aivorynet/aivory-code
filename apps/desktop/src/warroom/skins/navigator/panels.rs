@@ -81,14 +81,20 @@ pub(crate) fn scroll_area(
     if stick && (!over || off >= max - 2.) {
         handle.scroll_to_bottom();
     }
-    let mut area = div().relative().size_full().overflow_hidden().child(
-        div()
-            .id(id.clone())
-            .size_full()
-            .overflow_y_scroll()
-            .track_scroll(handle)
-            .child(div().when(over, |d| d.pr(px(BAR_W))).child(body)),
-    );
+    let mut area = div()
+        .relative()
+        .size_full()
+        .overflow_hidden()
+        .child(
+            div()
+                .id(id.clone())
+                .size_full()
+                .overflow_y_scroll()
+                .track_scroll(handle)
+                .child(div().when(over, |d| d.pr(px(BAR_W))).child(body)),
+        )
+        // The thumb follows the text: one more frame when the handle moved after this render.
+        .child(crate::ui::scroll_watch(handle, max, off));
     if !over {
         return area;
     }
@@ -356,7 +362,7 @@ pub(crate) fn push(id: impl Into<SharedString>, label: &str, primary: bool) -> S
     let id: SharedString = id.into();
     let group = SharedString::from(format!("{id}-g"));
     let face = div()
-        .h(px(28.))
+        .min_h(crate::ui::sw(28.))
         .px(px(14.))
         .flex()
         .items_center()
@@ -389,7 +395,7 @@ pub(crate) fn seg(id: impl Into<SharedString>, label: &str, on: bool) -> Statefu
     let id: SharedString = id.into();
     let group = SharedString::from(format!("{id}-g"));
     let face = div()
-        .h(px(26.))
+        .min_h(crate::ui::sw(26.))
         .px(px(14.))
         .flex()
         .items_center()

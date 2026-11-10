@@ -214,10 +214,14 @@ impl OpenFx {
             .top_0()
             .left_0()
             .size_full();
+        // A flex column: the screen inside gets the height of the area (a block parent leaves
+        // the percent height of the screen open, and a tall screen runs out of the window).
         let mut root = div()
             .relative()
             .flex_1()
             .min_h(px(0.))
+            .flex()
+            .flex_col()
             .child(content)
             .child(probe);
         if let State::Capture { old: Some(old) } = &self.state {

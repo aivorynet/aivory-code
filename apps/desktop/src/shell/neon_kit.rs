@@ -1,6 +1,6 @@
 //! The building blocks of the Neon look: the palette, the type scale, the neon frame
 //! with a glow on the frame only, titles, menu tabs, rows, buttons and the scanlines. The app
-//! frame (`neon`), the session view (`neon_session`) and the list screens
+//! frame (`neon`), the session screen (`neon_focus`) and the list screens
 //! (`neon_screens`) use them, so all screens speak one grammar.
 
 use gpui::prelude::*;
@@ -165,7 +165,7 @@ pub(super) fn button(
 ) -> Stateful<Div> {
     div()
         .id(id.into())
-        .h(px(36.))
+        .min_h(ui::sw(36.))
         .px(px(20.))
         .flex()
         .flex_none()
@@ -194,7 +194,7 @@ pub(super) fn menu_tab(
 ) -> Stateful<Div> {
     div()
         .id(id.into())
-        .h(px(40.))
+        .min_h(ui::sw(40.))
         .px(px(20.))
         .flex()
         .items_center()
@@ -226,20 +226,6 @@ pub(super) fn row(
     on: bool,
 ) -> Stateful<Div> {
     row_with(id, code_text, color, texts, on, (54., 1))
-}
-
-/// The height of a tall row (a title of up to two lines).
-pub(super) const TALL: f32 = 78.;
-
-/// A list row whose title wraps to two lines, so a name is never cut.
-pub(super) fn row_tall(
-    id: impl Into<SharedString>,
-    code_text: &str,
-    color: u32,
-    texts: (&str, &str, &str),
-    on: bool,
-) -> Stateful<Div> {
-    row_with(id, code_text, color, texts, on, (TALL, 2))
 }
 
 /// How many rows of height `row_h` fit in a list panel of this window. `reserved` is the room
@@ -354,43 +340,49 @@ pub(super) fn screen(
         .child(
             div()
                 .flex_none()
-                .px(px(48.))
-                .pt(px(28.))
+                .px(px(32.))
+                .pt(px(if ui::short() { 12. } else { 24. }))
                 .flex()
+                .flex_wrap()
                 .items_end()
                 .justify_between()
-                .gap(px(32.))
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.))
-                        .child(
-                            div()
-                                .font_family(ORBITRON)
-                                .font_weight(FontWeight::EXTRA_BOLD)
-                                .text_size(ui::ts(T_SCREEN))
-                                .line_height(ui::ts(40.))
-                                .text_color(rgb(color))
-                                .child(title.to_uppercase()),
-                        )
-                        .child(
-                            div()
-                                .w(px(88.))
-                                .h(px(3.))
-                                .bg(rgb(color))
-                                .shadow(glow(color, 0xC0, 14.)),
-                        )
-                        .child(label(sub, MIST).text_size(ui::ts(T_ENTRY))),
-                )
-                .child(div().flex().gap(px(12.)).children(actions)),
+                .gap_x(px(32.))
+                .gap_y(px(12.))
+                .when(!ui::short(), |d| {
+                    d.child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .min_w(px(0.))
+                            .gap(px(8.))
+                            .child(
+                                div()
+                                    .font_family(ORBITRON)
+                                    .font_weight(FontWeight::EXTRA_BOLD)
+                                    .text_size(ui::ts(T_SCREEN))
+                                    .line_height(ui::ts(40.))
+                                    .text_color(rgb(color))
+                                    .child(title.to_uppercase()),
+                            )
+                            .child(
+                                div()
+                                    .w(px(88.))
+                                    .h(px(3.))
+                                    .bg(rgb(color))
+                                    .shadow(glow(color, 0xC0, 14.)),
+                            )
+                            .child(label(sub, MIST).text_size(ui::ts(T_ENTRY))),
+                    )
+                })
+                .child(div().flex().flex_wrap().gap(px(12.)).children(actions)),
         )
         .child(
             div()
                 .flex_none()
-                .mt(px(16.))
-                .mx(px(48.))
+                .mt(px(12.))
+                .mx(px(32.))
                 .flex()
+                .flex_wrap()
                 .border_b_1()
                 .border_color(rgba(0x8C96BC30))
                 .children(menu),
@@ -399,8 +391,10 @@ pub(super) fn screen(
             div()
                 .flex_1()
                 .min_h(px(0.))
-                .px(px(48.))
-                .py(px(28.))
+                .flex()
+                .flex_col()
+                .px(px(32.))
+                .py(px(if ui::short() { 10. } else { 20. }))
                 .child(body),
         )
 }

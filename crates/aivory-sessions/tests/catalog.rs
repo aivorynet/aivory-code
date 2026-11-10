@@ -53,6 +53,8 @@ fn claude_fields_and_sidechains() {
     );
     assert_eq!(s.cli_version.as_deref(), Some("2.0.0-test"));
     assert_eq!(s.model.as_deref(), Some("claude-test-1"));
+    assert_eq!(s.mode.as_deref(), Some("plan"));
+    assert_eq!(s.effort.as_deref(), Some("high"));
     assert!(s.created.is_some());
     assert_eq!(
         s.sidechains.len(),
@@ -75,6 +77,8 @@ fn codex_fields() {
     assert_eq!(s.git_branch.as_deref(), Some("develop"));
     assert_eq!(s.cli_version.as_deref(), Some("0.0.1-test"));
     assert_eq!(s.model.as_deref(), Some("gpt-test"));
+    assert_eq!(s.mode.as_deref(), Some("on-request/read-only"));
+    assert_eq!(s.effort.as_deref(), Some("medium"));
 }
 
 #[test]

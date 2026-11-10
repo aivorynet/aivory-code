@@ -4,7 +4,7 @@
 
 use aivory_protocol::{LineKind, Pane, SessionState, WarRoom};
 use gpui::prelude::*;
-use gpui::{Context, Div, FontWeight, SharedString, Stateful, div, px, relative, rgb};
+use gpui::{AnyElement, Context, Div, FontWeight, SharedString, Stateful, div, px, relative, rgb};
 
 use super::{
     BLOCKED, GAP, Gates, IDLE, NEEDS, StateLine, Tier, WORKING, WidthClass, ab, alert, gate_empty,
@@ -15,6 +15,9 @@ use crate::actions::Action;
 use crate::theme::*;
 use crate::ui;
 use crate::warroom::{WarRoomEvent, WarRoomScreen};
+
+/// The height of a row of a gate, with its gap, for the count of whole rows.
+const ROW_H: f32 = 40.;
 
 /// The text of "Let it fix".
 const FIX_TEXT: &str = "Fix the error yourself and go on.";
@@ -35,6 +38,35 @@ fn card() -> Div {
         .bg(rgb(tk().card))
         .rounded(tk().r_card)
         .shadow(ui::card_shadow())
+}
+
+/// The fade and the hint at the foot of a scroll area that has more below (the values come
+/// from the last frame). `None` when the area shows its end, and in an area too low for the
+/// hint: there the fade would cover all of the area.
+pub(super) fn more_below(scroll: &gpui::ScrollHandle) -> Option<Div> {
+    let more = f32::from(scroll.max_offset().y + scroll.offset().y) > 4.
+        && f32::from(scroll.bounds().size.height) >= 96.;
+    let page = tk().card;
+    more.then(|| {
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .bottom_0()
+            .h(ui::sw(44.))
+            .flex()
+            .items_end()
+            .justify_center()
+            .pb(px(6.))
+            .bg(gpui::linear_gradient(
+                180.,
+                gpui::linear_color_stop(gpui::rgba(page << 8), 0.),
+                gpui::linear_color_stop(gpui::rgba(page << 8 | 0xFF), 0.55),
+            ))
+            .text_size(ui::ts(T_CAPTION))
+            .text_color(rgb(tk().ink_3))
+            .child("More below · scroll")
+    })
 }
 
 /// A text line that ends with an ellipsis; the full text shows on hover.
@@ -312,7 +344,18 @@ impl WarRoomScreen {
                 );
                 continue;
             }
-            let body = self.gate_rows(war, which, list, tier, spans[which].1, cx);
+            let scroll = self.board.gate_scroll[which].clone();
+            // Whole rows only: from the height of the last frame, show the rows that fit and a
+            // "+N more" line. A click on that line shows all rows (the column then scrolls).
+            let more_key = format!("more:{which}");
+            let all_rows = self.board.toggled.contains(&more_key);
+            let view_h = f32::from(scroll.bounds().size.height);
+            let limit = (!all_rows && view_h > 80.)
+                .then(|| (((view_h - 20.) / ROW_H).floor() as usize).max(2));
+            let body = self.gate_rows(war, which, list, tier, spans[which].1, limit, &more_key, cx);
+            // More rows below the visible part: a fade and a hint at the foot of the column, so
+            // the last row does not look cut off.
+            let fade = more_below(&scroll);
             row = row.child(
                 card()
                     .id(("gate-card", which))
@@ -327,13 +370,28 @@ impl WarRoomScreen {
                     .child(head)
                     .child(
                         div()
-                            .id(("gate", which))
+                            .relative()
                             .flex_1()
                             .min_h(px(0.))
-                            .overflow_y_scroll()
-                            .px(px(10.))
-                            .py(px(10.))
-                            .child(body),
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .id(("gate", which))
+                                    .flex_1()
+                                    .min_h(px(0.))
+                                    .overflow_y_scroll()
+                                    .track_scroll(&scroll)
+                                    .px(px(10.))
+                                    .py(px(10.))
+                                    .child(body),
+                            )
+                            .children(fade)
+                            .child(crate::ui::thumb(
+                                &scroll,
+                                gpui::rgba(tk().ink_3 << 8 | 0x80),
+                                3.,
+                            )),
                     ),
             );
         }
@@ -421,6 +479,7 @@ impl WarRoomScreen {
     }
 
     /// The rows of a gate. From 13 sessions the rows group by codebase.
+    #[allow(clippy::too_many_arguments, reason = "one column of rows")]
     fn gate_rows(
         &self,
         war: &WarRoom,
@@ -428,27 +487,68 @@ impl WarRoomScreen {
         list: &[&Pane],
         tier: Tier,
         width: f32,
+        limit: Option<usize>,
+        more_key: &str,
         cx: &mut Context<Self>,
     ) -> Div {
         let sel = self.focus_session.as_deref();
-        let mut col = div().flex().flex_col().gap(px(2.));
+        let mut items: Vec<AnyElement> = Vec::new();
         if !matches!(tier, Tier::Rows | Tier::Closed) {
             for s in list {
-                col = col.child(self.session_row(war, s, sel == Some(s.id.as_str()), width, cx));
+                items.push(
+                    self.session_row(war, s, sel == Some(s.id.as_str()), width, cx)
+                        .into_any_element(),
+                );
             }
-            return col;
-        }
-        for (cb, members) in groups(list) {
-            let key = format!("{which}:{cb}");
-            let hot = members.iter().any(|s| alert(s));
-            let open = group_open(tier, hot, self.board.toggled.contains(&key));
-            col = col.child(self.group_head(&key, &cb, members.len(), hot, open, cx));
-            if open {
-                for s in members {
-                    col =
-                        col.child(self.session_row(war, s, sel == Some(s.id.as_str()), width, cx));
+        } else {
+            for (cb, members) in groups(list) {
+                let key = format!("{which}:{cb}");
+                let hot = members.iter().any(|s| alert(s));
+                let open = group_open(tier, hot, self.board.toggled.contains(&key));
+                items.push(
+                    self.group_head(&key, &cb, members.len(), hot, open, cx)
+                        .into_any_element(),
+                );
+                if open {
+                    for s in members {
+                        items.push(
+                            self.session_row(war, s, sel == Some(s.id.as_str()), width, cx)
+                                .into_any_element(),
+                        );
+                    }
                 }
             }
+        }
+        let total = items.len();
+        let mut hidden = 0;
+        if let Some(n) = limit
+            && total > n
+        {
+            // One line of the budget goes to the "+N more" hint.
+            let keep = n.saturating_sub(1).max(1);
+            hidden = total - keep;
+            items.truncate(keep);
+        }
+        let mut col = div().flex().flex_col().gap(px(2.)).children(items);
+        if hidden > 0 {
+            let k = more_key.to_string();
+            col = col.child(
+                div()
+                    .id(SharedString::from(format!("gate-more-{which}")))
+                    .h(px(28.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .text_size(ui::ts(T_CAPTION))
+                    .text_color(rgb(tk().ink_3))
+                    .hover(|s| s.text_color(rgb(tk().ink)))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.board.toggled.insert(k.clone());
+                        cx.notify();
+                    }))
+                    .child(format!("+{hidden} more")),
+            );
         }
         col
     }
@@ -648,11 +748,14 @@ impl WarRoomScreen {
         }
         let input = self.board.answer.clone();
         let focus_id = id.clone();
+        let ask_scroll = self.board.ask_scroll.clone();
+        let ask_fade = more_below(&ask_scroll);
         let context = div()
             .id("ask-context")
             .flex_1()
             .min_h(px(0.))
             .overflow_y_scroll()
+            .track_scroll(&ask_scroll)
             .p(px(20.))
             .flex()
             .flex_col()
@@ -683,10 +786,13 @@ impl WarRoomScreen {
                     ),
             )
             .child(
+                // A narrow card wraps the row: the place keeps its own line, not "a…".
                 div()
                     .flex()
+                    .flex_wrap()
                     .items_center()
-                    .gap(px(8.))
+                    .gap_x(px(8.))
+                    .gap_y(px(2.))
                     .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(
@@ -694,7 +800,8 @@ impl WarRoomScreen {
                             "ask-where",
                             format!("{} / {} · {}", pane.codebase, pane.part, kind_label(pane)),
                         )
-                        .flex_1(),
+                        .flex_1()
+                        .min_w(ui::sw(140.)),
                     )
                     .child(
                         div()
@@ -776,7 +883,21 @@ impl WarRoomScreen {
             .border_1()
             .border_color(ui::hsla(tk().line))
             .overflow_hidden()
-            .child(context)
+            .child(
+                div()
+                    .relative()
+                    .flex_1()
+                    .min_h(px(0.))
+                    .flex()
+                    .flex_col()
+                    .child(context)
+                    .children(ask_fade)
+                    .child(crate::ui::thumb(
+                        &ask_scroll,
+                        gpui::rgba(tk().ink_3 << 8 | 0x80),
+                        3.,
+                    )),
+            )
             .child(footer)
     }
 

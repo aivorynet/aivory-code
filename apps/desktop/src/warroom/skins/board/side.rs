@@ -93,7 +93,14 @@ impl WarRoomScreen {
             .when(compact, |d| d.rounded_bl(px(18.)))
             .shadow(ui::side_shadow(-8.))
             .overflow_hidden()
-            .child(self.overview_panel(war, cx));
+            .relative()
+            .child(self.overview_panel(war, cx))
+            .children(super::parts::more_below(&self.board.side_scroll))
+            .child(ui::thumb(
+                &self.board.side_scroll,
+                gpui::rgba(tk().ink_3 << 8 | 0x80),
+                3.,
+            ));
         if !compact {
             return (Some(panel.into_any_element()), None);
         }
@@ -130,8 +137,10 @@ impl WarRoomScreen {
         let mut out = div().flex().flex_col().gap(px(8.)).child(
             div()
                 .flex()
+                .flex_wrap()
                 .items_baseline()
-                .gap(px(10.))
+                .gap_x(px(10.))
+                .gap_y(px(2.))
                 .child(big(gb(m.used_mb), 24., "used"))
                 .child(
                     div()
@@ -239,10 +248,16 @@ impl WarRoomScreen {
                     .child(if running {
                         "An organizer runs. Its reports show in its session."
                     } else {
-                        "An agent that watches RAM and the other agents."
+                        aivory_protocol::ORGANIZER_INFO
                     }),
             )
             .child(modes)
+            .child(
+                div()
+                    .text_size(ui::ts(T_SMALL))
+                    .text_color(rgb(tk().ink_2))
+                    .child(self.organizer.about()),
+            )
             .child(
                 ui::dark_button("organizer-start", "Start organizer").on_click(cx.listener(
                     |this, _, _, cx| {
@@ -253,6 +268,7 @@ impl WarRoomScreen {
                                 aivory_protocol::OrganizerStartParams {
                                     mode: this.organizer,
                                     codebase: None,
+                                    composer: None,
                                 },
                                 cx,
                             );
@@ -318,6 +334,7 @@ impl WarRoomScreen {
             .id("board-overview")
             .size_full()
             .overflow_y_scroll()
+            .track_scroll(&self.board.side_scroll)
             .px(px(24.))
             .pb(px(32.))
             .flex()

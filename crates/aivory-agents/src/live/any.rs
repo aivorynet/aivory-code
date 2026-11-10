@@ -59,6 +59,14 @@ impl AnyRun {
         }
     }
 
+    /// Send a user turn with images, and with a new mode, model, or effort.
+    pub fn send_input(&self, input: &super::Input) -> Result<(), LiveError> {
+        match self {
+            Self::Claude(r) => r.send_input(input),
+            Self::Rpc(r) => r.send_input(input),
+        }
+    }
+
     pub fn answer(&self, ask_id: &str, answer: Answer) -> Result<(), LiveError> {
         match self {
             Self::Claude(r) => r.answer(ask_id, answer),

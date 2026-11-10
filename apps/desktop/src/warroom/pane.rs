@@ -754,96 +754,99 @@ impl WarRoomScreen {
             }
             center = center.child(row);
         }
-        let composer = div()
-            .relative()
-            .flex()
-            .rounded(px(14.))
-            .bg(rgba(if focused { t.bg } else { t.field_bg }))
-            .when(focused, |d| d.shadow(ui::ring(tk().ink, 2.)))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_none()
-                    .child(
+        let media_id = pane.id.clone();
+        let composer = compose::media_target(
+            div()
+                .relative()
+                .flex()
+                .rounded(px(14.))
+                .bg(rgba(if focused { t.bg } else { t.field_bg }))
+                .when(focused, |d| d.shadow(ui::ring(tk().ink, 2.))),
+            move |this: &mut Self| Some(this.tools_of(&media_id)),
+            cx,
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_none()
+                .child(
+                    icon_button(
+                        format!("cap-{}", pane.id),
+                        "icons/capture.svg",
+                        "Capture a screen area",
+                    )
+                    .rounded_tl(px(14.))
+                    .on_click({
+                        let id = pane.id.clone();
+                        cx.listener(move |this, _, window, cx| this.capture(&id, window, cx))
+                    }),
+                )
+                .when(full, |d| {
+                    d.child(
                         icon_button(
-                            format!("cap-{}", pane.id),
-                            "icons/capture.svg",
-                            "Capture a screen area",
+                            format!("att-{}", pane.id),
+                            "icons/attach.svg",
+                            "Attach files",
                         )
-                        .rounded_tl(px(14.))
                         .on_click({
                             let id = pane.id.clone();
-                            cx.listener(move |this, _, window, cx| this.capture(&id, window, cx))
+                            cx.listener(move |this, _, window, cx| this.attach(&id, window, cx))
                         }),
                     )
-                    .when(full, |d| {
-                        d.child(
-                            icon_button(
-                                format!("att-{}", pane.id),
-                                "icons/attach.svg",
-                                "Attach files",
-                            )
-                            .on_click({
-                                let id = pane.id.clone();
-                                cx.listener(move |this, _, window, cx| this.attach(&id, window, cx))
-                            }),
+                }),
+        )
+        .child(center)
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_none()
+                .when(full && compose::VOICE_AVAILABLE, |d| {
+                    let listening = tools.is_some_and(|t| t.listening.is_some());
+                    d.child(
+                        icon_button(
+                            format!("mic-{}", pane.id),
+                            "icons/mic.svg",
+                            if listening {
+                                "Stop listening"
+                            } else {
+                                "Dictate"
+                            },
                         )
-                    }),
-            )
-            .child(center)
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_none()
-                    .when(full && compose::VOICE_AVAILABLE, |d| {
-                        let listening = tools.is_some_and(|t| t.listening.is_some());
-                        d.child(
-                            icon_button(
-                                format!("mic-{}", pane.id),
-                                "icons/mic.svg",
-                                if listening {
-                                    "Stop listening"
-                                } else {
-                                    "Dictate"
-                                },
-                            )
-                            .rounded_tr(px(14.))
-                            .when(listening, |d| d.bg(rgba(t.err_head_bg)))
-                            .on_click({
-                                let id = pane.id.clone();
-                                cx.listener(move |this, _, window, cx| {
-                                    this.dictate(&id, window, cx)
-                                })
-                            }),
-                        )
-                    })
-                    .child(
-                        div()
-                            .id(SharedString::from(format!("send-{}", pane.id)))
-                            .tooltip(ui::tip("Send (Enter)"))
-                            .mt_auto()
-                            .w(px(if small { 34. } else { 44. }))
-                            .h(px(if small { 32. } else { 40. }))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded_br(px(14.))
-                            .cursor_pointer()
-                            .hover(|s| s.bg(rgba(t.ghost_hover)))
-                            .on_click({
-                                let id = pane.id.clone();
-                                cx.listener(move |this, _, window, cx| this.submit(&id, window, cx))
-                            })
-                            .child(ui::icon(
-                                "icons/send.svg",
-                                if small { 15. } else { 16. },
-                                rgba(t.text),
-                            )),
-                    ),
-            )
-            .when_some(self.composer_menu(pane, &prefs, cx), |d, m| d.child(m));
+                        .rounded_tr(px(14.))
+                        .when(listening, |d| d.bg(rgba(t.err_head_bg)))
+                        .on_click({
+                            let id = pane.id.clone();
+                            cx.listener(move |this, _, window, cx| this.dictate(&id, window, cx))
+                        }),
+                    )
+                })
+                .child(
+                    div()
+                        .id(SharedString::from(format!("send-{}", pane.id)))
+                        .tooltip(ui::tip("Send (Enter)"))
+                        .mt_auto()
+                        .w(px(if small { 34. } else { 44. }))
+                        .h(px(if small { 32. } else { 40. }))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_br(px(14.))
+                        .cursor_pointer()
+                        .hover(|s| s.bg(rgba(t.ghost_hover)))
+                        .on_click({
+                            let id = pane.id.clone();
+                            cx.listener(move |this, _, window, cx| this.submit(&id, window, cx))
+                        })
+                        .child(ui::icon(
+                            "icons/send.svg",
+                            if small { 15. } else { 16. },
+                            rgba(t.text),
+                        )),
+                ),
+        )
+        .when_some(self.composer_menu(pane, &prefs, cx), |d, m| d.child(m));
         let fold = div()
             .flex_none()
             .pt(px(if wide { 12. } else { 8. }))

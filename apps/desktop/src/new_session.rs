@@ -4,8 +4,12 @@
 //! dialog stays open for the next task; the X button closes it.
 
 use aivory_protocol::actions::RepoAddParams;
-use aivory_protocol::rpc::{DispatchParams, method};
-use aivory_protocol::{Effort, Look, SessionState, WarRoom};
+use aivory_protocol::rpc::{DispatchParams, StartWhen, TaskCreateParams, method};
+use aivory_protocol::{
+    ComposerPrefs, Effort, Look, Mode, OrganizerMode, OrganizerStartParams, Playbook, SessionState,
+    WarRoom,
+};
+use gpui::AnimationExt;
 use gpui::prelude::*;
 use gpui::{
     Context, Entity, EventEmitter, FontWeight, KeyDownEvent, Rgba, SharedString, Subscription,
@@ -17,7 +21,6 @@ use crate::compose;
 use crate::model::Model;
 use crate::theme::tk;
 use crate::ui;
-use crate::warroom::pane;
 
 /// The agents of the dialog, in board order.
 const AGENTS: [&str; 3] = ["claude", "codex", "gemini"];
@@ -29,6 +32,68 @@ pub enum DialogEvent {
     Close,
 }
 
+/// What the dialog starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Purpose {
+    /// `session/dispatch`: a session now, or a queued task when no slot is free.
+    #[default]
+    Session,
+    /// `tasks/create` with `when: now`: a task on the board and its first session.
+    Task,
+    /// `organizer/start`: the session that watches the other sessions and the RAM.
+    Organizer,
+}
+
+/// A launcher that a button of a look asked for. The shell opens it at the next frame.
+#[derive(Default)]
+pub struct LaunchRequest(pub Option<Purpose>);
+
+impl gpui::Global for LaunchRequest {}
+
+/// Ask the shell to open the launcher (any look, any button).
+pub fn request(purpose: Purpose, cx: &mut gpui::App) {
+    cx.set_global(LaunchRequest(Some(purpose)));
+    cx.refresh_windows();
+}
+
+/// The two launcher buttons of a look header: `Organizer` and `New task`. The look gives
+/// the style of a button (`style(id, label)`) and places the pair.
+pub fn launch_buttons(
+    prefix: &'static str,
+    style: impl Fn(&'static str, &'static str) -> gpui::Stateful<gpui::Div>,
+) -> [gpui::Stateful<gpui::Div>; 2] {
+    let ids: [&'static str; 2] = match prefix {
+        "bridge" => ["bridge-organizer", "bridge-new-task"],
+        "holo" => ["holo-organizer", "holo-new-task"],
+        "tactical" => ["tactical-organizer", "tactical-new-task"],
+        "operator" => ["operator-organizer", "operator-new-task"],
+        "neon" => ["neon-organizer", "neon-new-task"],
+        "irix" => ["irix-organizer", "irix-new-task"],
+        "command" => ["command-organizer", "command-new-task"],
+        "themed" => ["themed-organizer", "themed-new-task"],
+        "warroom" => ["warroom-organizer", "warroom-new-task"],
+        _ => ["minimal-organizer", "minimal-new-task"],
+    };
+    [
+        style(ids[0], "Organizer")
+            .tooltip(ui::tip(
+                "Start an organizer session that watches all sessions",
+            ))
+            .on_click(|_, _, cx| request(Purpose::Organizer, cx)),
+        style(ids[1], "New task")
+            .tooltip(ui::tip("Create a task and start its first session"))
+            .on_click(|_, _, cx| request(Purpose::Task, cx)),
+    ]
+}
+
+const MODES: [Mode; 3] = [Mode::Plan, Mode::Edit, Mode::Auto];
+const ORGANIZER_MODES: [OrganizerMode; 4] = [
+    OrganizerMode::MemoryAndSessions,
+    OrganizerMode::FeedbackOnly,
+    OrganizerMode::MemoryOnly,
+    OrganizerMode::FullAuto,
+];
+
 pub struct NewSessionDialog {
     model: Entity<Model>,
     input: Entity<TextareaState>,
@@ -37,6 +102,9 @@ pub struct NewSessionDialog {
     agent: &'static str,
     model_name: Option<String>,
     effort: Effort,
+    mode: Mode,
+    purpose: Purpose,
+    organizer: OrganizerMode,
     busy: bool,
     adding: bool,
     /// The result of the last start: "Queued …" or "Started …", or an error.
@@ -47,12 +115,30 @@ pub struct NewSessionDialog {
 impl EventEmitter<DialogEvent> for NewSessionDialog {}
 
 impl NewSessionDialog {
-    pub fn new(model: Entity<Model>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        model: Entity<Model>,
+        purpose: Purpose,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let input = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .placeholder("What should the agent do?")
                 .auto_grow(6, 6)
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            |_| None,
+            move |cx| {
+                weak.upgrade().map_or((None, None), |v| {
+                    let v = v.read(cx);
+                    (Some(v.agent.to_string()), v.folder.clone())
+                })
+            },
+            cx,
+        );
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
             if let InputEvent::PressEnter {
                 secondary: true, ..
@@ -69,7 +155,18 @@ impl NewSessionDialog {
             folder: None,
             agent: AGENTS[0],
             model_name: None,
-            effort: Effort::High,
+            effort: if purpose == Purpose::Organizer {
+                Effort::Medium
+            } else {
+                Effort::High
+            },
+            mode: if purpose == Purpose::Organizer {
+                Mode::Auto
+            } else {
+                Mode::Edit
+            },
+            purpose,
+            organizer: OrganizerMode::default(),
             busy: false,
             adding: false,
             note: None,
@@ -116,22 +213,35 @@ impl NewSessionDialog {
         let ap = &war.autopilot;
         let free_all = ap.max_running.saturating_sub(all);
         let free_own = ap.max_per_codebase.saturating_sub(own);
-        if free_all < free_own {
-            (free_all, all, ap.max_running)
-        } else {
-            (free_own, own, ap.max_per_codebase)
+        // The count is the one of this folder; the global limit shows in the footer.
+        (free_all.min(free_own), own, ap.max_per_codebase)
+    }
+
+    /// The models of the agent, as the daemon reports them.
+    fn models(&self, cx: &gpui::App) -> Vec<String> {
+        crate::compose_controls::models_of(&self.model.read(cx).providers, self.agent, "")
+    }
+
+    fn title(&self) -> &'static str {
+        match self.purpose {
+            Purpose::Session if tk().look == Look::Command => "New unit",
+            Purpose::Session => "New session",
+            Purpose::Task => "New task",
+            Purpose::Organizer => "Organizer",
         }
     }
 
-    fn models(&self) -> Vec<String> {
-        pane::models(self.agent)
-            .iter()
-            .map(|m| m.to_string())
-            .collect()
+    fn composer(&self, cx: &gpui::App) -> ComposerPrefs {
+        ComposerPrefs {
+            mode: self.mode,
+            provider: self.agent.to_string(),
+            model: self.current_model(cx),
+            effort: self.effort,
+        }
     }
 
-    fn current_model(&self) -> String {
-        let models = self.models();
+    fn current_model(&self, cx: &gpui::App) -> String {
+        let models = self.models(cx);
         match &self.model_name {
             Some(m) if models.contains(m) => m.clone(),
             _ => models.first().cloned().unwrap_or_default(),
@@ -140,19 +250,26 @@ impl NewSessionDialog {
 
     fn start(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let prompt = self.input.read(cx).value().trim().to_string();
-        if prompt.is_empty() || self.busy {
+        // The organizer has its own prompt: the text is not needed.
+        if (prompt.is_empty() && self.purpose != Purpose::Organizer) || self.busy {
             return;
         }
         let Some(folder) = self.folder.clone() else {
             return;
         };
+        match self.purpose {
+            Purpose::Session => {}
+            Purpose::Task => return self.start_task(folder, prompt, window, cx),
+            Purpose::Organizer => return self.start_organizer(folder, window, cx),
+        }
         self.busy = true;
         let params = DispatchParams {
             codebase: Some(folder.clone()),
             part: None,
             agent: Some(self.agent.to_string()),
-            model: Some(self.current_model()),
+            model: Some(self.current_model(cx)),
             effort: Some(self.effort),
+            mode: Some(self.mode),
             prompt: prompt.clone(),
         };
         let place = self.model.read(cx).war.as_ref().map_or(1, |w| w.queued + 1);
@@ -176,6 +293,82 @@ impl NewSessionDialog {
                     this.tools.sent();
                     this.input.update(cx, |s, cx| s.clean(window, cx));
                 }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// A task on the board and its first session.
+    fn start_task(
+        &mut self,
+        folder: String,
+        prompt: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.busy = true;
+        let title: String = prompt
+            .lines()
+            .next()
+            .unwrap_or("")
+            .chars()
+            .take(80)
+            .collect();
+        let params = TaskCreateParams {
+            title: title.clone(),
+            codebase: folder.clone(),
+            part: "general".to_string(),
+            playbook: Playbook::Feature,
+            prompt,
+            when: StartWhen::Now,
+            provider: None,
+            mode: None,
+            priority: None,
+            composer: Some(self.composer(cx)),
+        };
+        let call = self.model.read(cx).call::<method::TasksCreate>(params, cx);
+        cx.spawn_in(window, async move |this, cx| {
+            let result = call.await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.busy = false;
+                this.note = Some(match result {
+                    Ok(_) => (format!("Task started in {folder}: {title}"), false),
+                    Err(e) => (format!("{e:#}"), true),
+                });
+                if this.note.as_ref().is_some_and(|n| !n.1) {
+                    this.tools.sent();
+                    this.input.update(cx, |s, cx| s.clean(window, cx));
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// The organizer session in the folder, with the picked agent and watch mode.
+    fn start_organizer(&mut self, folder: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.busy = true;
+        let params = OrganizerStartParams {
+            mode: self.organizer,
+            codebase: Some(folder.clone()),
+            composer: Some(self.composer(cx)),
+        };
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::OrganizerStart>(params, cx);
+        let watch = self.organizer.label();
+        cx.spawn_in(window, async move |this, cx| {
+            let result = call.await;
+            let _ = this.update_in(cx, |this, _, cx| {
+                this.busy = false;
+                this.note = Some(match result {
+                    Ok(_) => (format!("Organizer started in {folder}: {watch}"), false),
+                    Err(e) => (format!("{e:#}"), true),
+                });
                 cx.notify();
             });
         })
@@ -225,6 +418,9 @@ impl NewSessionDialog {
     }
 
     fn on_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::complete::is_open(cx) {
+            return;
+        }
         let key = ev.keystroke.key.as_str();
         let m = &ev.keystroke.modifiers;
         if key == "escape" {
@@ -290,7 +486,7 @@ fn style() -> Style {
     let t = tk();
     match t.look {
         Look::Bridge => Style {
-            scrim: 0x000000C7,
+            scrim: 0x000000FF,
             panel: 0x000000,
             edge: None,
             radius: 0.,
@@ -320,7 +516,7 @@ fn style() -> Style {
             caps: true,
         },
         Look::Operator => Style {
-            scrim: 0x010302CC,
+            scrim: 0x010302F2,
             panel: 0x07120D,
             edge: Some(0x2F6B4A),
             radius: 0.,
@@ -350,7 +546,7 @@ fn style() -> Style {
             caps: false,
         },
         Look::Neon => Style {
-            scrim: 0x050609CC,
+            scrim: 0x050609F2,
             panel: 0x0E1016,
             edge: Some(0x2A2F3D),
             radius: 0.,
@@ -380,7 +576,7 @@ fn style() -> Style {
             caps: true,
         },
         Look::Navigator => Style {
-            scrim: 0x141E2D73,
+            scrim: 0x141E2DE6,
             panel: 0xC6C6C6,
             edge: Some(0x6B6B6B),
             radius: 0.,
@@ -410,7 +606,7 @@ fn style() -> Style {
             caps: false,
         },
         Look::Holo => Style {
-            scrim: 0x02060EB8,
+            scrim: 0x02060EF0,
             panel: 0x0A182E,
             edge: Some(0x3A5A7A),
             radius: 0.,
@@ -440,37 +636,37 @@ fn style() -> Style {
             caps: true,
         },
         Look::Tactical => Style {
-            scrim: 0x000000A8,
-            panel: 0x0B0B0B,
-            edge: Some(0x3A3A3A),
+            scrim: 0x000400F2,
+            panel: 0x021206,
+            edge: Some(0x128A35),
             radius: 0.,
             frame: None,
             title_bar: None,
-            label: 0xA8A8A8,
-            text: 0xEDEDED,
-            bright: 0xEDEDED,
-            muted: 0x9A9A9A,
-            field: 0x000000,
-            field_edge: Some(0x333333),
+            label: 0x22C24E,
+            text: 0x8FFFAE,
+            bright: 0x39FF6A,
+            muted: 0x1FA845,
+            field: 0x000400,
+            field_edge: Some(0x128A35),
             field_radius: 0.,
-            sel_bg: 0x161616,
-            sel_edge: 0x8FD14F,
-            sel_text: 0xEDEDED,
-            chip_on_bg: 0x8FD14F,
-            chip_on_text: 0x0B0B0B,
-            chip_off_bg: 0x0B0B0B,
-            chip_off_edge: Some(0x3A3A3A),
+            sel_bg: 0x0B4A1E,
+            sel_edge: 0x39FF6A,
+            sel_text: 0xE8FFE8,
+            chip_on_bg: 0x39FF6A,
+            chip_on_text: 0x001A06,
+            chip_off_bg: 0x021206,
+            chip_off_edge: Some(0x128A35),
             chip_radius: 0.,
-            free: 0x8FD14F,
-            primary: 0x8FD14F,
-            primary_text: 0x0B0B0B,
+            free: 0x39FF6A,
+            primary: 0x39FF6A,
+            primary_text: 0x001A06,
             s_title: 40.,
             s_entry: 16.,
             s_label: 12.,
             caps: true,
         },
         Look::Command => Style {
-            scrim: 0x000000A0,
+            scrim: 0x050605F2,
             panel: 0x1E2124,
             edge: Some(0x6A7076),
             radius: 0.,
@@ -532,6 +728,24 @@ fn style() -> Style {
     }
 }
 
+/// The fonts of the look: body, mono (paths) and heading.
+fn fonts() -> (&'static str, &'static str, &'static str) {
+    let t = tk();
+    match t.look {
+        Look::Command => (
+            crate::command_kit::SANS,
+            crate::command_kit::SANS,
+            crate::command_kit::SANS,
+        ),
+        Look::Tactical => (
+            crate::tactical_kit::SANS,
+            crate::tactical_kit::MONO,
+            crate::tactical_kit::SANS,
+        ),
+        _ => (t.sans, t.mono, t.display_heading),
+    }
+}
+
 fn c(v: u32) -> Rgba {
     if v > 0xFFFFFF { rgba(v) } else { rgb(v) }
 }
@@ -539,6 +753,8 @@ fn c(v: u32) -> Rgba {
 impl Render for NewSessionDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let st = style();
+        let (f_sans, f_mono, f_head) = fonts();
+        let look = tk().look;
         let caps = |s: &str| -> SharedString {
             if st.caps {
                 s.to_uppercase().into()
@@ -573,61 +789,63 @@ impl Render for NewSessionDialog {
         // ---- the task ----
         let voice = compose::VOICE_AVAILABLE;
         let listening = self.tools.listening.is_some();
-        let task_box = div()
-            .h(px(220.))
-            .flex()
-            .flex_col()
-            .bg(c(st.field))
-            .rounded(px(st.field_radius))
-            .when_some(st.field_edge, |d, e| d.border_1().border_color(c(e)))
-            .px(px(18.))
-            .pt(px(14.))
-            .pb(px(10.))
-            .child(
-                div()
-                    .flex_1()
-                    .min_h(px(0.))
-                    .text_size(px(st.s_entry))
-                    .line_height(relative(1.5))
-                    .text_color(c(st.bright))
-                    .child(self.input.clone()),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .child(
+        let task_box = compose::media_target(
+            div()
+                .h(px(220.))
+                .flex()
+                .flex_col()
+                .bg(c(st.field))
+                .rounded(px(st.field_radius))
+                .when_some(st.field_edge, |d, e| d.border_1().border_color(c(e)))
+                .px(px(18.))
+                .pt(px(14.))
+                .pb(px(10.)),
+            |this: &mut Self| Some(&mut this.tools),
+            cx,
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_h(px(0.))
+                .text_size(px(st.s_entry))
+                .line_height(relative(1.5))
+                .text_color(c(st.bright))
+                .child(self.input.clone()),
+        )
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(12.))
+                .child(
+                    div()
+                        .flex_1()
+                        .text_size(px(st.s_label))
+                        .text_color(c(st.muted))
+                        .child(caps("Enter new line")),
+                )
+                .when(voice, |d| {
+                    d.child(
                         div()
-                            .flex_1()
-                            .text_size(px(st.s_label))
-                            .text_color(c(st.muted))
-                            .child(caps("Enter new line")),
+                            .id("ns-mic")
+                            .size(px(36.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(if st.chip_radius > 0. { 18. } else { 0. }))
+                            .bg(c(if listening { st.sel_bg } else { st.chip_off_bg }))
+                            .when_some(st.chip_off_edge, |d, e| d.border_1().border_color(c(e)))
+                            .cursor_pointer()
+                            .tooltip(ui::tip(if listening {
+                                "Stop the recording"
+                            } else {
+                                "Record audio"
+                            }))
+                            .on_click(cx.listener(|this, _, window, cx| this.dictate(window, cx)))
+                            .child(ui::icon("icons/mic.svg", 18., c(st.text))),
                     )
-                    .when(voice, |d| {
-                        d.child(
-                            div()
-                                .id("ns-mic")
-                                .size(px(36.))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .rounded(px(if st.chip_radius > 0. { 18. } else { 0. }))
-                                .bg(c(if listening { st.sel_bg } else { st.chip_off_bg }))
-                                .when_some(st.chip_off_edge, |d, e| d.border_1().border_color(c(e)))
-                                .cursor_pointer()
-                                .tooltip(ui::tip(if listening {
-                                    "Stop the recording"
-                                } else {
-                                    "Record audio"
-                                }))
-                                .on_click(
-                                    cx.listener(|this, _, window, cx| this.dictate(window, cx)),
-                                )
-                                .child(ui::icon("icons/mic.svg", 18., c(st.text))),
-                        )
-                    }),
-            );
+                }),
+        );
 
         // ---- the agent, model and effort ----
         let mut agents = div().flex().gap(px(8.));
@@ -657,7 +875,7 @@ impl Render for NewSessionDialog {
                     .child(caps(a)),
             );
         }
-        let model_name = self.current_model();
+        let model_name = self.current_model(cx);
         let small = |id: &'static str, name: &str, value: SharedString| {
             div()
                 .id(id)
@@ -676,8 +894,8 @@ impl Render for NewSessionDialog {
             .child(
                 small("ns-model", "Model", model_name.into()).on_click(cx.listener(
                     |this, _, _, cx| {
-                        let models = this.models();
-                        let now = this.current_model();
+                        let models = this.models(cx);
+                        let now = this.current_model(cx);
                         let i = models.iter().position(|m| *m == now).unwrap_or(0);
                         this.model_name = models.get((i + 1) % models.len().max(1)).cloned();
                         cx.notify();
@@ -692,17 +910,43 @@ impl Render for NewSessionDialog {
                         cx.notify();
                     },
                 )),
-            );
+            )
+            .child(
+                small(
+                    "ns-mode",
+                    "Mode",
+                    caps(crate::warroom::mode_label(self.mode)),
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    let i = MODES.iter().position(|m| *m == this.mode).unwrap_or(1);
+                    this.mode = MODES[(i + 1) % MODES.len()];
+                    cx.notify();
+                })),
+            )
+            .when(self.purpose == Purpose::Organizer, |d| {
+                d.child(
+                    small("ns-watch", "Watch", caps(self.organizer.label())).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            let i = ORGANIZER_MODES
+                                .iter()
+                                .position(|m| *m == this.organizer)
+                                .unwrap_or(0);
+                            this.organizer = ORGANIZER_MODES[(i + 1) % ORGANIZER_MODES.len()];
+                            cx.notify();
+                        },
+                    )),
+                )
+            });
 
         // ---- the folders ----
         let mut list = div().flex().flex_col();
         for (i, (id, path)) in folders.iter().enumerate() {
             let on = Some(id) == self.folder.as_ref();
-            let (free, run, max) = slots[i];
+            let (free, run, _max) = slots[i];
             let slot_text = if free > 0 {
                 format!("{free} free")
             } else {
-                format!("{run} of {max} run")
+                format!("{run} run")
             };
             let value = id.clone();
             list = list.child(
@@ -735,7 +979,7 @@ impl Render for NewSessionDialog {
                             )
                             .child(
                                 div()
-                                    .font_family(tk().mono)
+                                    .font_family(f_mono)
                                     .text_size(px(st.s_label))
                                     .text_color(c(if on && navigator {
                                         0xE4EAF4
@@ -781,7 +1025,14 @@ impl Render for NewSessionDialog {
         );
 
         // ---- the footer ----
-        let (line1, line2) = if free_now {
+        let organizer = self.purpose == Purpose::Organizer;
+        // The organizer starts at once; it does not take a session slot.
+        let (line1, line2) = if organizer {
+            (
+                format!("The organizer starts in {folder}."),
+                "It does not take a session slot.".to_string(),
+            )
+        } else if free_now {
             (
                 format!("A slot is free in {folder}."),
                 "The session starts now.".to_string(),
@@ -841,7 +1092,13 @@ impl Render for NewSessionDialog {
                     .cursor_pointer()
                     .when(self.busy, |d| d.opacity(0.6))
                     .on_click(cx.listener(|this, _, window, cx| this.start(window, cx)))
-                    .child(caps(if free_now { "Start" } else { "Queue task" }))
+                    .child(caps(if organizer {
+                        "Start organizer"
+                    } else if free_now {
+                        "Start"
+                    } else {
+                        "Queue task"
+                    }))
                     .child(
                         div()
                             .text_size(px(st.s_label))
@@ -856,7 +1113,7 @@ impl Render for NewSessionDialog {
             .items_center()
             .child(
                 div()
-                    .font_family(tk().display_heading)
+                    .font_family(f_head)
                     .text_size(px(st.s_title))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(c(if st.frame.is_some() {
@@ -864,24 +1121,22 @@ impl Render for NewSessionDialog {
                     } else {
                         st.bright
                     }))
-                    .child(caps(if tk().look == Look::Command {
-                        "New unit"
-                    } else {
-                        "New session"
-                    })),
+                    .child(caps(self.title())),
             )
             .child(div().flex_1())
-            .child(
-                div()
-                    .id("ns-close")
-                    .cursor_pointer()
-                    .text_size(px(st.s_label))
-                    .text_color(c(st.muted))
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
-                    .px(px(10.))
-                    .py(px(6.))
-                    .child(caps("X")),
-            );
+            .when(st.frame.is_none(), |d| {
+                d.child(
+                    div()
+                        .id("ns-close")
+                        .cursor_pointer()
+                        .text_size(px(st.s_label))
+                        .text_color(c(st.muted))
+                        .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
+                        .px(px(10.))
+                        .py(px(6.))
+                        .child(caps("X")),
+                )
+            });
         let body = div()
             .flex()
             .gap(px(40.))
@@ -909,102 +1164,201 @@ impl Render for NewSessionDialog {
                     .child(label("Folder · recent first"))
                     .child(list),
             );
-        let panel = div()
+        // The organizer is new to most people: say what it is and what the picked mode does.
+        let info = (self.purpose == Purpose::Organizer).then(|| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .px(px(14.))
+                .py(px(12.))
+                .rounded(px(st.radius.min(8.)))
+                .border_1()
+                .border_color(c(st.muted))
+                .text_size(px(st.s_label))
+                .child(
+                    div()
+                        .text_color(c(st.text))
+                        .child(aivory_protocol::ORGANIZER_INFO),
+                )
+                .child(div().text_color(c(st.muted)).child(format!(
+                    "{}: {}",
+                    self.organizer.label(),
+                    self.organizer.about()
+                )))
+        });
+        let native = look == Look::Command;
+        let close_btn = |cx: &mut Context<Self>| {
+            div()
+                .id("ns-close")
+                .cursor_pointer()
+                .text_size(px(st.s_label))
+                .text_color(c(st.muted))
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
+                .px(px(10.))
+                .py(px(6.))
+                .child(caps("X"))
+        };
+        let content = div()
+            .pl(px(if st.frame.is_some() {
+                64.
+            } else if native {
+                24.
+            } else {
+                40.
+            }))
+            .pr(px(if native { 24. } else { 40. }))
+            .pt(px(if st.frame.is_some() {
+                44.
+            } else if native {
+                8.
+            } else {
+                32.
+            }))
+            .pb(px(if st.frame.is_some() {
+                40.
+            } else if native {
+                16.
+            } else {
+                32.
+            }))
+            .flex()
+            .flex_col()
+            .gap(px(24.))
+            .when(st.title_bar.is_none() && !native, |d| d.child(head))
+            .children(info)
+            .child(body)
+            .child(footer);
+        let shell = div()
             .id("ns-panel")
-            .w(px(1040.))
             .relative()
-            .bg(c(st.panel))
-            .rounded(px(st.radius))
-            .when_some(st.edge, |d, e| d.border_1().border_color(c(e)))
-            .when(navigator, |d| ui::bevel_edges(true, d.border_2()))
-            .font_family(tk().sans)
+            .font_family(f_sans)
             .text_color(c(st.text))
-            .on_click(|_, _, cx| cx.stop_propagation())
-            .when_some(st.title_bar, |d, bar| {
-                d.child(
-                    div()
-                        .h(px(32.))
-                        .px(px(14.))
-                        .flex()
-                        .items_center()
-                        .bg(c(bar))
-                        .text_size(px(st.s_label))
-                        .text_color(c(if navigator { 0xFFFFFF } else { st.bright }))
-                        .font_weight(FontWeight::BOLD)
-                        .child(caps(if tk().look == Look::Command {
-                            "New unit"
-                        } else {
-                            "New session"
-                        })),
-                )
-            })
-            .when_some(st.frame, |d, f| {
-                d.child(
-                    div()
-                        .absolute()
-                        .left_0()
-                        .top_0()
-                        .bottom_0()
-                        .w(px(28.))
-                        .bg(c(f))
-                        .rounded_l(px(28.)),
-                )
+            .on_click(|_, _, cx| cx.stop_propagation());
+        let panel = if native {
+            let h: f32 = if self.purpose == Purpose::Organizer {
+                800.
+            } else {
+                720.
+            };
+            let h = h.min(f32::from(window.viewport_size().height) - 24.);
+            shell
+                .w(px(1040.))
+                .child(crate::command_kit::window(
+                    1040.,
+                    h,
+                    self.title(),
+                    close_btn(cx),
+                    content,
+                ))
+                .into_any_element()
+        } else if look == Look::Tactical {
+            shell
+                .w(px(1040.))
                 .child(
-                    div()
-                        .absolute()
-                        .left_0()
-                        .top_0()
-                        .w(px(660.))
-                        .h(px(24.))
-                        .bg(c(f))
-                        .rounded_tl(px(28.)),
+                    crate::tactical_kit::tbox("Launch")
+                        .bg(crate::tactical_kit::c(crate::tactical_kit::PANEL, 1.))
+                        .child(content),
                 )
-                .child(
-                    div()
-                        .absolute()
-                        .left_0()
-                        .right_0()
-                        .bottom_0()
-                        .h(px(12.))
-                        .bg(rgb(0x9999FF))
-                        .rounded_bl(px(28.)),
-                )
-            })
-            .child(
-                div()
-                    .pl(px(if st.frame.is_some() { 64. } else { 40. }))
-                    .pr(px(40.))
-                    .pt(px(if st.frame.is_some() { 44. } else { 32. }))
-                    .pb(px(if st.frame.is_some() { 40. } else { 32. }))
-                    .flex()
-                    .flex_col()
-                    .gap(px(24.))
-                    .when(st.title_bar.is_none(), |d| d.child(head))
-                    .when(st.title_bar.is_some(), |d| {
-                        d.child(
-                            div().flex().justify_end().child(
-                                div()
-                                    .id("ns-close")
-                                    .cursor_pointer()
-                                    .text_size(px(st.s_label))
-                                    .text_color(c(st.muted))
-                                    .on_click(
-                                        cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)),
-                                    )
-                                    .px(px(10.))
-                                    .py(px(6.))
-                                    .child(caps("X")),
-                            ),
-                        )
-                    })
-                    .child(body)
-                    .child(footer),
-            );
-        let _ = window;
+                .into_any_element()
+        } else {
+            shell
+                .w(px(1040.))
+                .bg(c(st.panel))
+                .rounded(px(st.radius))
+                .overflow_hidden()
+                .when_some(st.edge, |d, e| d.border_1().border_color(c(e)))
+                .when(navigator, |d| ui::bevel_edges(true, d.border_2()))
+                .when_some(st.title_bar, |d, bar| {
+                    d.child(
+                        div()
+                            .h(px(32.))
+                            .pl(px(14.))
+                            .pr(px(4.))
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .bg(c(bar))
+                            .text_size(px(st.s_label))
+                            .text_color(c(if navigator { 0xFFFFFF } else { st.bright }))
+                            .font_weight(FontWeight::BOLD)
+                            .child(caps(self.title()))
+                            .child(close_btn(cx)),
+                    )
+                })
+                .when_some(st.frame, |d, f| {
+                    d.child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .top_0()
+                            .bottom_0()
+                            .w(px(28.))
+                            .bg(c(f))
+                            .rounded_l(px(28.)),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top_0()
+                            .h(px(24.))
+                            .bg(c(f))
+                            .rounded_tl(px(28.))
+                            .rounded_tr(px(12.)),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .bottom_0()
+                            .h(px(12.))
+                            .bg(rgb(0x9999FF))
+                            .rounded_bl(px(28.))
+                            .rounded_br(px(12.)),
+                    )
+                    .child(
+                        div()
+                            .id("ns-close")
+                            .absolute()
+                            .top_0()
+                            .right(px(40.))
+                            .h(px(24.))
+                            .px(px(20.))
+                            .flex()
+                            .items_center()
+                            .rounded(px(12.))
+                            .bg(rgb(0xCC6699))
+                            .text_size(px(st.s_label))
+                            .text_color(rgb(0x000000))
+                            .font_weight(FontWeight::BOLD)
+                            .cursor_pointer()
+                            .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
+                            .child(caps("Close")),
+                    )
+                })
+                .child(content)
+                .into_any_element()
+        };
+        // The pop-up: the scrim fades in and the panel rises 18 px into place while it fades
+        // in. The ids carry the entity, so each new dialog plays it again.
+        let key = cx.entity_id().as_u64();
+        let pop = || {
+            gpui::Animation::new(std::time::Duration::from_millis(240))
+                .with_easing(gpui::ease_out_quint())
+        };
+        let panel = div().relative().child(panel).with_animation(
+            SharedString::from(format!("ns-pop-{key}")),
+            pop(),
+            |el, t| el.opacity(t).top(px((1. - t) * 18.)),
+        );
         div()
             .id("new-session-dialog")
             .absolute()
             .inset_0()
+            .occlude()
             .bg(rgba(st.scrim))
             .flex()
             .items_center()
@@ -1012,6 +1366,11 @@ impl Render for NewSessionDialog {
             .on_key_down(cx.listener(Self::on_key))
             .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
             .child(panel)
+            .with_animation(
+                SharedString::from(format!("ns-scrim-{key}")),
+                pop(),
+                |el, t| el.opacity(t),
+            )
     }
 }
 

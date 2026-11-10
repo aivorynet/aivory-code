@@ -1,29 +1,31 @@
-//! The Neon Focus screen: one session with its code, in the grammar of the look. The
-//! screen title and a tab menu of the live sessions on top, the chat in the middle (display
-//! lines, the decision, the composer), the changes on the right (diff, files, tests). The
-//! decision is the one bright panel; the others dim and light up on hover. Every control goes
-//! through `act`.
+//! The Neon session screen: one session with its chat and its code, in the grammar of the look.
+//! The screen title and a tab menu of the live sessions (waits first) on top, the chat in the
+//! middle (display lines, the decision, the composer with its controls), the changes on the
+//! right (diff, console, files, tests). The decision is the one bright panel; the others dim
+//! and light up on hover. Glow sits on frames and the title bar, never on text. Every control
+//! goes through `act`.
 
 use std::time::{Duration, Instant};
 
 use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::{DiffLineKind, SessionDiff};
-use aivory_protocol::{AskKind, ComposerPrefs, Effort, Mode, Pane};
+use aivory_protocol::{AskKind, Pane, SessionState};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, FontWeight, SharedString, Subscription, Window,
-    div, px, rgb, rgba,
+    div, px, relative, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, InputState};
 
 use super::neon_kit::*;
-use super::neon_session::{answer_label, bar, short_count, state_of, stream_rows, tag, test_lines};
 use crate::actions::{Action, act};
 use crate::compose::{self, Tools};
+use crate::compose_controls::{ControlStyle, Controls};
+use crate::media::{self, MediaStyle};
 use crate::model::Model;
-use crate::theme::tk;
+use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole, take_want_code};
+use crate::theme::{PaneTheme, tk};
 use crate::ui;
-use crate::warroom::{effort_label, mode_label, provider_models};
 
 /// How old a diff gets before the view asks again.
 const TTL: Duration = Duration::from_secs(8);
@@ -37,10 +39,8 @@ const GAP: f32 = 32.;
 #[derive(Debug, Clone)]
 pub(super) enum NightFocusEvent {
     Back,
-    /// Show another session in Focus.
+    /// Show another session.
     Open(String),
-    /// The session view.
-    Detail(String),
     /// Open a file of the session in the code lens.
     OpenFile {
         session: String,
@@ -52,7 +52,9 @@ impl EventEmitter<NightFocusEvent> for NightFocus {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Side {
+    Chat,
     Diff,
+    Console,
     Files,
     Tests,
 }
@@ -66,8 +68,34 @@ pub(super) struct NightFocus {
     side: Side,
     file: Option<String>,
     tools: Tools,
-    prefs: Option<ComposerPrefs>,
+    controls: Controls,
+    /// The console output of the session: a calm tab next to the diff.
+    console: Entity<SessionConsole>,
     _subs: Vec<Subscription>,
+}
+
+/// The console colors of the Neon look (`0xRRGGBBAA`): quiet ink on the panel.
+fn console_theme() -> PaneTheme {
+    let c = |rgb: u32| (rgb << 8) | 0xFF;
+    PaneTheme {
+        bg: c(0x0A0E22),
+        text: c(INK),
+        dim: c(MIST),
+        line: c(DIM),
+        hover: c(PANEL),
+        user_bg: c(PANEL),
+        add: c(GREEN),
+        add_bg: 0x0A0E22FF,
+        del: c(RED),
+        del_bg: 0x0A0E22FF,
+        sub: c(MIST),
+        tool: c(MIST),
+        accent: c(CYAN),
+        link: c(CYAN),
+        code_bg: c(PANEL),
+        top: c(0x0A0E22),
+        ..PaneTheme::NAVY
+    }
 }
 
 impl NightFocus {
@@ -81,22 +109,49 @@ impl NightFocus {
         let input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Reply, or tell the agent what to do")
         });
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            move |cx| weak.upgrade().map(|v| v.read(cx).id.clone()),
+            |_| (None, None),
+            cx,
+        );
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
-            if matches!(event, InputEvent::PressEnter { .. }) {
+            if matches!(event, InputEvent::PressEnter { .. }) && !crate::complete::is_open(cx) {
                 this.send(window, cx);
             }
         });
+        let console = cx.new(|cx| SessionConsole::new(model.clone(), id.clone(), cx));
+        console.update(cx, |c, _| {
+            c.set_look(ConsoleLook {
+                theme: Some(console_theme()),
+                size: 12.,
+                pad_x: 14.,
+                max_w: None,
+            })
+        });
+        let open_file = cx.subscribe(&console, |_, _, e: &ConsoleEvent, cx| {
+            let ConsoleEvent::OpenFile { session, path } = e;
+            cx.emit(NightFocusEvent::OpenFile {
+                session: session.clone(),
+                path: path.clone(),
+            });
+        });
+        // The diff is the first tab; the flag from Tasks ("Open diff") is used up here.
+        take_want_code(&id);
         Self {
             model,
             id,
             input,
             diff: None,
             busy: false,
-            side: Side::Diff,
+            side: Side::Chat,
             file: None,
             tools: Tools::default(),
-            prefs: None,
-            _subs: vec![observe, events],
+            controls: Controls::default(),
+            console,
+            _subs: vec![observe, events, open_file],
         }
     }
 
@@ -106,7 +161,12 @@ impl NightFocus {
             self.id = id.to_string();
             self.diff = None;
             self.file = None;
-            self.prefs = None;
+            self.controls = Controls::default();
+            self.console.update(cx, |c, cx| c.show(id, cx));
+            cx.notify();
+        }
+        if take_want_code(id) {
+            self.side = Side::Diff;
             cx.notify();
         }
     }
@@ -134,7 +194,7 @@ impl NightFocus {
         if text.trim().is_empty() {
             return;
         }
-        let prefs = self.prefs.clone().unwrap_or_else(|| pane.composer.clone());
+        let prefs = self.controls.current(&pane);
         let action = match &pane.ask {
             Some(ask) => Action::Answer {
                 id: pane.id.clone(),
@@ -142,11 +202,13 @@ impl NightFocus {
                 option: None,
                 text: Some(text),
             },
-            _ => Action::Send {
-                id: pane.id.clone(),
-                text,
-                composer: (prefs != pane.composer).then_some(prefs),
-            },
+            _ => {
+                let images = self.tools.images();
+                crate::compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+                self.tools.sent();
+                self.input.update(cx, |s, cx| s.clean(window, cx));
+                return;
+            }
         };
         act(&self.model, action, cx);
         self.tools.sent();
@@ -193,7 +255,7 @@ impl Render for NightFocus {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(p) = self.pane(cx) else {
             return screen(
-                "Focus",
+                "Session",
                 "Session gone".to_string(),
                 YELLOW,
                 (Vec::new(), Vec::new()),
@@ -220,10 +282,12 @@ impl Render for NightFocus {
             .unwrap_or_default();
         // Full names only: as many tabs as the width holds, then a "+N" tab.
         let vw = f32::from(window.viewport_size().width);
-        let mut room = vw - 96. - 90.;
+        let k = f32::from(ui::sw(1.));
+        let narrow = vw < 1100.;
+        let mut room = vw - 96. - 90. * k;
         let mut shown = 0;
         for (_, title, _) in &live {
-            let w = title.chars().count() as f32 * 9.6 + 40.;
+            let w = (title.chars().count() as f32 * 9.6 + 40.) * k;
             if room < w || shown >= TABS {
                 break;
             }
@@ -251,7 +315,7 @@ impl Render for NightFocus {
         if live.len() > shown {
             menu.push(
                 div()
-                    .h(px(40.))
+                    .min_h(ui::sw(40.))
                     .px(px(20.))
                     .flex()
                     .items_center()
@@ -259,15 +323,10 @@ impl Render for NightFocus {
                     .into_any_element(),
             );
         }
-        let (pause, stop, detail) = (p.id.clone(), p.id.clone(), p.id.clone());
+        let (pause, stop) = (p.id.clone(), p.id.clone());
         let actions = vec![
             button("nfo-back", "◂ War room", CYAN, false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(NightFocusEvent::Back)))
-                .into_any_element(),
-            button("nfo-detail", "Session ›", CYAN, false)
-                .on_click(cx.listener(move |_, _, _, cx| {
-                    cx.emit(NightFocusEvent::Detail(detail.clone()));
-                }))
                 .into_any_element(),
             button("nfo-pause", "Pause", MIST, false)
                 .on_click(cx.listener(move |this, _, _, cx| {
@@ -294,21 +353,66 @@ impl Render for NightFocus {
         let mut chat = div()
             .id("nfo-chat")
             .flex_1()
-            .min_h(px(0.))
+            .min_h(px(96.))
             .overflow_y_scroll()
             .flex()
             .flex_col()
             .gap(px(4.))
             .px(px(PAD))
             .pb(px(PAD));
-        for r in stream_rows(&p.tail, fit) {
-            chat = chat.child(r);
+        // A media line breaks the stream: the rows around it, and a preview between them.
+        let media_style = MediaStyle {
+            card: rgba(0x8C96BC22),
+            text: rgb(INK),
+            muted: rgb(MIST),
+            radius: 0.,
+        };
+        // Each part is a run of lines and the media line that follows it.
+        type Part<'a> = (
+            Vec<&'a aivory_protocol::Line>,
+            Option<&'a aivory_protocol::Line>,
+        );
+        let mut parts: Vec<Part> = Vec::new();
+        let mut run = Vec::new();
+        for l in &p.tail {
+            if l.media.is_some() {
+                parts.push((std::mem::take(&mut run), Some(l)));
+            } else {
+                run.push(l);
+            }
         }
+        parts.push((run, None));
+        let mut budget = fit;
+        let mut blocks: Vec<AnyElement> = Vec::new();
+        for (at, (run, shot)) in parts.into_iter().enumerate().rev() {
+            if budget == 0 {
+                break;
+            }
+            if let Some(m) = shot.and_then(|l| l.media.as_ref()) {
+                blocks.push(
+                    div()
+                        .flex_none()
+                        .py(px(4.))
+                        .child(media::preview(m, ("nfo-media", at), media_style))
+                        .into_any_element(),
+                );
+                budget = budget.saturating_sub(4);
+            }
+            let owned: Vec<aivory_protocol::Line> = run.into_iter().cloned().collect();
+            let rows = stream_rows(&owned, budget);
+            budget = budget.saturating_sub(rows.len().max(1));
+            for r in rows.into_iter().rev() {
+                blocks.push(r.into_any_element());
+            }
+        }
+        blocks.reverse();
+        chat = chat.children(blocks);
         let waits = p.ask.is_some();
         let mut center = frame(if waits { YELLOW } else { CYAN }, "nfo-center", waits)
             .flex_1()
-            .min_w(px(0.))
-            .h_full()
+            .min_w(px(if narrow { 0. } else { 380. }))
+            .min_h(px(0.))
+            .overflow_hidden()
             .child(section(
                 "Chat",
                 CYAN,
@@ -317,7 +421,10 @@ impl Render for NightFocus {
             .child(chat);
         if let Some(ask) = &p.ask {
             let mut card = div()
+                .id("nfo-ask")
                 .flex_none()
+                .max_h(px((vh * 0.22).clamp(96., 300.)))
+                .overflow_y_scroll()
                 .mx(px(PAD))
                 .mb(px(PAD))
                 .pt(px(16.))
@@ -379,11 +486,11 @@ impl Render for NightFocus {
             }
             center = center.child(card.child(buttons));
         }
-        let prefs = self.prefs.clone().unwrap_or_else(|| p.composer.clone());
+        self.controls.sync(&p);
         let chip = |id: SharedString, text: String, on: bool| {
             div()
                 .id(id)
-                .h(px(28.))
+                .min_h(ui::sw(28.))
                 .px(px(12.))
                 .flex()
                 .items_center()
@@ -397,65 +504,16 @@ impl Render for NightFocus {
                 .child(text.to_uppercase())
         };
         let mut chips = div().flex().flex_wrap().items_center().gap(px(8.));
-        for m in [Mode::Plan, Mode::Edit, Mode::Auto] {
-            let base = prefs.clone();
-            chips = chips.child(
-                chip(
-                    SharedString::from(format!("nfo-mode-{}", mode_label(m))),
-                    mode_label(m).to_string(),
-                    prefs.mode == m,
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.prefs = Some(ComposerPrefs {
-                        mode: m,
-                        ..base.clone()
-                    });
-                    cx.notify();
-                })),
-            );
-        }
-        // The model and the effort step to the next value on a click.
-        let models = provider_models(&p.provider);
-        let next_model = models
-            .iter()
-            .position(|m| *m == prefs.model)
-            .map_or(models.first(), |i| models.get((i + 1) % models.len()))
-            .map(|m| m.to_string());
-        let base = prefs.clone();
-        chips = chips.child(
-            chip("nfo-model".into(), prefs.model.clone(), false).on_click(cx.listener(
-                move |this, _, _, cx| {
-                    if let Some(model) = &next_model {
-                        this.prefs = Some(ComposerPrefs {
-                            model: model.clone(),
-                            ..base.clone()
-                        });
-                        cx.notify();
-                    }
-                },
-            )),
-        );
-        let next_effort = match prefs.effort {
-            Effort::Low => Effort::Medium,
-            Effort::Medium => Effort::High,
-            Effort::High => Effort::Max,
-            Effort::Max => Effort::Low,
-        };
-        let base = prefs.clone();
-        chips = chips.child(
-            chip(
-                "nfo-effort".into(),
-                effort_label(prefs.effort).to_string(),
-                false,
-            )
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.prefs = Some(ComposerPrefs {
-                    effort: next_effort,
-                    ..base.clone()
-                });
-                cx.notify();
-            })),
-        );
+        let providers = self.model.read(cx).providers.clone();
+        let style = ControlStyle::console(PANEL, INK, YELLOW, Some(CHAKRA.into()));
+        chips = chips.child(self.controls.row(
+            "nfo-ctl",
+            &p,
+            &providers,
+            &style,
+            |this: &mut Self| &mut this.controls,
+            cx,
+        ));
         chips = chips.child(
             chip("nfo-attach".into(), "Attach".to_string(), false).on_click(cx.listener(
                 |_, _, window, cx| {
@@ -487,7 +545,7 @@ impl Render for NightFocus {
                 .child(chips)
                 .child(
                     div()
-                        .h(px(48.))
+                        .min_h(ui::sw(48.))
                         .flex()
                         .items_center()
                         .gap(px(16.))
@@ -518,7 +576,7 @@ impl Render for NightFocus {
             .fold((0, 0), |(a, d), f| (a + f.added, d + f.removed));
         let mut body = scroll_box("nfo-side").px(px(PAD)).pb(px(PAD)).gap(px(4.));
         match self.side {
-            Side::Diff => match &current {
+            Side::Diff | Side::Chat => match &current {
                 Some(f) => {
                     body = body.child(div().pb(px(8.)).child(label(
                         format!("{}  +{} −{}", f.path, f.added, f.removed),
@@ -552,6 +610,7 @@ impl Render for NightFocus {
                     body = body.child(label("The agent has not changed a file yet.", MIST));
                 }
             },
+            Side::Console => {}
             Side::Files => {
                 if files.is_empty() {
                     body = body.child(label("No change yet", MIST));
@@ -609,24 +668,31 @@ impl Render for NightFocus {
         }
         let mut tabs = div()
             .flex_none()
-            .px(px(PAD))
+            .px(px(if narrow { 0. } else { PAD }))
             .flex()
+            .flex_wrap()
             .border_b_1()
             .border_color(rgba(0x8C96BC30));
         for (s, name, id) in [
+            (Side::Chat, "Chat", "nfo-s-chat"),
             (Side::Diff, "Diff", "nfo-s-diff"),
+            (Side::Console, "Console", "nfo-s-console"),
             (Side::Files, "Files", "nfo-s-files"),
             (Side::Tests, "Tests", "nfo-s-tests"),
         ] {
-            tabs = tabs.child(menu_tab(id, name, None, CYAN, self.side == s).on_click(
-                cx.listener(move |this, _, _, cx| {
+            if s == Side::Chat && !narrow {
+                continue;
+            }
+            let on = self.side == s || (!narrow && s == Side::Diff && self.side == Side::Chat);
+            tabs = tabs.child(menu_tab(id, name, None, CYAN, on).on_click(cx.listener(
+                move |this, _, _, cx| {
                     this.side = s;
                     cx.notify();
-                }),
-            ));
+                },
+            )));
         }
         let (sid, open_path) = (p.id.clone(), current.as_ref().map(|f| f.path.clone()));
-        tabs = tabs.child(div().flex_1()).child(
+        tabs = tabs.child(div().flex_1().min_w(px(0.))).child(
             menu_tab("nfo-lens", "Open in Lens ›", None, CYAN, false).on_click(cx.listener(
                 move |_, _, _, cx| {
                     if let Some(path) = &open_path {
@@ -638,32 +704,68 @@ impl Render for NightFocus {
                 },
             )),
         );
+        let (tabs_in, tabs_out) = if narrow {
+            (None, Some(tabs))
+        } else {
+            (Some(tabs), None)
+        };
+        let right_w = ((vw - 64.) * 0.4).clamp(320., 720.);
         let right = frame(CYAN, "nfo-changes", false)
-            .w(px(520.))
-            .flex_none()
-            .h_full()
+            .when(narrow, |d| d.flex_1().min_w(px(0.)))
+            .when(!narrow, |d| d.w(px(right_w)).flex_none())
+            .min_h(px(0.))
+            .overflow_hidden()
             .child(section(
                 "Changes",
                 CYAN,
                 Some(format!("{} FILES · +{add} −{del}", files.len())),
             ))
-            .child(tabs)
+            .children(tabs_in)
             .child(div().h(px(12.)))
-            .child(body);
+            .child(if self.side == Side::Console {
+                div()
+                    .id("nfo-console")
+                    .flex_1()
+                    .min_h(px(0.))
+                    .child(self.console.clone())
+                    .into_any_element()
+            } else {
+                body.into_any_element()
+            });
+
+        // A file dropped anywhere on the chat attaches; Ctrl+V pastes an image.
+        let center = compose::media_target(center, |this: &mut Self| Some(&mut this.tools), cx);
 
         screen(
-            "Focus",
+            "Session",
             sub,
             state_color,
             (menu, actions),
-            div()
-                .size_full()
-                .flex()
-                .gap(px(GAP))
-                .child(center)
-                .child(right)
-                .font_weight(FontWeight::NORMAL)
-                .into_any_element(),
+            if narrow {
+                // One column: Chat, Diff, Console, Files and Tests are tabs.
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(GAP))
+                    .children(tabs_out)
+                    .child(if self.side == Side::Chat {
+                        center.into_any_element()
+                    } else {
+                        right.into_any_element()
+                    })
+                    .font_weight(FontWeight::NORMAL)
+                    .into_any_element()
+            } else {
+                div()
+                    .size_full()
+                    .flex()
+                    .gap(px(GAP))
+                    .child(center)
+                    .child(right)
+                    .font_weight(FontWeight::NORMAL)
+                    .into_any_element()
+            },
         )
     }
 }
@@ -671,4 +773,143 @@ impl Render for NightFocus {
 /// The state word of a session for the chat note.
 fn tag_word(p: &Pane) -> &'static str {
     state_of(p).0
+}
+
+/// The word and the color of the state of a session.
+pub(super) fn state_of(p: &Pane) -> (&'static str, u32) {
+    match (&p.ask, p.state) {
+        (_, SessionState::Error) => ("FAULT", YELLOW),
+        (Some(_), _) => ("WAITS FOR YOU", RED),
+        (None, SessionState::Idle) => ("IDLE", MIST),
+        (None, _) => ("WORKING", CYAN),
+    }
+}
+
+/// The words of an answer button: the three permission answers carry their key.
+pub(super) fn answer_label(kind: AskKind, option: &str, at: usize) -> String {
+    match (kind, option) {
+        (AskKind::Permission, "Allow") => "1 Allow".to_string(),
+        (AskKind::Permission, "Always allow") => "2 Always".to_string(),
+        (AskKind::Permission, "Deny") => "3 Deny".to_string(),
+        _ => format!("{} {option}", at + 1),
+    }
+}
+
+/// `12k` for 12,345.
+pub(super) fn short_count(n: u64) -> String {
+    match n {
+        0..=999 => n.to_string(),
+        1_000..=999_999 => format!("{}k", n / 1_000),
+        _ => format!("{:.1}M", n as f64 / 1_000_000.),
+    }
+}
+
+/// A bar on a dark track; `frac` is 0 to 1.
+pub(super) fn bar(frac: f32, color: u32, h: f32) -> Div {
+    div().w_full().h(px(h)).bg(rgba(0x1A2142CC)).child(
+        div()
+            .h_full()
+            .w(relative(frac.clamp(0., 1.)))
+            .bg(rgb(color)),
+    )
+}
+
+/// A small filled tag with dark text.
+pub(super) fn tag(text: &str, color: u32) -> Div {
+    div()
+        .px(px(10.))
+        .py(px(3.))
+        .bg(rgb(color))
+        .text_color(rgb(DARK))
+        .font_weight(FontWeight::BOLD)
+        .text_size(ui::ts(T_LABEL))
+        .child(text.to_string())
+}
+
+/// The transcript as display lines (`console::display`): one speaker label per message, no
+/// raw markdown marker, code and table rows in the mono face. Top-aligned: the list starts at
+/// a message. Shared with the Focus view.
+pub(super) fn stream_rows(tail: &[aivory_protocol::Line], max: usize) -> Vec<Div> {
+    use crate::console::display::{DKind, last};
+    let mono = |color: u32| {
+        div()
+            .font_family(tk().mono)
+            .text_size(ui::ts(T_LABEL + 1.))
+            .line_height(ui::ts(20.))
+            .text_color(rgb(color))
+    };
+    let mut out = Vec::new();
+    for d in last(tail, max) {
+        let who = match d.kind {
+            DKind::You => Some(("YOU", CYAN)),
+            DKind::Agent | DKind::Heading | DKind::Bullet | DKind::Code | DKind::Table => {
+                Some(("AGENT", YELLOW))
+            }
+            DKind::Error => Some(("ERROR", RED)),
+            _ => None,
+        };
+        let mut cell = div().flex_none().flex().flex_col().gap(px(4.));
+        if d.first {
+            cell = cell.mt(px(14.));
+            if let Some((name, color)) = who {
+                cell = cell.child(label(name, color).font_weight(FontWeight::BOLD));
+            }
+        }
+        let text = d.text.clone();
+        cell = cell.child(match d.kind {
+            DKind::You => div()
+                .px(px(16.))
+                .py(px(8.))
+                .bg(rgba(0x00E0F01A))
+                .border_l_2()
+                .border_color(rgb(CYAN))
+                .text_size(ui::ts(T_ENTRY))
+                .line_height(ui::ts(21.))
+                .text_color(rgb(0xFFFFFF))
+                .child(text),
+            DKind::Agent => entry(text),
+            DKind::Heading => entry(text)
+                .font_weight(FontWeight::BOLD)
+                .text_color(rgb(YELLOW)),
+            DKind::Bullet => entry(text).pl(px(12.)),
+            DKind::Code => mono(PALE)
+                .px(px(16.))
+                .bg(rgba(0x00000099))
+                .border_l_2()
+                .border_color(rgba(0xF3E60088))
+                .child(text),
+            DKind::Table => mono(PALE).px(px(16.)).bg(rgba(0x0A0E22FF)).child(text),
+            DKind::Tool => mono(MIST)
+                .line_clamp(1)
+                .child(format!("● {}  {text}", d.label.as_deref().unwrap_or(""))),
+            DKind::Output => mono(DIM).line_clamp(2).child(format!("  └ {text}")),
+            DKind::Error => mono(YELLOW).child(text),
+            DKind::Meta => div()
+                .text_size(ui::ts(T_LABEL))
+                .text_color(rgb(DIM))
+                .child(text),
+        });
+        out.push(cell);
+    }
+    out
+}
+
+/// The test result lines of a transcript (`ok. 12 passed; 0 failed`), the last few.
+pub(super) fn test_lines(tail: &[aivory_protocol::Line]) -> Vec<(String, bool)> {
+    let mut out: Vec<(String, bool)> = tail
+        .iter()
+        .filter(|l| {
+            let t = l.text.to_lowercase();
+            ((t.contains("passed") || t.contains("failed")) && t.contains("test"))
+                || t.contains(" passed;")
+        })
+        .map(|l| {
+            let t = l.text.lines().next().unwrap_or("").to_string();
+            let bad = !t.contains(" 0 failed") && t.to_lowercase().contains("failed");
+            (t, bad)
+        })
+        .collect();
+    let skip = out.len().saturating_sub(2);
+    out.drain(..skip);
+    out
 }

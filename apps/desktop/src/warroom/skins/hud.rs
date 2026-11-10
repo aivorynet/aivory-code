@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
 
-use aivory_protocol::{LineKind, Pane, SessionState, WarRoom};
+use aivory_protocol::{Pane, SessionState, WarRoom};
 use gpui::{AnyElement, Context, Window};
 
 use super::common::{Painter, TextCache, asks, clip, part_of};
@@ -65,8 +65,6 @@ pub(in crate::warroom) struct HudState {
     pub(super) hits: Rc<RefCell<Vec<(Hit, Rect)>>>,
     /// The session in the decision panel (the longest wait when `None`).
     pub(super) pick: Option<String>,
-    /// The session view on screen.
-    pub(super) open: Option<String>,
     /// The session in the Selected panel of the Holo war room (the busiest worker when `None`).
     pub(super) sel: Option<String>,
 }
@@ -139,43 +137,7 @@ pub(super) fn contacts(st: &HudState, war: &WarRoom) -> (Vec<Contact>, Vec<Strin
     (list, books)
 }
 
-/// Lines per turn: the size of each turn of a session (a Turn line closes one).
-pub(super) fn turn_sizes(pane: &Pane) -> Vec<f32> {
-    let mut out = Vec::new();
-    let mut n: f32 = 0.;
-    for l in &pane.tail {
-        if l.kind == LineKind::Turn {
-            out.push(n.max(1.));
-            n = 0.;
-        } else {
-            n += 1.;
-        }
-    }
-    if n > 0. || out.is_empty() {
-        out.push(n.max(1.));
-    }
-    out
-}
-
 impl WarRoomScreen {
-    /// Show the session view of a session (the shell calls it for every "open session").
-    pub fn hud_open(&mut self, id: &str, cx: &mut Context<Self>) {
-        self.holo.open = Some(id.to_string());
-        self.tactical.open = Some(id.to_string());
-        cx.notify();
-    }
-
-    /// Same as [`Self::hud_open`] without a refresh (the shell calls it while it renders).
-    /// The session view open in the Holo war room.
-    pub fn hud_open_id(&self) -> Option<String> {
-        self.holo.open.clone()
-    }
-
-    pub fn hud_set_open(&mut self, id: &str) {
-        self.holo.open = Some(id.to_string());
-        self.tactical.open = Some(id.to_string());
-    }
-
     pub(super) fn render_holo(
         &mut self,
         war: &WarRoom,
@@ -202,11 +164,7 @@ impl WarRoomScreen {
         let Some(war) = self.war.clone() else {
             return;
         };
-        let st = &self.tactical;
-        if st.open.is_some() {
-            return; // the composer of the dossier takes the digits
-        }
-        let target = st.pick.clone();
+        let target = self.tactical.pick.clone();
         let queue = asks(&war);
         let pane = target
             .and_then(|id| queue.iter().find(|p| p.id == id).copied())

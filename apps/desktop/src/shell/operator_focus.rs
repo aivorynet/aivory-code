@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::{DiffLineKind, SessionDiff};
-use aivory_protocol::{ComposerPrefs, Effort, Mode, Pane, SessionState};
+use aivory_protocol::{Pane, SessionState};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, ScrollHandle, Subscription, Window, div, px,
@@ -19,7 +19,11 @@ use gpui_base::input::{InputEvent, InputState};
 use super::operator_screens::{btn, head_line, page};
 use crate::actions::{Action, act};
 use crate::compose::{self, Tools};
+use crate::compose_controls::{ControlStyle, Controls};
+use crate::media::{self, MediaStyle};
 use crate::model::Model;
+use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole, take_want_code};
+use crate::theme::PaneTheme;
 use crate::ui;
 use crate::warroom::skins::operator::kit::*;
 
@@ -36,8 +40,6 @@ const ERR: u32 = 0xFF8A80;
 pub enum OperatorFocusEvent {
     /// Show another session.
     Open(String),
-    /// The session view of the session.
-    Detail(String),
     /// Open a file of the session in the code lens.
     OpenFile { session: String, path: String },
     /// Back to the war room.
@@ -60,11 +62,51 @@ pub struct OperatorFocus {
     /// The chips of the composer: attachments, and the mode, model and effort of the next
     /// message when the owner changed them.
     tools: Tools,
-    prefs: Option<ComposerPrefs>,
+    controls: Controls,
+    /// The console output of the session, shown next to the diff.
+    console: Entity<SessionConsole>,
+    tab: Tab,
     _subs: Vec<Subscription>,
 }
 
+/// The tab of the blue changes screen.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Tab {
+    Chat,
+    Diff,
+    Console,
+}
+
+/// The console colors of the blue screen (`0xRRGGBBAA`).
+fn console_theme() -> PaneTheme {
+    let c = |rgb: u32| (rgb << 8) | 0xFF;
+    PaneTheme {
+        bg: c(BLUE_INK),
+        text: c(BLUE_HI),
+        dim: c(BLUE_SOFT),
+        line: c(BLUE_DIM),
+        hover: c(BLUE_DIM),
+        user_bg: c(BLUE_DIM),
+        add: c(BLUE_HI),
+        add_bg: (BLUE_DIM << 8) | 0x99,
+        del: c(BLUE_SOFT),
+        del_bg: (BLUE_INK << 8) | 0x99,
+        sub: c(BLUE_SOFT),
+        tool: c(BLUE),
+        accent: c(BLUE),
+        link: c(BLUE),
+        code_bg: c(BLUE_DIM),
+        top: c(BLUE_INK),
+        ..PaneTheme::NAVY
+    }
+}
+
 impl OperatorFocus {
+    /// The focus handle of the chat field (the shell keys J and K stay quiet while it has focus).
+    pub fn input_focus(&self, cx: &gpui::App) -> gpui::FocusHandle {
+        gpui::Focusable::focus_handle(&self.input, cx)
+    }
+
     pub fn new(
         model: Entity<Model>,
         id: String,
@@ -74,11 +116,38 @@ impl OperatorFocus {
         let observe = cx.observe(&model, |_, _, cx| cx.notify());
         let input =
             cx.new(|cx| InputState::new(window, cx).placeholder("tell the agent what to do"));
+        let weak = cx.weak_entity();
+        crate::complete::attach(
+            &input,
+            model.clone(),
+            move |cx| weak.upgrade().map(|v| v.read(cx).id.clone()),
+            |_| (None, None),
+            cx,
+        );
         let events = cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
-            if matches!(event, InputEvent::PressEnter { .. }) {
+            if matches!(event, InputEvent::PressEnter { .. }) && !crate::complete::is_open(cx) {
                 this.send(window, cx);
             }
         });
+        let console = cx.new(|cx| SessionConsole::new(model.clone(), id.clone(), cx));
+        console.update(cx, |c, _| {
+            c.set_look(ConsoleLook {
+                theme: Some(console_theme()),
+                size: 11.,
+                pad_x: 12.,
+                max_w: None,
+            })
+        });
+        let open_file = cx.subscribe(&console, |_, _, e: &ConsoleEvent, cx| {
+            let ConsoleEvent::OpenFile { session, path } = e;
+            cx.emit(OperatorFocusEvent::OpenFile {
+                session: session.clone(),
+                path: path.clone(),
+            });
+        });
+        // The diff is the first tab; the flag from Tasks ("Open diff") is used up here.
+        take_want_code(&id);
+        let tab = Tab::Chat;
         Self {
             model,
             id,
@@ -89,8 +158,10 @@ impl OperatorFocus {
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
             tools: Tools::default(),
-            prefs: None,
-            _subs: vec![observe, events],
+            controls: Controls::default(),
+            console,
+            tab,
+            _subs: vec![observe, events, open_file],
         }
     }
 
@@ -102,7 +173,12 @@ impl OperatorFocus {
             self.file = None;
             self.scrolled.clear();
             self.tools = Tools::default();
-            self.prefs = None;
+            self.controls = Controls::default();
+            self.console.update(cx, |c, cx| c.show(id, cx));
+            cx.notify();
+        }
+        if take_want_code(id) {
+            self.tab = Tab::Diff;
             cx.notify();
         }
     }
@@ -126,7 +202,8 @@ impl OperatorFocus {
             return;
         }
         let text = self.tools.message(&text, None);
-        let composer = self.prefs.take().filter(|p| *p != pane.composer);
+        let prefs = self.controls.current(&pane);
+        let images = self.tools.images();
         self.tools.sent();
         let action = match &pane.ask {
             Some(ask) => Action::Answer {
@@ -135,14 +212,49 @@ impl OperatorFocus {
                 option: None,
                 text: Some(text),
             },
-            _ => Action::Send {
-                id: pane.id.clone(),
-                text,
-                composer,
-            },
+            _ => {
+                crate::compose_controls::submit(&self.model, &pane, text, images, prefs, cx);
+                self.input.update(cx, |s, cx| s.clean(window, cx));
+                return;
+            }
         };
         act(&self.model, action, cx);
         self.input.update(cx, |s, cx| s.clean(window, cx));
+    }
+
+    /// The mic: dictate into the prompt; a second press stops the listening.
+    fn dictate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(stop) = self.tools.start_listening() else {
+            self.tools.stop_listening();
+            cx.notify();
+            return;
+        };
+        cx.notify();
+        compose::dictate(
+            |this: &mut Self| Some(&mut this.tools),
+            stop,
+            self.input.clone(),
+            window,
+            cx,
+        );
+    }
+
+    /// A button of the dictation status line (stop, download of the offline model, cancel).
+    fn tool_action(
+        &mut self,
+        action: compose::ToolAction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let input = self.input.clone();
+        compose::handle_action(
+            self,
+            action,
+            |this: &mut Self| Some(&mut this.tools),
+            input,
+            window,
+            cx,
+        );
     }
 
     /// Read the diff again when the last read is old.
@@ -194,10 +306,10 @@ fn title(text: &str, color: u32) -> Div {
 }
 
 impl Render for OperatorFocus {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(p) = self.pane(cx) else {
             return page(
-                head_line("F1", "Focus", Vec::new()),
+                head_line("F1", "Session", Vec::new()),
                 vec![
                     div()
                         .flex_1()
@@ -208,6 +320,12 @@ impl Render for OperatorFocus {
             );
         };
         self.ensure(cx);
+        let vp = window.viewport_size();
+        let (vw, vh) = (f32::from(vp.width), f32::from(vp.height));
+        // Under 1100 px the details move into the chat column as tabs.
+        let narrow = vw < 1100.;
+        let short = vh < 760.;
+        let right_w = (vw * 0.38).clamp(320., 720.);
         let now = self.model.read(cx).war.as_ref().map_or(0, |w| w.now);
         let mins = p.minutes(now);
         let state_word = match p.state {
@@ -220,17 +338,22 @@ impl Render for OperatorFocus {
         };
 
         // The title line with the controls.
-        let mut head = head_line(
-            "F1",
-            "Focus",
+        let stats = if narrow {
+            vec![("state".into(), state_word.into())]
+        } else {
             vec![
                 ("session".into(), name(&p)),
                 ("agent".into(), p.provider.clone()),
                 ("state".into(), state_word.into()),
-            ],
-        )
-        .gap(px(12.));
-        let (sid, did) = (p.id.clone(), p.id.clone());
+            ]
+        };
+        let mut head = head_line("F1", "Session", stats)
+            .h_auto()
+            .min_h(px(68.))
+            .py(px(6.))
+            .flex_wrap()
+            .gap(px(12.));
+        let sid = p.id.clone();
         head = head
             .child(
                 btn("mf-pause".into(), "Pause", false).on_click(cx.listener({
@@ -240,9 +363,6 @@ impl Render for OperatorFocus {
             )
             .child(btn("mf-stop".into(), "Stop", false).on_click(
                 cx.listener(move |this, _, _, cx| act(&this.model, Action::Stop(sid.clone()), cx)),
-            ))
-            .child(btn("mf-deep".into(), "Deep dive ›", false).on_click(
-                cx.listener(move |_, _, _, cx| cx.emit(OperatorFocusEvent::Detail(did.clone()))),
             ))
             .child(
                 btn("mf-back".into(), "‹ War room", false)
@@ -265,7 +385,7 @@ impl Render for OperatorFocus {
             .unwrap_or_default();
         let mut strip = div()
             .flex_none()
-            .h(px(40.))
+            .min_h(ui::sw(40.))
             .mb(px(14.))
             .flex()
             .items_center()
@@ -274,7 +394,7 @@ impl Render for OperatorFocus {
             .border_b_1()
             .border_color(rgb(0x0E3A1C));
         // Whole names only: the tabs that fit, the open session always, and a "+N" tab.
-        let mut budget = 880.0_f32;
+        let mut budget = (vw - if narrow { 80. } else { right_w + 110. }).max(240.);
         let mut shown = 0usize;
         for (k, (sid, nm, st)) in sessions.iter().enumerate() {
             let on = *sid == p.id;
@@ -295,7 +415,7 @@ impl Render for OperatorFocus {
                 div()
                     .id(eid(format!("mf-tab-{k}")))
                     .flex_none()
-                    .h(px(36.))
+                    .min_h(ui::sw(36.))
                     .px(px(14.))
                     .flex()
                     .items_center()
@@ -332,10 +452,29 @@ impl Render for OperatorFocus {
             self.scroll.scroll_to_bottom();
             self.scrolled = key;
         }
+        // The media of the newest lines: a thumbnail or a card under the console text.
+        let media_style = MediaStyle {
+            card: gpui::rgba(0x04170AF0),
+            text: gpui::rgb(GREEN_HI),
+            muted: gpui::rgb(GREEN_DIM),
+            radius: 0.,
+        };
+        let mut shots: Vec<_> = p.tail.iter().filter_map(|l| l.media.as_ref()).collect();
+        shots.drain(..shots.len().saturating_sub(4));
+        let previews: Vec<_> = shots
+            .into_iter()
+            .enumerate()
+            .map(|(n, m)| {
+                div()
+                    .flex_none()
+                    .py(px(4.))
+                    .child(media::preview(m, ("mf-media", n), media_style))
+            })
+            .collect();
         let transcript = div()
             .id("mf-chat")
             .flex_1()
-            .min_h(px(0.))
+            .min_h(px(96.))
             .px(px(PAD))
             .pt(px(PAD - 6.))
             .pb(px(10.))
@@ -343,7 +482,8 @@ impl Render for OperatorFocus {
             .track_scroll(&self.scroll)
             .text_size(ui::ts(T_ENTRY))
             .line_height(relative(1.5))
-            .child(div().flex_none().child(tokenize(&lines).into_text()));
+            .child(div().flex_none().child(tokenize(&lines).into_text()))
+            .children(previews);
 
         let ask_block = p.ask.as_ref().map(|ask| {
             let mut buttons = div().flex().flex_wrap().gap(px(8.));
@@ -378,7 +518,10 @@ impl Render for OperatorFocus {
                 );
             }
             div()
+                .id("mf-ask")
                 .flex_none()
+                .max_h(px((vh * 0.22).clamp(96., 300.)))
+                .overflow_y_scroll()
                 .mx(px(PAD - 8.))
                 .mb(px(10.))
                 .px(px(16.))
@@ -400,77 +543,46 @@ impl Render for OperatorFocus {
                 .child(buttons)
         });
 
-        let prefs = self.prefs.clone().unwrap_or_else(|| p.composer.clone());
-        let chip = |id: String, text: String, on: bool| btn(id, &text, on).h(px(30.));
+        self.controls.sync(&p);
+        let providers = self.model.read(cx).providers.clone();
+        let style = ControlStyle::operator(Some(FONT.into()));
+        // A key of the status line: plain dim text, inverse video when it is on, as in a
+        // terminal. Same size and cell as the composer controls next to it.
+        let chip = |id: String, text: String, on: bool| {
+            let (bg, fg) = if on {
+                (rgb(0x9BFFC0), rgb(0x020A04))
+            } else {
+                (gpui::rgba(0x00000000), rgb(0x6DB596))
+            };
+            div()
+                .id(eid(id))
+                .flex_none()
+                .h(px(20.))
+                .px(px(6.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .bg(bg)
+                .text_color(fg)
+                .text_size(ui::ts(T_LABEL))
+                .hover(|h| h.bg(rgb(0x0F2A1C)).text_color(rgb(0xB8FFCC)))
+                .child(text)
+        };
         let mut chips = div()
             .flex_none()
-            .mx(px(PAD - 8.))
-            .mb(px(8.))
             .flex()
             .flex_wrap()
-            .gap(px(8.))
-            .child(
-                chip(
-                    "mf-mode".into(),
-                    format!("mode: {}", crate::warroom::mode_label(prefs.mode)),
-                    false,
-                )
-                .on_click(cx.listener({
-                    let base = prefs.clone();
-                    move |this, _, _, cx| {
-                        let mut next = base.clone();
-                        next.mode = match base.mode {
-                            Mode::Plan => Mode::Edit,
-                            Mode::Edit => Mode::Auto,
-                            Mode::Auto => Mode::Plan,
-                        };
-                        this.prefs = Some(next);
-                        cx.notify();
-                    }
-                })),
-            )
-            .child(
-                chip("mf-model".into(), format!("model: {}", prefs.model), false).on_click(
-                    cx.listener({
-                        let base = prefs.clone();
-                        move |this, _, _, cx| {
-                            let list = crate::warroom::provider_models(&base.provider);
-                            if list.is_empty() {
-                                return;
-                            }
-                            let at = list
-                                .iter()
-                                .position(|m| *m == base.model)
-                                .map_or(0, |i| i + 1);
-                            let mut next = base.clone();
-                            next.model = list[at % list.len()].to_string();
-                            this.prefs = Some(next);
-                            cx.notify();
-                        }
-                    }),
-                ),
-            )
-            .child(
-                chip(
-                    "mf-effort".into(),
-                    format!("effort: {}", crate::warroom::effort_label(prefs.effort)),
-                    false,
-                )
-                .on_click(cx.listener({
-                    let base = prefs.clone();
-                    move |this, _, _, cx| {
-                        let mut next = base.clone();
-                        next.effort = match base.effort {
-                            Effort::Low => Effort::Medium,
-                            Effort::Medium => Effort::High,
-                            Effort::High => Effort::Max,
-                            Effort::Max => Effort::Low,
-                        };
-                        this.prefs = Some(next);
-                        cx.notify();
-                    }
-                })),
-            )
+            .items_center()
+            .gap(px(2.))
+            .text_size(ui::ts(T_LABEL))
+            .child(self.controls.row(
+                "mf-ctl",
+                &p,
+                &providers,
+                &style,
+                |this: &mut Self| &mut this.controls,
+                cx,
+            ))
             .child(
                 chip("mf-attach".into(), "+ attach".to_string(), false).on_click(cx.listener(
                     |_, _, window, cx| {
@@ -482,6 +594,20 @@ impl Render for OperatorFocus {
                     },
                 )),
             );
+        let listening = self.tools.listening.is_some();
+        chips = chips.child(
+            chip(
+                "mf-mic".into(),
+                if listening { "● rec" } else { "mic" }.to_string(),
+                listening,
+            )
+            .tooltip(ui::tip(if listening {
+                "Stop the dictation"
+            } else {
+                "Dictate into the prompt"
+            }))
+            .on_click(cx.listener(|this, _, window, cx| this.dictate(window, cx))),
+        );
         for (k, a) in self.tools.attachments.iter().enumerate() {
             let file = a
                 .path
@@ -496,19 +622,24 @@ impl Render for OperatorFocus {
                 )),
             );
         }
+        // The prompt: one console line under a thin rule, like the shell of the session. No
+        // field box; the input text is the bright green of the console.
         let composer = div()
             .flex_none()
-            .h(px(52.))
-            .mx(px(PAD - 8.))
-            .mb(px(PAD - 8.))
-            .px(px(14.))
+            .min_h(ui::sw(30.))
+            .pt(px(6.))
             .flex()
             .items_center()
-            .gap(px(10.))
-            .bg(hca(0x04170A, 240))
+            .gap(px(8.))
+            .border_t_1()
+            .border_color(hca(GREEN_DIM, 160))
             .text_size(ui::ts(T_ENTRY))
             .text_color(rgb(GREEN_MID))
-            .child("you>")
+            .child(
+                div()
+                    .flex_none()
+                    .child(format!("{}@{}:~$", p.provider, p.codebase)),
+            )
             .child(
                 div()
                     .flex_1()
@@ -518,32 +649,64 @@ impl Render for OperatorFocus {
             )
             .child(
                 div()
+                    .flex_none()
                     .text_size(ui::ts(T_LABEL))
                     .text_color(rgb(GREEN_DIM))
                     .child(if p.ask.is_some() && p.controlled {
-                        "↵ answers the ask"
+                        "↵ answer"
                     } else {
-                        "↵ send"
+                        "↵"
                     }),
             );
+        let column = div()
+            .absolute()
+            .inset_0()
+            .flex()
+            .flex_col()
+            .overflow_hidden()
+            .child(ui::with_thumb(
+                transcript,
+                &self.scroll,
+                gpui::rgba(0x2BA85ACC),
+                4.,
+            ))
+            .children(ask_block)
+            .child(
+                div()
+                    .flex_none()
+                    .mx(px(PAD - 8.))
+                    .mb(px(PAD - 8.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(4.))
+                    .child(composer)
+                    .child(chips)
+                    .children(compose::status(
+                        &self.tools,
+                        "mf",
+                        compose::Palette {
+                            text: (GREEN_HI << 8) | 0xFF,
+                            dim: (GREEN_DIM << 8) | 0xFF,
+                            line: (GREEN_DIM << 8) | 0xFF,
+                            chip_bg: 0x04170AFF,
+                            hover: 0x125A2AFF,
+                            fail: 0xF2C063FF,
+                            ok: (GREEN_MID << 8) | 0xFF,
+                        },
+                        |action| {
+                            Box::new(cx.listener(move |this, _, window, cx| {
+                                this.tool_action(action, window, cx)
+                            }))
+                        },
+                    )),
+            );
+        // A file dropped anywhere on the chat attaches; Ctrl+V pastes an image.
+        let column =
+            compose::media_target(column, |this: &mut OperatorFocus| Some(&mut this.tools), cx);
         let center = bezel(GREEN_MID)
             .flex_1()
             .min_w(px(0.))
-            .child(
-                glass(false)
-                    .child(
-                        div()
-                            .absolute()
-                            .inset_0()
-                            .flex()
-                            .flex_col()
-                            .child(transcript)
-                            .children(ask_block)
-                            .child(chips)
-                            .child(composer),
-                    )
-                    .child(glaze(false)),
-            )
+            .child(glass(false).child(column).child(glaze(false)))
             .child(foot(
                 "1",
                 GREEN,
@@ -551,7 +714,7 @@ impl Render for OperatorFocus {
                     (format!("{} · {}", p.provider, p.codebase), GREEN_HI),
                     (format!("· {state_word} {mins} min"), FOOT),
                 ],
-                30.,
+                f32::from(ui::sw(30.)),
             ))
             .into_any_element();
 
@@ -579,9 +742,14 @@ impl Render for OperatorFocus {
             .child(fact("in this state", format!("{mins} min")));
         let facts = bezel(BLUE_RING)
             .flex_none()
-            .h(px(250.))
+            .h(ui::sw(250.))
             .child(screen(true, facts_body))
-            .child(foot("A", FOOT, vec![("facts".into(), FOOT)], 30.));
+            .child(foot(
+                "A",
+                FOOT,
+                vec![("facts".into(), FOOT)],
+                f32::from(ui::sw(30.)),
+            ));
 
         let files: Vec<aivory_protocol::session::DiffFile> = self
             .diff
@@ -597,8 +765,8 @@ impl Render for OperatorFocus {
             .cloned();
         let mut changes = div()
             .id("mf-changes")
-            .absolute()
-            .inset_0()
+            .flex_1()
+            .min_h(px(0.))
             .px(px(PAD))
             .py(px(PAD - 8.))
             .flex()
@@ -626,7 +794,7 @@ impl Render for OperatorFocus {
                 div()
                     .id(eid(format!("mf-file-{k}")))
                     .flex_none()
-                    .h(px(34.))
+                    .min_h(ui::sw(34.))
                     .px(px(8.))
                     .flex()
                     .items_center()
@@ -699,30 +867,128 @@ impl Render for OperatorFocus {
                 );
             }
         }
+        let tab_btn = |id: &str, text: &str, tab: Tab, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(eid(id.to_string()))
+                .flex_none()
+                .min_h(ui::sw(30.))
+                .px(px(10.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .text_size(ui::ts(T_SECTION))
+                .text_color(rgb(if on { BLUE_HI } else { BLUE_SOFT }))
+                .when(on, |d| d.bg(rgb(BLUE_DIM)))
+                .when(!on, |d| d.hover(|h| h.text_color(rgb(BLUE_HI))))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.tab = tab;
+                    cx.notify();
+                }))
+                .child(text.to_uppercase())
+        };
+        let tabs = div()
+            .flex_none()
+            .px(px(PAD - 8.))
+            .pt(px(10.))
+            .flex()
+            .flex_wrap()
+            .gap(px(6.))
+            .when(narrow, |d| {
+                d.child(tab_btn(
+                    "mf-tab-chat",
+                    "Chat",
+                    Tab::Chat,
+                    self.tab == Tab::Chat,
+                    cx,
+                ))
+            })
+            .child(tab_btn(
+                "mf-tab-diff",
+                "Diff",
+                Tab::Diff,
+                self.tab == Tab::Diff || (!narrow && self.tab == Tab::Chat),
+                cx,
+            ))
+            .child(tab_btn(
+                "mf-tab-console",
+                "Console",
+                Tab::Console,
+                self.tab == Tab::Console,
+                cx,
+            ));
+        let (tabs_in, tabs_out) = if narrow {
+            (None, Some(tabs.pb(px(10.))))
+        } else {
+            (Some(tabs), None)
+        };
+        let pane_body: AnyElement = match self.tab {
+            Tab::Diff | Tab::Chat => changes.into_any_element(),
+            Tab::Console => div()
+                .id("mf-console")
+                .flex_1()
+                .min_h(px(0.))
+                .child(self.console.clone())
+                .into_any_element(),
+        };
         let changes = bezel(BLUE_RING)
             .flex_1()
             .min_h(px(0.))
-            .child(screen(true, changes))
+            .child(screen(
+                true,
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .flex_col()
+                    .children(tabs_in)
+                    .child(pane_body),
+            ))
             .child(foot(
                 "B",
                 FOOT,
-                vec![("diff of the session".into(), FOOT)],
-                30.,
+                vec![(
+                    if self.tab != Tab::Console {
+                        "diff of the session"
+                    } else {
+                        "console output"
+                    }
+                    .into(),
+                    FOOT,
+                )],
+                f32::from(ui::sw(30.)),
             ));
         let right = div()
-            .flex_none()
-            .w(px(400.))
             .flex()
             .flex_col()
             .gap(px(GAP))
-            .child(facts)
+            .when(narrow, |d| d.flex_1().min_w(px(0.)))
+            .when(!narrow, |d| d.flex_none().w(px(right_w)))
+            .when(!short && !narrow, |d| d.child(facts))
             .child(changes)
             .into_any_element();
 
         // `page` puts the title line over one row; the strip joins the first column.
+        if narrow {
+            // One column: Chat, Diff and Console are tabs of the same column.
+            let shown = if self.tab == Tab::Chat {
+                div().flex_1().min_w(px(0.)).flex().child(center)
+            } else {
+                div().flex_1().min_w(px(0.)).flex().child(right)
+            };
+            let body: AnyElement = div()
+                .flex_1()
+                .min_w(px(0.))
+                .flex()
+                .flex_col()
+                .child(strip)
+                .children(tabs_out)
+                .child(div().flex_1().min_h(px(0.)).flex().child(shown))
+                .into_any_element();
+            return page(head, vec![body]);
+        }
         let body: AnyElement = div()
             .flex_1()
-            .min_w(px(0.))
+            .min_w(px(380.))
             .flex()
             .flex_col()
             .child(strip)

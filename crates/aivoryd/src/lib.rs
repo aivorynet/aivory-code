@@ -7,6 +7,7 @@ pub mod claude_usage;
 pub mod client;
 pub mod code;
 pub mod codex_usage;
+pub mod complete;
 pub mod config;
 pub mod coord;
 pub mod demo;
@@ -22,6 +23,7 @@ pub mod remote;
 pub mod repos;
 pub mod resources;
 pub mod rpc;
+pub mod schedule;
 pub mod server;
 pub mod theme;
 

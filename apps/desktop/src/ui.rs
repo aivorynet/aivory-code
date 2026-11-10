@@ -23,14 +23,55 @@ pub fn ui_scale() -> u16 {
     UI_SCALE.load(std::sync::atomic::Ordering::Relaxed) as u16
 }
 
+/// The window fit in per mille: the text grows on a large window and shrinks a little on a
+/// small one. The shell sets it from the window size at each frame ([`set_fit`]).
+static FIT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1000);
+
+/// The window size that the designs use at fit 1.
+const FIT_BASE: (f32, f32) = (1600., 1000.);
+/// The smallest and the largest fit.
+const FIT_RANGE: (f32, f32) = (0.85, 1.4);
+
+/// The fit for a window of `w` x `h` logical px.
+pub fn fit_for(w: f32, h: f32) -> f32 {
+    (w / FIT_BASE.0)
+        .min(h / FIT_BASE.1)
+        .clamp(FIT_RANGE.0, FIT_RANGE.1)
+}
+
+/// A window under this height (logical px) is short: the screens hide their big title rows.
+pub const SHORT_H: f32 = 820.;
+
+static SHORT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// `true` when the window is short ([`SHORT_H`]): a screen drops its big title row so the chat
+/// and the composer keep their room.
+pub fn short() -> bool {
+    SHORT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Set the fit from the window size. `true`: the fit changed (the frame must draw again).
+pub fn set_fit(w: f32, h: f32) -> bool {
+    SHORT.store(h < SHORT_H, std::sync::atomic::Ordering::Relaxed);
+    let next = (fit_for(w, h) * 1000.).round() as u32;
+    FIT.swap(next, std::sync::atomic::Ordering::Relaxed) != next
+}
+
+/// The text scale (the setting and the window fit) as a factor.
+fn factor() -> f32 {
+    UI_SCALE.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.
+        * FIT.load(std::sync::atomic::Ordering::Relaxed) as f32
+        / 1000.
+}
+
 /// A width that holds interface text (a table column): `w` px at 100 %, scaled like the text.
 pub fn sw(w: f32) -> Pixels {
-    px(w * UI_SCALE.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.)
+    px(w * factor())
 }
 
 /// A text size of the interface: `size` px at 100 %, scaled by the interface text size.
 pub fn ts(size: f32) -> Pixels {
-    px(size * UI_SCALE.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.)
+    px(size * factor())
 }
 
 pub fn hsla(rgba_hex: u32) -> Hsla {
@@ -492,4 +533,113 @@ pub fn animate<T: 'static>(_window: &mut Window, cx: &mut Context<T>) {
         this.update(cx, |_, cx| cx.notify()).ok();
     })
     .detach();
+}
+
+#[cfg(test)]
+mod fit_tests {
+    use super::fit_for;
+
+    #[test]
+    fn the_fit_follows_the_window_within_its_range() {
+        assert_eq!(fit_for(1600., 1000.), 1.);
+        assert_eq!(fit_for(3200., 2000.), 1.4);
+        assert_eq!(fit_for(800., 600.), 0.85);
+        // The smaller side decides.
+        assert_eq!(fit_for(2400., 1000.), 1.);
+    }
+}
+
+/// The scroll thumb of a scroll area, at its right edge. Put it as a sibling after the scroll
+/// element, inside a relative parent of the same size. It reads the scroll handle while it
+/// paints, after the layout of this frame, so it always follows the text (also while the text
+/// grows and the area keeps to the bottom). It hides when all of the text fits.
+pub fn thumb(handle: &gpui::ScrollHandle, color: Rgba, width: f32) -> impl IntoElement {
+    let handle = handle.clone();
+    gpui::canvas(
+        |_, _, _| (),
+        move |b, _, window, _| {
+            if let Some((y, h)) = thumb_span(
+                f32::from(handle.max_offset().y),
+                -f32::from(handle.offset().y),
+                f32::from(handle.bounds().size.height),
+                f32::from(b.size.height),
+            ) {
+                let x = f32::from(b.origin.x) + f32::from(b.size.width) - width - 2.;
+                let rect = gpui::Bounds::new(
+                    gpui::point(px(x), b.origin.y + px(y)),
+                    gpui::size(px(width), px(h)),
+                );
+                window.paint_quad(gpui::fill(rect, color).corner_radii(px(width / 2.)));
+            }
+        },
+    )
+    .absolute()
+    .top_0()
+    .bottom_0()
+    .right_0()
+    .w(px(width + 4.))
+}
+
+/// The top and the height of a thumb in a track of `track` px, for a view of `view` px that
+/// is `off` px down a text with `max` px more below the first view. `None` when all fits.
+pub fn thumb_span(max: f32, off: f32, view: f32, track: f32) -> Option<(f32, f32)> {
+    if max <= 1. || view <= 0. || track <= 0. {
+        return None;
+    }
+    let h = (track * view / (view + max)).clamp(18_f32.min(track), track);
+    let at = (off / max).clamp(0., 1.);
+    Some(((track - h) * at, h))
+}
+
+#[cfg(test)]
+mod thumb_tests {
+    #[test]
+    fn the_thumb_follows_the_offset_and_hides_when_all_fits() {
+        assert_eq!(super::thumb_span(0., 0., 300., 300.), None);
+        let (top, h) = super::thumb_span(300., 0., 300., 300.).unwrap();
+        assert_eq!((top, h), (0., 150.));
+        let (top, _) = super::thumb_span(300., 300., 300., 300.).unwrap();
+        assert_eq!(top, 150.);
+        let (top, _) = super::thumb_span(300., 150., 300., 300.).unwrap();
+        assert_eq!(top, 75.);
+    }
+}
+
+/// For a scroll bar that a view builds from the scroll handle while it renders: the handle
+/// changes after the layout (new text, a jump to the bottom), and then no new frame comes. This
+/// empty element checks the handle while it paints and asks for one more frame when it moved
+/// away from the values (`max`, `off`) that the bar used, so the bar follows the text.
+pub fn scroll_watch(handle: &gpui::ScrollHandle, max: f32, off: f32) -> impl IntoElement {
+    let handle = handle.clone();
+    gpui::canvas(
+        |_, _, _| (),
+        move |_, _, window, _| {
+            let now_max = f32::from(handle.max_offset().y);
+            let now_off = -f32::from(handle.offset().y);
+            if (now_max - max).abs() > 0.5 || (now_off - off).abs() > 0.5 {
+                window.refresh();
+            }
+        },
+    )
+    .absolute()
+    .size_0()
+}
+
+/// A scroll element (it grows with `flex_1`) with its [`thumb`] on top: the wrapper takes the
+/// place of the scroll element in its column.
+pub fn with_thumb(
+    scroll: impl IntoElement,
+    handle: &gpui::ScrollHandle,
+    color: Rgba,
+    width: f32,
+) -> Div {
+    div()
+        .relative()
+        .flex_1()
+        .min_h(px(0.))
+        .min_w(px(0.))
+        .flex()
+        .flex_col()
+        .child(scroll)
+        .child(thumb(handle, color, width))
 }
