@@ -8,6 +8,9 @@ version="${1:?version, for example 2026.1.0}"
 dist="${2:?folder with the release files}"
 out="${3:?output folder}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
+# Absolute: the checksum step below runs inside the dist folder.
+mkdir -p "$out"
+out="$(cd "$out" && pwd)"
 
 hash() {
   local f="$dist/$1"
