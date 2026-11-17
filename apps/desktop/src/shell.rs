@@ -301,6 +301,18 @@ impl Shell {
         view
     }
 
+    /// Open the pairing card of the full settings screen, in every look.
+    pub(crate) fn open_pairing(&mut self, cx: &mut Context<Self>) {
+        self.go(Screen::Settings, cx);
+        self.bridge_full_settings = true;
+        self.holo_screens.full_settings = true;
+        self.operator_full_settings = true;
+        self.tactical_screens.full = true;
+        self.command.full = true;
+        self.settings.update(cx, |s, cx| s.open_pairing(cx));
+        cx.notify();
+    }
+
     /// Open the session screen of a session; Back returns to the screen on view now.
     fn open_session(&mut self, id: &str, cx: &mut Context<Self>) {
         if !matches!(self.screen, Screen::Session(_)) {

@@ -1512,7 +1512,7 @@ impl Render for ReposScreen {
             &repos,
             selected.and_then(|id| codebases.iter().find(|c| c.id == id)),
         ) {
-            (None, _) => centered_note("Waits for aivoryd"),
+            (None, _) => centered_note(self.model.read(cx).wait_text()),
             (Some(_), None) => centered_note("No codebases yet. Add a repo to start."),
             (Some(_), Some(cb)) => div()
                 .flex_1()

@@ -37,6 +37,8 @@ const ERR: u32 = 0xFF8A80;
 /// What a screen asks the shell to do.
 #[derive(Debug, Clone)]
 pub enum OperatorEvent {
+    /// Open the pairing card of the full settings screen.
+    PairPhone,
     OpenSession(String),
     /// The full Settings screen.
     AllSettings,
@@ -1532,6 +1534,10 @@ impl Render for OperatorSettings {
         menu = menu.child(
             menu_item("ms-all".into(), "All settings ›", None, false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(OperatorEvent::AllSettings))),
+        );
+        menu = menu.child(
+            menu_item("ms-pair".into(), "Pair a phone ›", None, false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(OperatorEvent::PairPhone))),
         );
         let menu = menu_col(
             "ms-menu",

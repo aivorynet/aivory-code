@@ -278,7 +278,8 @@ impl Model {
         match event {
             Event::Connected(info) => {
                 // The link came back after a drop: say so (a restart of the daemon shows here).
-                let back = matches!(self.link, Link::Offline(_));
+                // Not at the first connect: the app may have started the daemon a moment ago.
+                let back = matches!(self.link, Link::Offline(_)) && self.info.is_some();
                 self.link = Link::Running;
                 self.demo = info.demo;
                 self.info = Some(info);
@@ -370,16 +371,29 @@ impl Model {
     {
         let endpoint = self.endpoint.clone();
         let drafts = self.drafts.clone();
+        // While the daemon starts, the screens say so: no toast per failed call.
+        let quiet = self.link != Link::Running;
         cx.background_executor().spawn(async move {
             match daemon::call::<M>(&endpoint, &params) {
                 Ok(result) => Some(result),
                 Err(e) => {
                     eprintln!("aivory: {} failed: {e:#}", M::NAME);
-                    let _ = drafts.unbounded_send(notice::failure(M::NAME, &e));
+                    if !quiet {
+                        let _ = drafts.unbounded_send(notice::failure(M::NAME, &e));
+                    }
                     None
                 }
             }
         })
+    }
+
+    /// What a screen shows while it has no data yet: the daemon starts, or it reads the
+    /// sessions for the first time (a large store takes a while).
+    pub fn wait_text(&self) -> &'static str {
+        match self.link {
+            Link::Running => "aivoryd reads your sessions. The first scan can take a minute.",
+            Link::Connecting | Link::Offline(_) => "Starting aivoryd…",
+        }
     }
 
     /// `HH:MM` of a daemon time: UTC in demo mode, local time otherwise.

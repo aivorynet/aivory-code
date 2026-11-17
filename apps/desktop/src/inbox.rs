@@ -171,7 +171,10 @@ impl InboxScreen {
                     Err(e) => {
                         eprintln!("aivory: inbox/list failed: {e:#}");
                         this.model.update(cx, |m, cx| {
-                            m.notify_user(crate::notice::failure("inbox/list", &e), cx)
+                            // While the daemon starts, the screen says so: no toast.
+                            if m.link == crate::model::Link::Running {
+                                m.notify_user(crate::notice::failure("inbox/list", &e), cx)
+                            }
                         });
                     }
                 }
@@ -1410,7 +1413,7 @@ impl Render for InboxScreen {
                         .justify_center()
                         .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().muted))
-                        .child("Waits for aivoryd"),
+                        .child(self.model.read(cx).wait_text()),
                 );
         };
         let shown: Vec<&InboxItem> = data

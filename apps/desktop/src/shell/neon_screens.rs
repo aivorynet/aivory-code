@@ -28,6 +28,8 @@ use crate::model::Model;
 /// What a screen asks the shell to do.
 #[derive(Debug, Clone)]
 pub(super) enum NightEvent {
+    /// Open the pairing card of the full settings screen.
+    PairPhone,
     OpenSession(String),
     /// The full Settings screen.
     AllSettings,
@@ -1522,6 +1524,11 @@ impl Render for NightSettings {
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(NightEvent::AllSettings)))
                 .into_any_element(),
         );
+        menu.push(
+            menu_tab("ns-tab-Pair", "Pair a phone ›", None, MIST, false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(NightEvent::PairPhone)))
+                .into_any_element(),
+        );
         let actions: Vec<AnyElement> = Vec::new();
 
         let mut rows: Vec<AnyElement> = Vec::new();
@@ -1808,7 +1815,7 @@ impl Render for NightSettings {
                     .child(
                         div().flex().child(
                             button("ns-pair", "Pair a phone", YELLOW, true).on_click(
-                                cx.listener(|_, _, _, cx| cx.emit(NightEvent::AllSettings)),
+                                cx.listener(|_, _, _, cx| cx.emit(NightEvent::PairPhone)),
                             ),
                         ),
                     );
@@ -1934,6 +1941,7 @@ impl Shell {
         fn handle(this: &mut Shell, event: &NightEvent, cx: &mut Context<Shell>) {
             match event {
                 NightEvent::OpenSession(id) => this.open_session(id, cx),
+                NightEvent::PairPhone => this.open_pairing(cx),
                 NightEvent::AllSettings => {
                     this.bridge_full_settings = true;
                     cx.notify();

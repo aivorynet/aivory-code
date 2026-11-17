@@ -422,6 +422,7 @@ impl Shell {
                     this.bridge_full_settings = true;
                     cx.notify();
                 }
+                BridgeEvent::PairPhone => this.open_pairing(cx),
             }
         }
         let model = self.model.clone();

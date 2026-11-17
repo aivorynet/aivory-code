@@ -33,7 +33,7 @@ pub(super) struct HoloScreens {
     /// The codebase and file that the Holo Lens shows next.
     pub(super) lens_target: Option<(String, String, Option<String>)>,
     /// The Holo Settings screen hands over to the full Settings screen.
-    full_settings: bool,
+    pub(super) full_settings: bool,
     /// The start of the slow rings.
     started: Option<Instant>,
     /// The open effect of a new screen.
@@ -377,6 +377,7 @@ impl Shell {
         fn handle(this: &mut Shell, event: &HoloEvent, cx: &mut Context<Shell>) {
             match event {
                 HoloEvent::OpenSession(id) => this.open_session(id, cx),
+                HoloEvent::PairPhone => this.open_pairing(cx),
                 HoloEvent::AllSettings => {
                     this.holo_screens.full_settings = true;
                     cx.notify();

@@ -13,7 +13,12 @@
   <a href="#install"><b>Install</b></a> ·
   <a href="#write-your-own-look">Write your own look</a> ·
   <a href="docs/roadmap.md">Roadmap</a> ·
-  <a href="https://github.com/aivorynet/aivory-code/issues">Issues</a>
+  <a href="https://github.com/aivorynet/aivory-code/issues">Issues</a> ·
+  <a href="#buy-me-a-coffee">Buy Paul a coffee</a>
+</p>
+
+<p align="center">
+  <a href="https://aivory.net/coffee/"><img src="docs/images/coffee-mug.svg" width="64" height="64" alt="Buy Paul a coffee"></a>
 </p>
 
 AIVory Code is a local-first control room for coding agents. It shows the sessions of Claude Code,
@@ -66,8 +71,20 @@ If you download the installer or the archive from the
 shows a warning at the first start ("More info" > "Run anyway"). On macOS, right-click the app
 and select "Open".
 
+## Buy me a coffee
+
+AIVory Code is free and open source (MIT). If it saves you time, you can buy me a coffee:
+
+<p>
+  <a href="https://aivory.net/coffee/"><img src="docs/images/coffee-mug.svg" width="96" height="96" alt="Buy Paul a coffee"></a><br>
+  <a href="https://aivory.net/coffee/"><b>Buy Paul a coffee</b></a>
+</p>
+
+The link opens the coffee page, and its button opens a Stripe payment page. The coffee is a
+thank-you: it buys no license, no support contract, and no extra features. A
+<a href="https://github.com/aivorynet/aivory-code">star</a> on GitHub helps too.
+
 <p align="center">
-  AIVory Code is free and open source. If it saves you time, I'd love a <a href="https://buy.stripe.com/5kQbJ3csm21Xfz64DhdjO00">coffee</a> or a <a href="https://github.com/aivorynet/aivory-code">star</a>.<br>
   Everybody is welcome: <a href="https://github.com/aivorynet/aivory-code/issues/new?labels=bug">report a bug</a>, <a href="https://github.com/aivorynet/aivory-code/issues/new?labels=feature">ask for a feature</a>, <a href="https://github.com/aivorynet/aivory-code/pulls">open a pull request</a>, or <a href="#write-your-own-look">write your own look</a>.
 </p>
 
@@ -78,7 +95,7 @@ This project grows with the people who use it. You don't need permission to help
 - **Found a bug?** [Open an issue](https://github.com/aivorynet/aivory-code/issues/new?labels=bug). A screenshot and the steps to repeat it are perfect.
 - **Missing something?** [Ask for a feature](https://github.com/aivorynet/aivory-code/issues/new?labels=feature). Tell us what you want to do, not only how.
 - **Want to code?** Pick an issue, or bring your own idea, and [open a pull request](https://github.com/aivorynet/aivory-code/pulls). Small PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-- **Like it?** A [coffee](https://buy.stripe.com/5kQbJ3csm21Xfz64DhdjO00), a star or a short review helps a lot.
+- **Like it?** [Buy me a coffee](#buy-me-a-coffee), give a star, or write a short review. It helps a lot.
 
 ### Write your own look
 

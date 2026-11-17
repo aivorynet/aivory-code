@@ -196,6 +196,7 @@ impl Shell {
         fn handle(this: &mut Shell, event: &OperatorEvent, cx: &mut Context<Shell>) {
             match event {
                 OperatorEvent::OpenSession(id) => this.open_session(id, cx),
+                OperatorEvent::PairPhone => this.open_pairing(cx),
                 OperatorEvent::AllSettings => {
                     this.operator_full_settings = true;
                     cx.notify();

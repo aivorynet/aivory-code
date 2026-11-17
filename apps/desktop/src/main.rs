@@ -13,6 +13,7 @@ mod bridge_focus;
 mod bridge_kit;
 mod bridge_lens;
 mod bridge_screens;
+mod coffee;
 mod command_inbox;
 mod command_kit;
 mod command_screens;

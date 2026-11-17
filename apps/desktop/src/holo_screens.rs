@@ -23,6 +23,8 @@ use crate::model::Model;
 /// What a screen asks the shell to do.
 #[derive(Debug, Clone)]
 pub enum HoloEvent {
+    /// Open the pairing card of the full settings screen.
+    PairPhone,
     OpenSession(String),
     /// The full Settings screen.
     AllSettings,
@@ -1535,6 +1537,11 @@ impl Render for HoloSettings {
         left_tabs.push(
             tab("ls-tab-Other", "All settings ›", PK, false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(HoloEvent::AllSettings)))
+                .into_any_element(),
+        );
+        left_tabs.push(
+            tab("ls-tab-Pair", "Pair a phone ›", PK, false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(HoloEvent::PairPhone)))
                 .into_any_element(),
         );
         let mut left = div().flex().flex_col();

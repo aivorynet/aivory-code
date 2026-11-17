@@ -1758,7 +1758,7 @@ impl Render for WarRoomScreen {
                     .justify_center()
                     .text_size(crate::ui::ts(crate::theme::T_SMALL))
                     .text_color(rgb(tk().muted))
-                    .child("Waits for aivoryd"),
+                    .child(self.model.read(cx).wait_text()),
             );
         };
         self.tick_fps(window);

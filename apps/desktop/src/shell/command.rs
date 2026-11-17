@@ -39,6 +39,7 @@ pub(super) struct CommandScreens {
 fn handle(this: &mut Shell, event: &CmdEvent, cx: &mut Context<Shell>) {
     match event {
         CmdEvent::OpenSession(id) => this.open_session(id, cx),
+        CmdEvent::PairPhone => this.open_pairing(cx),
         CmdEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         CmdEvent::Full => {
             this.command.full = true;

@@ -31,6 +31,10 @@ jobs:
             libdbus-1-dev libxdo-dev libgbm-dev libdrm-dev pkg-config clang cmake \
             libpipewire-0.3-dev libspa-0.2-dev libegl-dev
       - uses: Swatinem/rust-cache@v2
+        with:
+          # sherpa-onnx-sys downloads its native libs here; a cached build script output
+          # points at them, so the folder must be in the cache too.
+          cache-directories: target/sherpa-onnx-prebuilt
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace

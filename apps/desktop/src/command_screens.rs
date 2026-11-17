@@ -28,6 +28,8 @@ use crate::ui;
 /// What a window asks the shell to do.
 #[derive(Debug, Clone)]
 pub enum CmdEvent {
+    /// Open the pairing card of the full settings screen.
+    PairPhone,
     OpenSession(String),
     /// Open a file of a session in the code lens.
     OpenFile {
@@ -644,6 +646,11 @@ impl Render for CommandSetup {
                 )
                 .w_full()
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
+            )
+            .child(
+                cmd::plate("cs-pair", "PAIR A PHONE", 960., 32., false)
+                    .w_full()
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::PairPhone))),
             );
         if let Some(a) = &auto {
             let (lo, hi) = Ap::MAX_RUNNING;

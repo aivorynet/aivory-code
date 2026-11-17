@@ -102,7 +102,7 @@ impl Section {
             Section::Providers => "Providers and models",
             Section::Autopilot => "Autopilot",
             Section::Display => "Display",
-            Section::Devices => "Daemons and devices",
+            Section::Devices => "Devices and pairing",
             Section::Notifications => "Notifications",
             Section::Account => "About and license",
         }
@@ -816,6 +816,11 @@ impl SettingsScreen {
             });
         })
         .detach();
+    }
+
+    /// Open the pairing card (Devices and pairing). Every look's "Pair a phone" key lands here.
+    pub fn open_pairing(&mut self, cx: &mut Context<Self>) {
+        self.select(Section::Devices, cx);
     }
 
     fn select(&mut self, section: Section, cx: &mut Context<Self>) {
@@ -2293,9 +2298,10 @@ impl SettingsScreen {
             .flex_col()
             .gap(px(20.))
             .child(section_head(
-                "Daemons and devices",
-                Some("Daemons run the agents. Phones and other desktops connect to them through the hub."),
+                "Devices and pairing",
+                Some("Pair a phone here. Daemons run the agents; phones and other desktops connect to them through the hub."),
             ))
+            .child(self.pair_card(cx))
             .child(self.daemon_card(&view.daemons, view.settings.autopilot.max_running, cx))
             .child(card().child(self.row(
                 true,
@@ -2311,7 +2317,6 @@ impl SettingsScreen {
                 ),
             )))
             .child(self.phone_card(&view.devices, now, cx))
-            .child(self.pair_card(cx))
             .child(self.machines_card(cx))
     }
 
@@ -2414,14 +2419,22 @@ impl SettingsScreen {
                 row_label("License", "MIT. Free for everyone, no limits."),
                 badge("free", Tone::Ok),
             ))
-            .child(self.row(
-                false,
-                row_label(
-                    "Support",
-                    "It's free and it stays free. If it saves you time, I'd love a coffee :)",
+            .child(
+                self.row(
+                    false,
+                    row_label(
+                        "Support",
+                        "It's free and it stays free. If it saves you time, I'd love a coffee :)",
+                    ),
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(10.))
+                        .child(crate::coffee::mug(32.))
+                        .child(coffee)
+                        .into_any_element(),
                 ),
-                coffee.into_any_element(),
-            ));
+            );
         // A hub shows only when the user connects one.
         if let Some(url) = team_url(a) {
             let (hub_text, hub_tone) = hub_badge(a.hub_state);

@@ -297,7 +297,10 @@ impl TasksScreen {
                     Err(e) => {
                         eprintln!("aivory: tasks/list failed: {e:#}");
                         this.model.update(cx, |m, cx| {
-                            m.notify_user(crate::notice::failure("tasks/list", &e), cx)
+                            // While the daemon starts, the screen says so: no toast.
+                            if m.link == crate::model::Link::Running {
+                                m.notify_user(crate::notice::failure("tasks/list", &e), cx)
+                            }
                         });
                     }
                 }
@@ -1980,7 +1983,7 @@ impl Render for TasksScreen {
                     .justify_center()
                     .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().muted))
-                    .child("Waits for aivoryd"),
+                    .child(self.model.read(cx).wait_text()),
             );
         };
         let order: Vec<String> = self

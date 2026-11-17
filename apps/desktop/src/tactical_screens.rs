@@ -29,6 +29,8 @@ use crate::ui;
 /// What a screen asks the shell to do.
 #[derive(Debug, Clone)]
 pub enum TacEvent {
+    /// Open the pairing card of the full settings screen.
+    PairPhone,
     OpenSession(String),
     /// Show the full screen of this view inside the frame.
     Full,
@@ -1377,6 +1379,11 @@ impl Render for TacticalSettings {
         menu.push(
             navb("ts-full", "FULL SETTINGS >", false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
+                .into_any_element(),
+        );
+        menu.push(
+            navb("ts-pair", "PAIR A PHONE >", false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::PairPhone)))
                 .into_any_element(),
         );
 

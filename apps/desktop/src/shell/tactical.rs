@@ -42,6 +42,7 @@ pub(super) struct TacticalScreens {
 fn handle(this: &mut Shell, event: &TacEvent, cx: &mut Context<Shell>) {
     match event {
         TacEvent::OpenSession(id) => this.open_session(id, cx),
+        TacEvent::PairPhone => this.open_pairing(cx),
         TacEvent::Full => {
             this.tactical_screens.full = true;
             cx.notify();

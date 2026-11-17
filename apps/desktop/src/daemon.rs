@@ -17,7 +17,8 @@ use serde_json::Value;
 
 const INFO_ID: u64 = 1;
 const SUBSCRIBE_ID: u64 = 2;
-const MAX_BACKOFF: Duration = Duration::from_secs(5);
+// Short: the app starts the daemon itself, and a local pipe connect is cheap.
+const MAX_BACKOFF: Duration = Duration::from_secs(1);
 
 /// What the feed thread tells the UI.
 #[derive(Debug)]
