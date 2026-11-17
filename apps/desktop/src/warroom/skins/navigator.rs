@@ -25,7 +25,7 @@ use gpui::{
 };
 
 use self::camera::{FLY, Pose};
-use self::panels::{OUTLINE, TEXT, TITLE, bevel, button, sunken};
+use self::panels::{OUTLINE, S_ENTRY, S_SECTION, TEXT, TITLE, bevel, button, sunken};
 use self::scene::{Aim, Cube, Hits, Look, Picked, Scene};
 use self::tree::{Tree, layout, length, point_at, splice};
 use self::windows::{Panels, WinState};
@@ -570,7 +570,7 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .when(on, |d| d.bg(rgb(TITLE)).text_color(rgb(0xFFFFFF)))
                     .when(!on, |d| d.hover(|h| h.bg(rgb(panels::BTN_HOT))))
                     .child(format!("Look: {name}"))
@@ -583,13 +583,25 @@ impl WarRoomScreen {
         Some(
             div()
                 .absolute()
-                .top(px(2.))
-                .right(px(8.))
-                .w(px(190.))
-                .occlude()
-                .border_1()
-                .border_color(rgb(OUTLINE))
-                .child(bevel(true, list.bg(rgb(panels::BTN)))),
+                .size_full()
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        this.navigator.menu = false;
+                        cx.notify();
+                    }),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(2.))
+                        .right(px(8.))
+                        .w(px(190.))
+                        .occlude()
+                        .border_1()
+                        .border_color(rgb(OUTLINE))
+                        .child(bevel(true, list.bg(rgb(panels::BTN)))),
+                ),
         )
     }
 
@@ -620,17 +632,17 @@ impl WarRoomScreen {
             .gap(px(18.))
             .px(px(10.))
             .py(px(3.))
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(S_ENTRY))
             .border_b_1()
             .border_color(rgb(0x8A8A8A))
             .child(
-                item("nav-m-file", "File").on_click(cx.listener(|this, _, _, cx| {
+                item("nav-m-file", "Look").on_click(cx.listener(|this, _, _, cx| {
                     this.navigator.menu = !this.navigator.menu;
                     cx.notify();
                 })),
             )
             .child(
-                item("nav-m-view", "View").on_click(cx.listener(|this, _, _, cx| {
+                item("nav-m-view", "Home").on_click(cx.listener(|this, _, _, cx| {
                     this.nav_select(None, cx);
                 })),
             )
@@ -639,9 +651,13 @@ impl WarRoomScreen {
                     this.toggle(Overlay::NewSession, cx);
                 })),
             )
-            // TODO(daemon): Locks and Help have no function yet; they only show the mockup.
-            .child(div().child("Locks"))
-            .child(div().child("Help"));
+            .child(
+                item("nav-m-locks", "Locks").on_click(cx.listener(|this, _, _, cx| {
+                    let key = this.navigator.panels.slot_of_kind("locks");
+                    this.navigator.panels.set_state(key, WinState::Normal);
+                    cx.notify();
+                })),
+            );
         let paint_scene = scene.clone();
         let empty = scene.cubes.is_empty() && scene.tree.blocks.is_empty();
         let viewport = div()
@@ -792,7 +808,7 @@ impl WarRoomScreen {
                         .items_center()
                         .justify_center()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .text_size(ui::ts(T_HEADING))
+                        .text_size(ui::ts(S_SECTION))
                         .text_color(rgb(0xC9D6F0))
                         .child("No live agents"),
                 )
@@ -811,7 +827,7 @@ impl WarRoomScreen {
             .gap(px(8.))
             .px(px(8.))
             .py(px(6.))
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(S_ENTRY))
             .child("Location")
             .child(
                 sunken(

@@ -1,0 +1,18 @@
+{
+  "machines": [
+    {
+      "id": "local",
+      "local": true,
+      "look": "operator",
+      "name": "This PC",
+      "online": true
+    },
+    {
+      "id": "5e81c0de",
+      "local": false,
+      "look": "holo",
+      "name": "MacBook",
+      "online": true
+    }
+  ]
+}

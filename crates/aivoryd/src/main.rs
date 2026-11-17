@@ -139,6 +139,13 @@ enum Command {
         #[arg(long, default_value = Endpoint::DEFAULT_NAME)]
         endpoint: String,
     },
+    /// The machine mesh: pair this daemon with the daemons of your other machines (ADR 0026)
+    Peers {
+        #[command(subcommand)]
+        action: PeersCommand,
+        #[arg(long, default_value = Endpoint::DEFAULT_NAME)]
+        endpoint: String,
+    },
     /// Write or print the part map of a repository (.aivory/map.toml)
     Map {
         #[command(subcommand)]
@@ -151,6 +158,23 @@ enum PushCommand {
     /// Print the SHA-256 of the daemon key for the allow list of the push gateway. Creates the
     /// key file (push.key, next to iroh.key) when it is missing
     Key,
+}
+
+#[derive(Subcommand, Debug)]
+enum PeersCommand {
+    /// Print a one-time link (10 minutes) for `aivoryd peers join` on the other machine
+    Invite,
+    /// Join the mesh of another machine with its invite link
+    Join {
+        /// The aivory://peer link of `aivoryd peers invite`
+        link: String,
+    },
+    /// List the paired machines with their path (direct or relay) and round-trip time
+    List,
+    /// Ping a paired machine now (node id or a unique prefix)
+    Check { id: String },
+    /// Forget a paired machine on this side
+    Remove { id: String },
 }
 
 #[derive(Subcommand, Debug)]
@@ -221,6 +245,16 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
     {
         return call(method, params.as_deref(), endpoint);
     }
+    if let Command::Peers { action, endpoint } = &cli.command {
+        let (method, params) = match action {
+            PeersCommand::Invite => ("peers/invite", json!({})),
+            PeersCommand::Join { link } => ("peers/join", json!({ "link": link })),
+            PeersCommand::List => ("peers/list", json!({})),
+            PeersCommand::Check { id } => ("peers/check", json!({ "id": id })),
+            PeersCommand::Remove { id } => ("peers/remove", json!({ "id": id })),
+        };
+        return call(method, Some(&params.to_string()), endpoint);
+    }
     if let Command::Map { action } = &cli.command {
         return map(action);
     }
@@ -267,6 +301,12 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
         }
         _ => None,
     };
+    let mesh = match &cli.command {
+        Command::Serve { iroh: true, .. } => Some(aivoryd::mesh::Mesh::load(
+            data_dir.as_ref().map(|dir| dir.join("peers.json")),
+        )),
+        _ => None,
+    };
     let codex_home = config.roots.codex.clone();
     let daemon = match &cli.command {
         Command::Serve { demo: true, .. } => match &pairings {
@@ -284,6 +324,19 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             },
         ),
         _ => Daemon::new(config),
+    };
+    let files = mesh.as_ref().map(|mesh| {
+        let root = data_dir.as_ref().map_or_else(
+            || std::env::temp_dir().join("aivory-mirrors"),
+            |d| d.join("mirrors"),
+        );
+        aivoryd::mesh_sync::FileSync::new(Arc::clone(mesh), root)
+    });
+    let daemon = match (&mesh, &files) {
+        (Some(mesh), Some(files)) => daemon
+            .with_mesh(Arc::clone(mesh))
+            .with_files(Arc::clone(files)),
+        _ => daemon,
     };
     match cli.command {
         Command::List {
@@ -359,8 +412,24 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             push_url,
             ..
         } => {
+            if !demo {
+                aivoryd::autostart::set_endpoint(&endpoint);
+                // Write the sign-in entry again: an updated or moved install keeps a valid path.
+                if aivoryd::live::saved_start_with_system(store.as_deref()) {
+                    std::thread::spawn(|| {
+                        if let Err(e) = aivoryd::autostart::apply(true) {
+                            eprintln!("aivoryd: cannot renew the start with the system: {e}");
+                        }
+                    });
+                }
+            }
             let endpoint = Endpoint::new(&endpoint).map_err(|e| e.to_string())?;
             let daemon = Arc::new(daemon);
+            let host = mesh.as_ref().map(|mesh| {
+                let host = aivoryd::mesh_host::DaemonHost::new(&daemon);
+                mesh.set_host(Arc::clone(&host) as Arc<dyn aivoryd::mesh::MeshHost>);
+                host
+            });
             // A process that `daemon/restart` started waits for the old one to let go.
             if let (Some(addr), Some(pairings)) = (remote, pairings.clone()) {
                 aivoryd::actions::retry_bind(|| {
@@ -380,11 +449,23 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
                                 .as_deref(),
                         ),
                         bind: None,
+                        mesh: mesh.clone(),
                     };
                     let link =
                         aivoryd::iroh_link::IrohLink::start(Arc::clone(&daemon), pairings, options)
                             .map_err(|e| format!("cannot start the iroh link: {e}"))?;
                     eprintln!("aivoryd iroh link on node {}", link.node_id());
+                    if let Some(files) = &files {
+                        files.start();
+                    }
+                    if let (Some(host), Some(handle)) =
+                        (&host, mesh.as_ref().and_then(|m| m.runtime()))
+                    {
+                        host.start_autosync(&handle);
+                        if let Some(mesh) = &mesh {
+                            host.start_room_mirror(mesh, &handle);
+                        }
+                    }
                     Some(link)
                 }
                 _ => None,
@@ -420,6 +501,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Call { .. }
+        | Command::Peers { .. }
         | Command::Fire { .. }
         | Command::Map { .. }
         | Command::Push { .. }

@@ -345,6 +345,10 @@ pub struct NewSessionParams {
     /// the client names other files in the prompt.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<String>,
+    /// Where the session runs (machine mesh, ADR 0026): `auto` (the best free machine), a node
+    /// id or a unique prefix of a peer, or `local`. Missing: this machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
 }
 
 /// Start work from one line, or queue it (`session/dispatch`).
@@ -374,6 +378,10 @@ pub struct DispatchParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<Mode>,
     pub prompt: String,
+    /// Where the session runs (machine mesh, ADR 0026): `auto` (the best free machine), a node
+    /// id or a unique prefix of a peer, or `local`. Missing: this machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
 }
 
 impl DispatchParams {
@@ -408,6 +416,7 @@ impl DispatchParams {
             effort: None,
             mode: None,
             prompt: prompt.join(" "),
+            node: None,
         })
     }
 }
@@ -420,6 +429,9 @@ pub struct Dispatched {
     pub session: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<String>,
+    /// The peer that runs the session or holds the task. Missing: this machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
 }
 
 /// Set the mode of the composer of a session. It applies from the next turn.
@@ -693,6 +705,9 @@ methods! {
     /// Read an image, video, or PDF file of the daemon machine. Another file type, a missing
     /// file, or a file over 20 MB: `INVALID_PARAMS`.
     MediaGet = "media/get", crate::media::MediaGetParams => crate::media::MediaData;
+    /// Store an image of a phone for the next turn (png, jpeg, gif, webp, at most 20 MB). The
+    /// result path goes into `SendParams::attachments`. Another type: `INVALID_PARAMS`.
+    MediaPut = "media/put", crate::media::MediaPutParams => crate::media::MediaStored;
     /// The suggestions for the word at the cursor of a chat field: `/` commands of the agent
     /// of the session, `@` files of its codebase and subagents. At most 40, best first.
     ComposeComplete = "compose/complete", crate::complete::CompleteParams => crate::complete::CompleteList;
@@ -757,6 +772,26 @@ methods! {
     DevicesRemove = "devices/remove", DeviceRef => Ack;
     /// A paired device registers the push target for the sealed push of the daemon.
     DevicesPush = "devices/push", DevicePushParams => Ack;
+    /// Machine mesh (ADR 0026): a one-time link for another machine of the user.
+    PeersInvite = "peers/invite", Empty => crate::mesh::PeerInvite;
+    /// Join the mesh of another machine with its `peers/invite` link.
+    PeersJoin = "peers/join", crate::mesh::PeerJoinParams => crate::mesh::Peer;
+    PeersList = "peers/list", Empty => crate::mesh::PeerList;
+    /// The machines of the mesh with their looks: this machine first. A paired phone may call it.
+    MachinesList = "machines/list", Empty => crate::mesh::MachineList;
+    /// Ping one peer now and show its path (direct or relay) and the round-trip time.
+    PeersCheck = "peers/check", crate::mesh::PeerRef => crate::mesh::Peer;
+    PeersRemove = "peers/remove", crate::mesh::PeerRef => Ack;
+    /// Run one method on a peer (see `crate::mesh::PEER_METHODS`). The result is the result of
+    /// the peer.
+    PeersCall = "peers/call", crate::mesh::PeerCallParams => Value;
+    /// Push a folder live to peers (read-only mirrors on the peers).
+    PeersShare = "peers/share", crate::mesh::ShareParams => crate::mesh::ShareInfo;
+    PeersUnshare = "peers/unshare", crate::mesh::ShareRef => Ack;
+    /// The shared folders of this machine and the mirrors of folders of peers.
+    PeersShares = "peers/shares", Empty => crate::mesh::SharesView;
+    /// The auto-sync state of each codebase (VCS update on a timer).
+    PeersVcs = "peers/vcs", Empty => crate::mesh::VcsSyncView;
     /// A file with its highlights for the visible lines, outline, folding, and findings.
     CodeFileMethod = "code/file", CodeFileParams => CodeFile;
     /// Where the name under the cursor is defined (index first, a language server when it runs).
@@ -795,6 +830,9 @@ methods! {
     /// Commit a staged theme (the token of `theme/inspect`) to the themes folder.
     ThemeAdd = "theme/add", crate::theme::ThemeAddParams => crate::theme::InstalledTheme;
     ThemeListMethod = "theme/list", Empty => crate::theme::ThemeList;
+    /// The SHA of every installed theme and one revision. It also subscribes the connection to
+    /// the `theme/changed` notification.
+    ThemeSyncMethod = "theme/sync", Empty => crate::theme::ThemeSync;
     /// Remove an installed theme. The current theme falls back: `display.customTheme` clears.
     ThemeRemove = "theme/remove", crate::theme::ThemeRef => crate::theme::RemoveResult;
     /// Ask the source of each installed theme for a newer version. A job with an `UpdateList`.
@@ -818,6 +856,8 @@ methods! {
 
 /// The notification of the war-room feed.
 pub const WARROOM_DELTA: &str = "warroom/delta";
+/// The notification after a theme is added, updated or removed, or the look changes.
+pub const THEME_CHANGED: &str = "theme/changed";
 
 #[cfg(test)]
 mod tests {

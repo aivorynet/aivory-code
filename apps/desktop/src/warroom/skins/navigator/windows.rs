@@ -19,7 +19,7 @@ use super::panels::{
     LED_OFF, LED_RED, SCREEN, SCREEN_TEXT, TEXT, TEXT_2, TITLE, TITLE_ASK, bevel, button, frame,
     led, screen, scroll_area, strip_chart, sunken,
 };
-use super::panels::{OUTLINE, Press};
+use super::panels::{OUTLINE, Press, S_ENTRY, S_LABEL};
 use super::{Pick, WarRoomScreen};
 use crate::actions::Action;
 use crate::theme::*;
@@ -160,7 +160,7 @@ impl Panels {
         self.wins.get(key).copied().unwrap_or_default()
     }
 
-    fn set_state(&mut self, key: &'static str, to: WinState) {
+    pub(super) fn set_state(&mut self, key: &'static str, to: WinState) {
         if to == WinState::Normal {
             self.wins.remove(key);
         } else {
@@ -706,7 +706,7 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .hover(|h| h.bg(rgb(BTN_HOT)))
                     .child(label)
                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -727,7 +727,7 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .hover(|h| h.bg(rgb(BTN_HOT)))
                     .child(format!(
                         "{} {title}",
@@ -772,7 +772,13 @@ impl WarRoomScreen {
 
     /// Permission locks: a row per codebase with the keys Plan, Edit and Auto.
     pub(super) fn nav_locks(&self, war: &WarRoom, cx: &mut gpui::Context<Self>) -> Div {
-        let mut rows = div().flex().flex_col().gap(px(6.)).px(px(12.)).py(px(8.));
+        let mut rows = div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .px(px(12.))
+            .pt(px(8.))
+            .pb(px(28.));
         for cb in &war.codebases {
             let mode = self.lock_mode(war, &cb.id);
             let tint = match mode {
@@ -823,7 +829,7 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .bg(rgb(if on { color } else { BTN }))
                     .text_color(rgb(if on { 0xFFFFFF } else { TEXT }))
                     .child(label);
@@ -870,7 +876,7 @@ impl WarRoomScreen {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(ui::ts(T_BODY))
+                            .text_size(ui::ts(S_ENTRY))
                             .font_weight(FontWeight::BOLD)
                             .child(cb.id.clone()),
                     )
@@ -920,7 +926,7 @@ impl WarRoomScreen {
                 if paused {
                     format!("on · {} paused", self.navigator.panels.paused.len())
                 } else {
-                    "off · all agents run".to_string()
+                    "agents run".to_string()
                 },
                 paused,
                 LED_AMBER,
@@ -955,14 +961,14 @@ impl WarRoomScreen {
                             .flex()
                             .items_center()
                             .gap(px(6.))
-                            .text_size(ui::ts(T_SMALL))
+                            .text_size(ui::ts(S_ENTRY))
                             .font_weight(FontWeight::BOLD)
                             .child(led(if on { lit } else { LED_OFF }))
                             .child(name),
                     )
                     .child(
                         div()
-                            .text_size(ui::ts(T_CAPTION))
+                            .text_size(ui::ts(S_LABEL))
                             .text_color(rgb(TEXT_2))
                             .text_center()
                             .child(sub),
@@ -992,7 +998,7 @@ impl WarRoomScreen {
                         .cursor_pointer()
                         .bg(rgb(BTN))
                         .hover(|h| h.bg(rgb(BTN_HOT)))
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(S_ENTRY))
                         .font_weight(FontWeight::BOLD)
                         .child("Reset windows")
                         .on_click(cx.listener(|this, _, _, cx| {
@@ -1062,7 +1068,7 @@ impl WarRoomScreen {
                 "No session selected",
                 div()
                     .p(px(12.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .child("Click a tower or a camera to see its session here."),
             );
         };
@@ -1077,7 +1083,7 @@ impl WarRoomScreen {
             .gap(px(8.))
             .px(px(12.))
             .py(px(8.))
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(S_ENTRY))
             .child(led(led_of(s)).when(s.ask.is_some(), |d| d.opacity(blink(t))))
             .child(
                 div()
@@ -1116,7 +1122,7 @@ impl WarRoomScreen {
                                 .flex()
                                 .flex_col()
                                 .justify_end()
-                                .child(lines_flow(&view_lines(s, 14), T_SMALL, 18.)),
+                                .child(lines_flow(&view_lines(s, 14), S_ENTRY, 18.)),
                         )),
                 )
                 .size_full(),
@@ -1134,7 +1140,7 @@ impl WarRoomScreen {
                     .bg(ink(0x000000, 0.6))
                     .font_family(tk().mono)
                     .font_weight(FontWeight::BOLD)
-                    .text_size(ui::ts(11.))
+                    .text_size(ui::ts(S_LABEL))
                     .text_color(rgb(0xFFFFFF))
                     .child("LIVE VIEW")
                     .child(
@@ -1163,7 +1169,7 @@ impl WarRoomScreen {
             ))
             .child(div().flex_1())
             .child(
-                button("nav-focus", "Open Focus view", true)
+                button("nav-focus", "Focus", true)
                     .on_click(cx.listener(move |this, _, _, cx| this.skin_focus(&focus, cx))),
             );
         self.win(
@@ -1193,7 +1199,13 @@ impl WarRoomScreen {
         }
         providers.sort();
         providers.dedup();
-        let mut col = div().flex().flex_col().gap(px(10.)).px(px(10.)).py(px(8.));
+        let mut col = div()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .px(px(10.))
+            .pt(px(8.))
+            .pb(px(28.));
         // (name, caption, color, readout, window gauge)
         type Chart = (String, String, u32, String, Option<(u8, String)>);
         let mut charts: Vec<Chart> = Vec::new();
@@ -1202,7 +1214,7 @@ impl WarRoomScreen {
             let mut gauge = None;
             if let Some(u) = war.usage.iter().find(|u| &u.provider == p) {
                 name = format!("{p} · {} {}%", u.label, u.pct);
-                gauge = Some((u.pct, format!("{} window used", u.label)));
+                gauge = Some((u.pct, "used".to_string()));
             }
             // The rate from the growth of the token counts between polls; at rest, the total.
             let rate = h.mean(p, 10) * 60.;
@@ -1251,7 +1263,7 @@ impl WarRoomScreen {
                         div()
                             .flex()
                             .justify_between()
-                            .text_size(ui::ts(T_CAPTION))
+                            .text_size(ui::ts(S_LABEL))
                             .text_color(rgb(color))
                             .child(name)
                             .child(div().font_family(tk().mono).child(value)),
@@ -1273,12 +1285,16 @@ impl WarRoomScreen {
                             .child(
                                 div()
                                     .flex_none()
-                                    .text_size(ui::ts(T_CAPTION))
+                                    .text_size(ui::ts(S_LABEL))
                                     .text_color(rgb(SCREEN_TEXT))
                                     .child(text),
                             )
                     }))
-                    .child(strip_chart(&bars, color, 44., 1., "per s")),
+                    .children(
+                        bars.iter()
+                            .any(|v| *v > 0.)
+                            .then(|| strip_chart(&bars, color, 44., 1., "per s")),
+                    ),
             );
         }
         self.win(
@@ -1351,7 +1367,7 @@ impl WarRoomScreen {
                         .flex()
                         .flex_col()
                         .font_family(tk().mono)
-                        .text_size(ui::ts(11.5))
+                        .text_size(ui::ts(S_LABEL))
                         .line_height(ui::ts(16.));
                     for (time, kind, title, detail, color) in &lines {
                         let cell = |w: f32, text: String| {
@@ -1362,26 +1378,39 @@ impl WarRoomScreen {
                                 .overflow_hidden()
                                 .child(text)
                         };
+                        // Two lines per entry: the title on the first, the detail below it,
+                        // so a narrow window shows both whole.
                         col = col.child(
                             div()
-                                .h(ui::ts(16.))
                                 .flex_none()
                                 .flex()
-                                .gap(px(10.))
+                                .flex_col()
+                                .pb(px(4.))
                                 .text_color(rgb(*color))
-                                .child(cell(64., time.clone()))
-                                .child(cell(52., kind.to_string()))
-                                // Title and detail share the rest of the row; a narrow
-                                // window cuts both with an ellipsis, not the detail alone.
                                 .child(
                                     div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .max_w(px(220.))
-                                        .truncate()
-                                        .child(title.clone()),
+                                        .h(ui::ts(16.))
+                                        .flex()
+                                        .gap(px(10.))
+                                        .child(cell(f32::from(ui::sw(64.)), time.clone()))
+                                        .child(cell(f32::from(ui::sw(54.)), kind.to_string()))
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .truncate()
+                                                .child(title.clone()),
+                                        ),
                                 )
-                                .child(div().flex_1().min_w_0().truncate().child(detail.clone())),
+                                .when(!detail.is_empty(), |d| {
+                                    d.child(
+                                        div()
+                                            .h(ui::ts(16.))
+                                            .pl(ui::sw(138.))
+                                            .truncate()
+                                            .child(detail.clone()),
+                                    )
+                                }),
                         );
                     }
                     col
@@ -1479,7 +1508,7 @@ impl WarRoomScreen {
                 .px(px(8.))
                 .py(px(6.))
                 .font_family(tk().mono)
-                .text_size(ui::ts(if plan { T_CAPTION } else { T_SMALL }))
+                .text_size(ui::ts(if plan { S_LABEL } else { S_ENTRY }))
                 .line_height(ui::ts(18.))
                 .text_color(rgb(TEXT))
                 .whitespace_nowrap()
@@ -1502,12 +1531,12 @@ impl WarRoomScreen {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(div().text_size(ui::ts(T_BODY)).child(head))
+                    .child(div().text_size(ui::ts(S_ENTRY)).child(head))
                     .child(mono_box)
                     .child(
                         div()
                             .truncate()
-                            .text_size(ui::ts(T_CAPTION))
+                            .text_size(ui::ts(S_LABEL))
                             .text_color(rgb(TEXT_2))
                             .child(note),
                     ),
@@ -1634,7 +1663,7 @@ impl WarRoomScreen {
                         .flex()
                         .items_center()
                         .cursor_pointer()
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(S_ENTRY))
                         .hover(|h| h.bg(rgb(BTN_HOT)))
                         .child(label)
                         .on_click(cx.listener(move |this, _, _, cx| {
@@ -1764,7 +1793,7 @@ impl WarRoomScreen {
                         .px(px(6.))
                         .py(px(1.))
                         .font_family(tk().mono)
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(S_ENTRY))
                         .text_color(rgb(TEXT))
                         .child(path),
                 )
@@ -1797,7 +1826,7 @@ impl WarRoomScreen {
         if n == 0 {
             grid = grid.child(
                 div()
-                    .text_size(ui::ts(T_BODY))
+                    .text_size(ui::ts(S_ENTRY))
                     .text_color(rgb(0xFFFFFF))
                     .child("No live session in this codebase."),
             );
@@ -1861,7 +1890,7 @@ impl WarRoomScreen {
                     .bg(ink(0x000000, 0.65))
                     .font_family(tk().mono)
                     .font_weight(FontWeight::BOLD)
-                    .text_size(ui::ts(T_CAPTION))
+                    .text_size(ui::ts(S_LABEL))
                     .text_color(rgb(0xFFFFFF))
                     .child(format!("CAM {no:02} {}/{}", s.codebase, part_of(s)))
                     .child(
@@ -1884,7 +1913,7 @@ impl WarRoomScreen {
                     .right(px(8.))
                     .top(px(28.))
                     .bottom(px(24.))
-                    .child(lines_box(&view_lines(s, 10), T_SMALL, 18.)),
+                    .child(lines_box(&view_lines(s, 10), S_ENTRY, 18.)),
             )
             .child(
                 div()
@@ -1895,7 +1924,7 @@ impl WarRoomScreen {
                     .flex()
                     .justify_between()
                     .font_family(tk().mono)
-                    .text_size(ui::ts(11.))
+                    .text_size(ui::ts(S_LABEL))
                     .text_color(rgb(0x9A9A9A))
                     .child(div().truncate().child(s.title.clone()))
                     .child(format!(
@@ -1947,7 +1976,7 @@ pub(super) fn legend() -> Div {
         .gap(px(16.))
         .px(px(10.))
         .bg(rgb(0x050A1E))
-        .text_size(ui::ts(T_CAPTION))
+        .text_size(ui::ts(S_LABEL))
         .text_color(rgb(0xC9D6FF))
         .child("height = tokens this turn")
         .child(sw(0x6E8CFF, "working"))

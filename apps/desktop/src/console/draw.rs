@@ -464,12 +464,15 @@ fn table(
     let s = f.style;
     let t = s.theme;
     let row = |cells: &[Inline], bold: bool, tag: String| {
-        let mut r = div().flex().when(bold, |d| d.font_weight(FontWeight::BOLD));
+        let mut r = div()
+            .flex()
+            .flex_none()
+            .when(bold, |d| d.font_weight(FontWeight::BOLD));
         for (c, w) in widths.iter().enumerate() {
             // Natural width in characters; a narrow pane shrinks the columns together.
             let cell = div()
                 .w(px(s.ch() * (*w as f32 + 3.)))
-                .min_w(px(0.))
+                .flex_none()
                 .pr(px(s.ch() * 1.5));
             r = r.child(match cells.get(c) {
                 Some(text) => cell.child(inline(text, f, &format!("{tag}.{c}"))),
@@ -478,7 +481,13 @@ fn table(
         }
         r
     };
-    let mut col = div().flex().flex_col().w_full();
+    // Columns keep their natural width; a table wider than the pane scrolls sideways.
+    let mut col = div()
+        .id(SharedString::from(format!("{key}.tbl")))
+        .flex()
+        .flex_col()
+        .w_full()
+        .overflow_x_scroll();
     if !head.is_empty() {
         col = col.child(
             row(head, true, format!("{key}.h"))

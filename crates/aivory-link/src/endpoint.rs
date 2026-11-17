@@ -4,11 +4,12 @@
 //! carries the node id and the relay URL, so the daemon publishes nothing to a third party.
 
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use iroh::endpoint::presets;
-use iroh::{Endpoint, RelayMode, RelayUrl, SecretKey};
+use iroh::{Endpoint, EndpointAddr, PublicKey, RelayMode, RelayUrl, SecretKey};
 
-use crate::{ALPN, LinkError};
+use crate::{ALPN, LinkError, MESH_ALPN};
 
 /// Which relay an endpoint uses.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -55,6 +56,25 @@ pub fn parse_relay(url: &str) -> Result<RelayUrl, LinkError> {
         .map_err(|e| LinkError::Invalid(format!("relay URL '{url}': {e}")))
 }
 
+/// The address to dial: the node id, a relay URL, and direct `ip:port` addresses. A direct
+/// address that does not parse is left out.
+pub fn addr_of(
+    node: &str,
+    relay: Option<&str>,
+    direct: &[String],
+) -> Result<EndpointAddr, LinkError> {
+    let id = PublicKey::from_str(node.trim())
+        .map_err(|_| LinkError::Invalid("the node id is not 64 hex characters".into()))?;
+    let mut addr = EndpointAddr::new(id);
+    if let Some(url) = relay.filter(|u| !u.trim().is_empty()) {
+        addr = addr.with_relay_url(parse_relay(url)?);
+    }
+    for parsed in direct.iter().filter_map(|d| d.parse::<SocketAddr>().ok()) {
+        addr = addr.with_ip_addr(parsed);
+    }
+    Ok(addr)
+}
+
 #[derive(Debug, Clone)]
 pub struct EndpointConfig {
     pub secret: SecretKey,
@@ -62,7 +82,7 @@ pub struct EndpointConfig {
     /// Bind one IPv4 socket on this address (for example `127.0.0.1:0` in tests). `None`:
     /// all interfaces.
     pub bind: Option<SocketAddr>,
-    /// `true` for the daemon: accept connections with the ALPN of the link.
+    /// `true` for the daemon: accept connections with the ALPN of the link and of the mesh.
     pub accept: bool,
 }
 
@@ -72,7 +92,7 @@ pub async fn bind(config: EndpointConfig) -> Result<Endpoint, LinkError> {
         .secret_key(config.secret)
         .relay_mode(config.relay.mode()?);
     if config.accept {
-        builder = builder.alpns(vec![ALPN.to_vec()]);
+        builder = builder.alpns(vec![ALPN.to_vec(), MESH_ALPN.to_vec()]);
     }
     if let Some(addr) = config.bind {
         builder = builder

@@ -85,6 +85,26 @@ pub struct MediaData {
     pub size: u64,
 }
 
+/// `media/put`: a phone sends an image for the next turn. The daemon stores it in its upload
+/// folder and gives the path for [`crate::rpc::SendParams::attachments`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaPutParams {
+    /// The file name with its extension (png, jpg, jpeg, gif, webp).
+    pub name: String,
+    /// The bytes as base64.
+    pub data: String,
+}
+
+/// The stored upload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaStored {
+    /// The absolute path on the daemon machine.
+    pub path: String,
+    pub size: u64,
+}
+
 /// The largest file that `media/get` sends.
 pub const MEDIA_GET_MAX_BYTES: u64 = 20 * 1024 * 1024;
 

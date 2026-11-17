@@ -13,7 +13,7 @@ use crate::look::LOOKS;
 use crate::theme::*;
 use crate::ui;
 use crate::warroom::skins::navigator::panels::{
-    BTN_HOT, Click, Controls, FACE, OUTLINE, TEXT, TITLE, bevel, frame,
+    BTN_HOT, Click, Controls, FACE, OUTLINE, S_ENTRY, TEXT, TITLE, bevel, frame,
 };
 
 thread_local! {
@@ -40,9 +40,13 @@ impl Shell {
                 .flex()
                 .items_center()
                 .cursor_pointer()
-                .text_size(ui::ts(T_SMALL))
-                .when(on, |d| d.font_weight(FontWeight::BOLD))
-                .hover(|h| h.bg(rgb(BTN_HOT)))
+                .text_size(ui::ts(S_ENTRY))
+                .when(on, |d| {
+                    d.font_weight(FontWeight::BOLD)
+                        .bg(rgb(TITLE))
+                        .text_color(rgb(0xFFFFFF))
+                })
+                .when(!on, |d| d.hover(|h| h.bg(rgb(BTN_HOT))))
                 .child(label)
         };
         let go = |screen: Screen| {
@@ -61,7 +65,7 @@ impl Shell {
                 div()
                     .px(px(8.))
                     .font_weight(FontWeight::BOLD)
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .child("Toolchest"),
             )
             .child(
@@ -99,8 +103,10 @@ impl Shell {
             )
             .child(
                 // Pending decisions always show here; red when some wait.
-                entry("tc-decisions", format!("Decisions ({asks})"), open)
-                    .text_color(rgb(if asks > 0 { 0xB3141C } else { TEXT }))
+                entry("tc-decisions", "Decisions".to_string(), open)
+                    .when(!open, |d| {
+                        d.text_color(rgb(if asks > 0 { 0xB3141C } else { TEXT }))
+                    })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if asks > 0 {
                             this.go(Screen::WarRoom, cx);
@@ -109,9 +115,11 @@ impl Shell {
                         }
                     })),
             )
-            .children(crate::new_session::launch_buttons("irix", |id, label| {
-                entry(id, label.to_string(), false)
-            }))
+            .children(crate::new_session::launch_buttons_open(
+                "irix",
+                self.launcher_open(cx),
+                |id, label, on| entry(id, label.to_string(), on),
+            ))
             .child(div().flex_1())
             .child(
                 entry("tc-look", "Look ▾".into(), self.look_menu).on_click(cx.listener(
@@ -167,7 +175,7 @@ impl Shell {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .when(open, |d| d.font_weight(FontWeight::BOLD))
                     .hover(|h| h.bg(rgb(BTN_HOT)))
                     .child(format!("{} {title}", if open { "✓" } else { "  " }))
@@ -211,7 +219,7 @@ impl Shell {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .when(on, |d| d.bg(rgb(TITLE)).text_color(rgb(0xFFFFFF)))
                     .when(!on, |d| d.hover(|h| h.bg(rgb(BTN_HOT))))
                     .child(format!("Look: {name}"))
@@ -260,7 +268,7 @@ impl Shell {
                     .flex()
                     .items_center()
                     .cursor_pointer()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(S_ENTRY))
                     .hover(|h| h.bg(rgb(BTN_HOT)))
                     .child(label)
                     .on_click(cx.listener(move |this, _, _, cx| {

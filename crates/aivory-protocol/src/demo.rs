@@ -350,6 +350,7 @@ fn pane(seed: &Seed) -> (Pane, Vec<Line>) {
             effort: Effort::High,
         },
         task: seed.task.map(s),
+        machine: None,
     };
     (pane, lines)
 }
@@ -1138,6 +1139,7 @@ fn settings_view() -> SettingsView {
             acp: Vec::new(),
             pinned: Vec::new(),
             coffee_reminder: true,
+            start_with_system: false,
         },
         providers: vec![
             provider("claude", "Claude Code", "C", "subscription · Max · signed in", ProviderStatus::Connected, &["opus-5.5", "sonnet-5.5", "haiku-5.5"]),

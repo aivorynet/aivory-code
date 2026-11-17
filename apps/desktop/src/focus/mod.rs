@@ -207,7 +207,7 @@ impl FocusScreen {
         });
         let input = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .placeholder("Reply, or ask about the selected lines")
+                .placeholder("Reply to the agent")
                 .submit_on_enter(true)
                 .auto_grow(2, 5)
         });
@@ -704,7 +704,7 @@ impl FocusScreen {
                     .px(px(10.))
                     .py(px(4.))
                     .rounded(px(8.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .cursor_pointer()
                     .when(on, |d| d.bg(rgb(tk().track)).text_color(rgb(tk().ink)))
                     .when(!on, |d| {
@@ -745,8 +745,13 @@ impl FocusScreen {
             div().flex_1().min_w(px(0.))
         } else {
             let vw = f32::from(window.viewport_size().width);
+            // An empty Code tab gives its width to the chat.
+            let empty_code =
+                self.tab == Tab::Code && self.diff.is_some() && self.changed().is_empty();
+            let share = if empty_code { 0.2 } else { 0.45 };
+            let min = if empty_code { 260. } else { 320. };
             div().flex_none().w(px(
-                (vw * 0.45).clamp(ui::sw(420.).into(), ui::sw(900.).into())
+                (vw * share).clamp(ui::sw(min).into(), ui::sw(900.).into())
             ))
         };
         panel
@@ -770,7 +775,7 @@ impl FocusScreen {
             .text_color(rgb(tk().ink_3))
             .child("This session is not in the war room any more.")
             .child(
-                ui::button("focus-gone", "War room", true)
+                ui::button("focus-gone", "Back", true)
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(FocusEvent::Back))),
             )
     }

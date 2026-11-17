@@ -222,7 +222,7 @@ impl FocusScreen {
         let frame = div()
             .flex_1()
             .flex_grow(1.7)
-            .min_w(px(560.))
+            .min_w(px(0.))
             .h_full()
             .flex()
             .flex_col()
@@ -389,7 +389,7 @@ impl FocusScreen {
                         .flex()
                         .items_center()
                         .gap(px(8.))
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(T_CAPTION))
                         .border_r_1()
                         .border_color(rgba(tk().line))
                         .cursor_pointer()
@@ -411,7 +411,7 @@ impl FocusScreen {
                         .child(
                             div()
                                 .font_family(tk().mono)
-                                .text_size(ui::ts(12.5))
+                                .text_size(ui::ts(T_CAPTION))
                                 .child(name),
                         )
                         .when(agent, |d| {
@@ -521,7 +521,7 @@ impl FocusScreen {
                         .justify_center()
                         .rounded(px(6.))
                         .font_family(tk().mono)
-                        .text_size(ui::ts(11.))
+                        .text_size(ui::ts(crate::theme::T_CAPTION))
                         .cursor_pointer()
                         .map(|d| {
                             if on {
@@ -569,7 +569,7 @@ impl FocusScreen {
                 .flex()
                 .items_center()
                 .justify_between()
-                .text_size(ui::ts(11.))
+                .text_size(ui::ts(crate::theme::T_CAPTION))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(rgb(tk().ink_3))
                 .child(label)
@@ -585,7 +585,7 @@ impl FocusScreen {
             .bg(rgb(tree_bg()))
             .border_r_1()
             .border_color(rgba(tk().line))
-            .text_size(ui::ts(12.5))
+            .text_size(ui::ts(T_CAPTION))
             .child(
                 head("CHANGES").child(
                     div()
@@ -613,7 +613,7 @@ impl FocusScreen {
                                 .flex_none()
                                 .w(px(10.))
                                 .font_family(tk().mono)
-                                .text_size(ui::ts(11.))
+                                .text_size(ui::ts(crate::theme::T_CAPTION))
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(rgb(letter_color))
                                 .child(letter),
@@ -624,7 +624,7 @@ impl FocusScreen {
                             div()
                                 .flex_none()
                                 .font_family(tk().mono)
-                                .text_size(ui::ts(11.))
+                                .text_size(ui::ts(crate::theme::T_CAPTION))
                                 .text_color(rgb(tk().ink_3))
                                 .child(format!("+{} −{}", f.added, f.removed)),
                         ),
@@ -667,7 +667,7 @@ impl FocusScreen {
                                     div()
                                         .flex_none()
                                         .font_family(tk().mono)
-                                        .text_size(ui::ts(11.))
+                                        .text_size(ui::ts(crate::theme::T_CAPTION))
                                         .font_weight(FontWeight::BOLD)
                                         .text_color(rgb(0x9A6700))
                                         .child("M"),
@@ -768,7 +768,7 @@ impl FocusScreen {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(if busy {
                         "Reads the file…"
@@ -993,7 +993,7 @@ impl FocusScreen {
                     .overflow_hidden()
                     .bg(rgb(bg))
                     .font_family(tk().mono)
-                    .text_size(px(13.))
+                    .text_size(ui::ts(crate::theme::T_CAPTION))
                     .line_height(line_h)
                     .when(bg == tk().card, |d| d.hover(|s| s.bg(rgb(hover_bg()))))
                     .when(mark == Mark::Removed, |d| {
@@ -1088,7 +1088,7 @@ impl FocusScreen {
                 .flex()
                 .items_center()
                 .rounded_full()
-                .text_size(ui::ts(11.))
+                .text_size(ui::ts(crate::theme::T_CAPTION))
                 .font_weight(FontWeight::SEMIBOLD)
                 .cursor_pointer()
                 .map(|d| {
@@ -1248,7 +1248,7 @@ impl FocusScreen {
                 .flex_1()
                 .pl(px(50.))
                 .pb(px(4.))
-                .text_size(ui::ts(11.))
+                .text_size(ui::ts(crate::theme::T_CAPTION))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(rgb(tk().ink_3))
                 .child(label)
@@ -1258,7 +1258,7 @@ impl FocusScreen {
             .size_full()
             .overflow_y_scroll()
             .font_family(tk().mono)
-            .text_size(px(12.5))
+            .text_size(ui::ts(T_CAPTION))
             .pb(px(40.))
             .child(
                 div()
@@ -1314,7 +1314,7 @@ fn caret_el() -> Div {
                 .bg(rgb(CLAUDE))
                 .text_color(rgb(0xFFFFFF))
                 .font_family(tk().sans)
-                .text_size(px(10.))
+                .text_size(ui::ts(crate::theme::T_CAPTION))
                 .font_weight(FontWeight::SEMIBOLD)
                 .child("claude"),
         )

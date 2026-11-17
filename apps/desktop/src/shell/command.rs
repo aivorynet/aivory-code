@@ -21,7 +21,7 @@ use crate::command_kit::{self as cmd, c};
 use crate::command_screens::{CmdEvent, CommandRepos, CommandSetup, CommandTasks, CommandUnit};
 use crate::rts::{Frame9, frame, sprites};
 use crate::theme::tk;
-use crate::warroom::skins::command::{SIDE_W, rts_waits};
+use crate::warroom::skins::command::{SIDE_W, Unit, rts_waits};
 
 /// The Command views.
 #[derive(Default)]
@@ -45,7 +45,7 @@ fn handle(this: &mut Shell, event: &CmdEvent, cx: &mut Context<Shell>) {
             cx.notify();
         }
         CmdEvent::NewUnit => this.open_new_session(cx),
-        CmdEvent::Close => this.go(Screen::WarRoom, cx),
+        CmdEvent::Close => this.go_back(cx),
         CmdEvent::Village(name) => {
             this.go(Screen::WarRoom, cx);
             let name = name.clone();
@@ -152,7 +152,7 @@ impl Shell {
                 "VILLAGES · {} CODEBASES",
                 war.as_ref().map_or(0, |w| w.codebases.len())
             ),
-            Screen::Settings => "SETUP".into(),
+            Screen::Settings => "SETTINGS".into(),
             Screen::Session(id) => {
                 let t = war
                     .as_ref()
@@ -197,6 +197,12 @@ impl Shell {
             );
         } else {
             let (ww, wh) = cmd::win_size(vw, vh, SIDE_W);
+            // The setup window holds a few rows: it takes the height of its rows, not the screen.
+            let wh = if self.screen == Screen::Settings && !self.command.full {
+                wh.min(660.)
+            } else {
+                wh
+            };
             let title = self.command_title(cx);
             // The own Command views draw on the steel; a full screen keeps its page color.
             let own = !self.command.full
@@ -237,7 +243,8 @@ impl Shell {
                         .top_0()
                         .w(px(map_w))
                         .h(px(vh))
-                        .bg(c(0x000000, 0.55))
+                        .bg(c(cmd::WELL, 1.))
+                        .occlude()
                         .on_click(cx.listener(|this, _, _, cx| this.go(Screen::WarRoom, cx))),
                 )
                 .child(
@@ -308,18 +315,23 @@ impl Shell {
             Some(u) => format!("{}%", 100 - u.pct.min(100)),
             None => "----".into(),
         };
+        let led_label = match &usage {
+            Some(u) if u.pct > 0 && u.used > 0 => "TOKENS LEFT",
+            Some(_) => "USAGE LEFT",
+            None => "USAGE",
+        };
         side = side.child(
             well(24., 22., 272., 40.)
                 .bg(c(0x040704, 1.))
                 .child(
-                    cmd::data("AIV", 20.)
+                    cmd::data(led_label, cmd::S_ENTRY)
                         .absolute()
                         .left(px(10.))
                         .top(px(10.))
                         .text_color(c(cmd::INK_3, 1.)),
                 )
                 .child(
-                    cmd::data(led, 32.)
+                    cmd::data(led, cmd::S_TITLE)
                         .absolute()
                         .right(px(12.))
                         .top(px(4.))
@@ -415,192 +427,321 @@ impl Shell {
         if !compact {
             side = side.child(radar);
         }
-        // the screen buttons
-        let inbox = war.as_ref().map_or(0, |w| w.inbox_open);
-        for (id, name, screen, x, y, w) in [
-            (
-                "cmd-war",
-                "WAR ROOM".to_string(),
-                Screen::WarRoom,
-                24.,
-                290. - dy,
-                134.,
-            ),
-            (
-                "cmd-inbox",
-                if inbox > 0 {
-                    format!("INBOX {inbox}")
+        // The unit command card (C2, C3): the portrait of the selected worker, then a grid of
+        // square command buttons with an icon, a name and the hotkey letter. FOCUS is the one
+        // green button that opens the selected session.
+        const CELL: f32 = 86.;
+        const STEP: f32 = 93.;
+        let on_map = self.screen == Screen::WarRoom;
+        let selected = self.war_room.read(cx).rts_selected();
+        let pane = selected
+            .as_ref()
+            .and_then(|id| war.as_ref().and_then(|w| w.session(id)).cloned());
+        let list_open = self.war_room.read(cx).rts_list_open();
+        let waits_n = war.as_ref().map_or(0, |w| rts_waits(w).len());
+        let mut portrait = well(24., 278. - dy, 272., 116.).overflow_hidden();
+        let slot = div()
+            .absolute()
+            .left(px(10.))
+            .top(px(8.))
+            .w(px(64.))
+            .h(px(88.))
+            .bg(c(0x2A4A1E, 1.))
+            .child(
+                img(s.bot.render.clone())
+                    .absolute()
+                    .left(px(9.))
+                    .top_0()
+                    .w(px(s.bot.rgba.width() as f32))
+                    .h(px(s.bot.rgba.height() as f32)),
+            );
+        match &pane {
+            Some(p) => {
+                let (word, col) = match p.state {
+                    SessionState::Working => ("WORKING", cmd::LAMP_RUN),
+                    SessionState::NeedsYou => ("WAITS FOR YOU", cmd::AMBER),
+                    SessionState::Error => ("STOPPED ON AN ERROR", cmd::RED),
+                    SessionState::Idle => ("IDLE", cmd::HINT),
+                    SessionState::Parked => ("PARKED", cmd::HINT),
+                    SessionState::Done => ("DONE", cmd::HINT),
+                };
+                let now = war.as_ref().map_or(0, |w| w.now);
+                portrait = portrait.child(slot).child(
+                    div()
+                        .absolute()
+                        .left(px(86.))
+                        .top(px(8.))
+                        .w(px(176.))
+                        .flex()
+                        .flex_col()
+                        .gap(px(1.))
+                        .child(
+                            cmd::data(cmd::up(&p.title), cmd::S_ENTRY)
+                                .max_h(px(38.))
+                                .overflow_hidden()
+                                .line_height(px(19.))
+                                .text_color(c(cmd::WHITE, 1.)),
+                        )
+                        .child(
+                            cmd::label(cmd::up(&format!("{} · {}", p.codebase, p.provider)))
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis(),
+                        )
+                        .child(cmd::data(word, cmd::S_ENTRY).text_color(c(col, 1.)))
+                        .child(cmd::label(format!(
+                            "{} · CTX {}%",
+                            cmd::mins(now, p.since),
+                            p.context_pct
+                        )))
+                        .child(cmd::bar(f32::from(p.context_pct) / 100.).mt(px(3.))),
+                );
+            }
+            None => {
+                portrait = portrait.child(slot.opacity(0.35)).child(
+                    div()
+                        .absolute()
+                        .left(px(86.))
+                        .top(px(22.))
+                        .w(px(176.))
+                        .flex()
+                        .flex_col()
+                        .gap(px(4.))
+                        .child(cmd::data("NO UNIT SELECTED", cmd::S_ENTRY))
+                        .child(cmd::label("CLICK A WORKER"))
+                        .child(cmd::label("ON THE MAP")),
+                );
+            }
+        }
+        side = side.child(portrait);
+
+        let cell = |id: &'static str,
+                    label: &str,
+                    icon: &'static str,
+                    key: Option<&'static str>,
+                    on: bool,
+                    enabled: bool,
+                    badge: Option<String>| {
+            let ink = if on { 0xEEF8DE } else { cmd::INK };
+            let key = key.filter(|_| on_map);
+            div()
+                .id(id)
+                .relative()
+                .w(px(CELL))
+                .h(px(CELL))
+                .flex_none()
+                .when(enabled, |d| d.cursor_pointer().hover(|st| st.opacity(0.9)))
+                .when(!enabled, |d| d.opacity(0.4))
+                .child(
+                    img(frame(
+                        if on { Frame9::ButtonOn } else { Frame9::Button },
+                        CELL,
+                        CELL,
+                    ))
+                    .absolute()
+                    .left_0()
+                    .top_0()
+                    .size_full(),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left_0()
+                        .top(px(15.))
+                        .w_full()
+                        .flex()
+                        .justify_center()
+                        .child(crate::ui::icon(icon, 30., gpui::rgb(ink))),
+                )
+                .child(
+                    cmd::data(label.to_string(), cmd::S_LABEL)
+                        .absolute()
+                        .left_0()
+                        .bottom(px(9.))
+                        .w_full()
+                        .flex()
+                        .justify_center()
+                        .whitespace_nowrap()
+                        .text_color(c(ink, 1.)),
+                )
+                .when_some(key, |d, k| {
+                    d.child(
+                        cmd::data(k, cmd::S_LABEL)
+                            .absolute()
+                            .left(px(9.))
+                            .top(px(6.))
+                            .text_color(c(if on { 0xEEF8DE } else { cmd::AMBER }, 1.)),
+                    )
+                })
+                .when_some(badge, |d, b| {
+                    d.child(
+                        cmd::data(b, cmd::S_LABEL)
+                            .absolute()
+                            .right(px(9.))
+                            .top(px(6.))
+                            .text_color(c(cmd::AMBER, 1.)),
+                    )
+                })
+        };
+        let grid_y = 402. - dy;
+        let at = |col: usize, row: usize| (24. + col as f32 * STEP, grid_y + row as f32 * STEP);
+        let live = pane
+            .as_ref()
+            .is_some_and(|p| p.controlled && p.state.is_live());
+        let parked = pane
+            .as_ref()
+            .is_some_and(|p| p.state == SessionState::Parked);
+        // row 1: the commands of the selected worker
+        let (x, y) = at(0, 0);
+        side = side.child(
+            cell(
+                "cmd-focus",
+                "FOCUS",
+                "icons/open.svg",
+                Some("F"),
+                pane.is_some() && on_map,
+                pane.is_some(),
+                None,
+            )
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .when(pane.is_some(), |d| {
+                d.on_click(cx.listener(|this, _, _, cx| {
+                    this.war_room
+                        .update(cx, |w, cx| w.rts_unit(Unit::Focus, cx))
+                }))
+            }),
+        );
+        let (x, y) = at(1, 0);
+        side = side.child(
+            cell(
+                "cmd-park",
+                if parked { "RESUME" } else { "PARK" },
+                if parked {
+                    "icons/play.svg"
                 } else {
-                    "INBOX".into()
+                    "icons/pause.svg"
                 },
-                Screen::Inbox,
-                162.,
-                290. - dy,
-                134.,
-            ),
-            (
-                "cmd-tasks",
-                "TASKS".into(),
-                Screen::Tasks,
-                24.,
-                334. - dy,
-                134.,
-            ),
-            (
-                "cmd-repos",
-                "REPOS".into(),
-                Screen::Repos,
-                162.,
-                334. - dy,
-                134.,
-            ),
-            (
-                "cmd-set",
-                "SETUP".into(),
-                Screen::Settings,
-                24.,
-                378. - dy,
-                272.,
-            ),
-        ] {
+                Some("P"),
+                false,
+                live || parked,
+                None,
+            )
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .when(live || parked, |d| {
+                d.on_click(cx.listener(|this, _, _, cx| {
+                    this.war_room.update(cx, |w, cx| {
+                        w.rts_unit(Unit::Park, cx);
+                        w.rts_unit(Unit::Resume, cx);
+                    })
+                }))
+            }),
+        );
+        let (x, y) = at(2, 0);
+        side = side.child(
+            cell(
+                "cmd-stop",
+                "STOP",
+                "icons/stop.svg",
+                Some("S"),
+                false,
+                live,
+                None,
+            )
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .when(live, |d| {
+                d.on_click(cx.listener(|this, _, _, cx| {
+                    this.war_room.update(cx, |w, cx| w.rts_unit(Unit::Stop, cx))
+                }))
+            }),
+        );
+        // row 2: New session and Organizer (they light up while their dialog is open), LIST
+        let launch = crate::new_session::launch_buttons_open(
+            "command",
+            self.launcher_open(cx),
+            |id, label, on| {
+                let (name, icon, key) = if label == "Organizer" {
+                    ("ORG", "icons/panel.svg", None)
+                } else {
+                    ("NEW", "icons/branch.svg", Some("N"))
+                };
+                cell(id, name, icon, key, on, true, None)
+            },
+        );
+        let [organizer, new] = launch;
+        let (x, y) = at(0, 1);
+        side = side.child(new.absolute().left(px(x)).top(px(y)));
+        let (x, y) = at(1, 1);
+        side = side.child(organizer.absolute().left(px(x)).top(px(y)));
+        let (x, y) = at(2, 1);
+        side = side.child(
+            cell(
+                "cmd-list",
+                "LIST",
+                "icons/mail.svg",
+                Some("L"),
+                list_open && on_map,
+                true,
+                (waits_n > 0).then(|| waits_n.to_string()),
+            )
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.go(Screen::WarRoom, cx);
+                this.war_room.update(cx, |w, cx| w.rts_toggle_list(cx));
+            })),
+        );
+        // rows 3 and 4: the screens
+        for (k, (id, name, icon, screen)) in [
+            ("cmd-war", "MAP", "icons/warroom.svg", Screen::WarRoom),
+            ("cmd-inbox", "INBOX", "icons/inbox.svg", Screen::Inbox),
+            ("cmd-tasks", "TASKS", "icons/tasks.svg", Screen::Tasks),
+            ("cmd-repos", "REPOS", "icons/repos.svg", Screen::Repos),
+            ("cmd-set", "SETUP", "icons/settings.svg", Screen::Settings),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (x, y) = at(k % 3, 2 + k / 3);
+            let badge = (screen == Screen::Inbox)
+                .then(|| war.as_ref().map_or(0, |w| w.inbox_open))
+                .filter(|n| *n > 0)
+                .map(|n| n.to_string());
             side = side.child(
-                cmd::plate(id, name, w, 40., here == screen)
+                cell(id, name, icon, None, here == screen, true, badge)
                     .absolute()
                     .left(px(x))
                     .top(px(y))
                     .on_click(cx.listener(move |this, _, _, cx| this.go(screen.clone(), cx))),
             );
         }
-        // Organizer and New task: two plates under the screen buttons
-        for (k, b) in crate::new_session::launch_buttons("command", |id, label| {
-            cmd::plate(id, label.to_uppercase(), 134., 40., false)
-        })
-        .into_iter()
-        .enumerate()
-        {
-            side = side.child(
-                b.absolute()
-                    .left(px(24. + k as f32 * 138.))
-                    .top(px(422. - dy)),
-            );
-        }
-        // NEW UNIT: the build tile of a new session
+        let (x, y) = at(2, 3);
         side = side.child(
-            div()
-                .absolute()
-                .left(px(24.))
-                .top(px(478. - dy))
-                .w(px(272.))
-                .h(px(112.))
-                .id("cmd-new")
-                .cursor_pointer()
-                .on_click(cx.listener(|this, _, _, cx| this.open_new_session(cx)))
-                .child(
-                    img(frame(Frame9::Button, 272., 112.))
-                        .absolute()
-                        .left_0()
-                        .top_0()
-                        .size_full(),
-                )
-                .child(
-                    // the robot at its own size (no scaling), in a recessed slot
-                    div()
-                        .absolute()
-                        .left(px(14.))
-                        .top(px(12.))
-                        .w(px(64.))
-                        .h(px(88.))
-                        .bg(c(0x2A4A1E, 1.))
-                        .child(
-                            img(s.bot.render.clone())
-                                .absolute()
-                                .left(px(9.))
-                                .top_0()
-                                .w(px(s.bot.rgba.width() as f32))
-                                .h(px(s.bot.rgba.height() as f32)),
-                        ),
-                )
-                .child(
-                    div()
-                        .absolute()
-                        .left(px(94.))
-                        .top(px(12.))
-                        .flex()
-                        .flex_col()
-                        .gap(px(1.))
-                        .child(cmd::data("NEW UNIT", 30.).text_color(c(0xB6F28A, 1.)))
-                        .child(cmd::label("A NEW SESSION"))
-                        .child(cmd::label("IN ANY VILLAGE"))
-                        .child(cmd::label("PRESS N").text_color(c(cmd::HINT, 1.))),
-                ),
+            cell(
+                "cmd-find",
+                "FIND",
+                "icons/search.svg",
+                Some("/"),
+                false,
+                true,
+                None,
+            )
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.go(Screen::WarRoom, cx);
+                this.war_room.update(cx, |w, cx| w.rts_find_open(cx));
+            })),
         );
-        // the sessions that wait for you
-        let wt = 602. - dy;
-        let ram_top = (vh - 106.).max(wt + 132.);
-        let waits_h = ram_top - 12. - wt;
-        // As many rows as the well holds (the label takes about 40 px, a row 46 px).
-        let rows = (((waits_h - 40.) / 46.).floor() as usize).clamp(1, 4);
-        let mut waits = well(24., wt, 272., waits_h)
-            .p(px(10.))
-            .overflow_hidden()
-            .flex()
-            .flex_col();
-        let asks: Vec<_> = war
-            .as_ref()
-            .map(|w| {
-                rts_waits(w)
-                    .iter()
-                    .filter_map(|id| w.session(id).cloned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        waits = waits.child(cmd::label(format!("WAITS FOR YOU · {}", asks.len())));
-        if asks.is_empty() {
-            waits = waits.child(
-                cmd::label("ALL CLEAR · NO ORDERS WAIT")
-                    .mt(px(12.))
-                    .text_color(c(cmd::HINT, 1.)),
-            );
-        }
-        let now = war.as_ref().map_or(0, |w| w.now);
-        for (k, p) in asks.iter().take(rows).enumerate() {
-            let id = p.id.clone();
-            let fault = p.state == SessionState::Error;
-            waits = waits.child(
-                div()
-                    .id(("cmd-wait", k))
-                    .min_h(px(46.))
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(8.))
-                    .when(k > 0, |d| d.border_t_2().border_color(c(cmd::RULE, 1.)))
-                    .cursor_pointer()
-                    .hover(|st| st.bg(c(cmd::ROW_HOVER, 1.)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.go(Screen::WarRoom, cx);
-                        this.war_room.update(cx, |w, cx| w.rts_goto(&id, cx));
-                    }))
-                    .child(
-                        cmd::entry(cmd::up(&p.title))
-                            .flex_1()
-                            .min_w(px(0.))
-                            .whitespace_nowrap()
-                            .overflow_hidden()
-                            .text_ellipsis(),
-                    )
-                    .child(
-                        cmd::entry(if fault {
-                            "FAULT".to_string()
-                        } else {
-                            cmd::mins(now, p.since)
-                        })
-                        .flex_none()
-                        .text_color(c(if fault { cmd::RED } else { cmd::AMBER }, 1.)),
-                    ),
-            );
-        }
-        side = side.child(waits);
+        let wt = grid_y + 3. * STEP + CELL;
+        let ram_top = (vh - 106.).max(wt + 12.);
         // RAM
         let (used, total) = self
             .war_room
@@ -621,7 +762,10 @@ impl Shell {
                         .flex()
                         .justify_between()
                         .child(cmd::label("RAM"))
-                        .child(cmd::data(format!("{used:.1} / {total:.0} GB"), 18.)),
+                        .child(cmd::data(
+                            format!("{used:.1} / {total:.0} GB"),
+                            cmd::S_LABEL,
+                        )),
                 )
                 .child(cmd::bar(if total > 0. { used / total } else { 0. })),
         )

@@ -348,7 +348,7 @@ pub(super) fn render(
                             .rounded_full()
                             .bg(rgb(state_tone(tag.state)))
                             .text_color(rgb(tk().card))
-                            .text_size(ui::ts(11.))
+                            .text_size(ui::ts(crate::theme::T_CAPTION))
                             .line_height(px(16.))
                             .font_weight(FontWeight::SEMIBOLD)
                             .whitespace_nowrap()

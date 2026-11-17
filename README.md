@@ -29,7 +29,14 @@ but nobody has tested them yet.
 
 ## Install
 
-**Windows** (winget):
+**Windows** (Microsoft Store, recommended): [AIVory Code in the Microsoft Store](https://apps.microsoft.com/detail/9NG19Z8T9XR6).
+Microsoft signs the Store build, and the Store installs the updates. From a terminal:
+
+```powershell
+winget install 9NG19Z8T9XR6 --source msstore
+```
+
+**Windows** (winget, the installer from the releases page):
 
 ```powershell
 winget install Aivory.AivoryCode
@@ -52,7 +59,7 @@ curl -fsSL https://github.com/aivorynet/aivory-code/releases/latest/download/ins
 
 All of them install `aivory` (the desktop app) and `aivoryd` (the daemon). Start the app with `aivory`.
 
-The builds have no code signature yet. The package managers avoid the warnings: winget installs
+The builds outside the Microsoft Store have no code signature yet. The package managers avoid the warnings: winget installs
 without the SmartScreen prompt, and Homebrew formulas do not get the macOS quarantine flag.
 If you download the installer or the archive from the
 [releases page](https://github.com/aivorynet/aivory-code/releases) yourself, Windows SmartScreen

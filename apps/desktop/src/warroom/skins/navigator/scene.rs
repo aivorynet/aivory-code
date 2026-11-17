@@ -179,7 +179,10 @@ fn centre_of(free: [f32; 4]) -> [f32; 2] {
     ]
 }
 
-/// The nearest distance at which all `pts` fit in the free area.
+/// The room that a cube label needs left and right of a point at the view edge.
+const LABEL_PAD: f32 = 56.;
+
+/// The nearest distance at which all `pts` fit in the free area, with room for the labels.
 fn fit(pose: Pose, pts: &[[f32; 3]], free: [f32; 4], f: f32) -> f32 {
     let centre = centre_of(free);
     let ok = |d: f32| {
@@ -187,10 +190,10 @@ fn fit(pose: Pose, pts: &[[f32; 3]], free: [f32; 4], f: f32) -> f32 {
         pts.iter().all(|p| {
             let s = c.at(*p);
             c.depth(*p) > NEAR * 2.
-                && s[0] >= free[0]
-                && s[0] <= free[2]
-                && s[1] >= free[1]
-                && s[1] <= free[3]
+                && s[0] >= free[0] + LABEL_PAD
+                && s[0] <= free[2] - LABEL_PAD
+                && s[1] >= free[1] + 8.
+                && s[1] <= free[3] - 8.
         })
     };
     let (mut lo, mut hi) = (60f32, 40_000f32);
@@ -633,15 +636,27 @@ pub(super) fn paint(scene: &Scene, bounds: Bounds<Pixels>, window: &mut Window, 
     // The labels: the selection first, then waits, pedestals, blocks; never on top of another.
     labels.sort_by_key(|(prio, _)| *prio);
     let mut placed: Vec<[f32; 4]> = Vec::new();
-    for (_, l) in labels {
+    for (_, mut l) in labels {
         let lw = f32::from(
             pen.shaped(&l.text, l.size, tk().sans, l.bold, l.color, l.alpha)
                 .width(),
         );
-        let r = [l.at[0] - lw / 2. - 3., l.at[1] - 1., lw + 6., l.size + 6.];
-        let free = placed.iter().all(|q| {
-            r[0] + r[2] <= q[0] || q[0] + q[2] <= r[0] || r[1] + r[3] <= q[1] || q[1] + q[3] <= r[1]
-        });
+        // A label that touches another moves down one row; then it gives way.
+        let mut r = [0.; 4];
+        let mut free = false;
+        for _ in 0..2 {
+            r = [l.at[0] - lw / 2. - 8., l.at[1] - 1., lw + 16., l.size + 6.];
+            free = placed.iter().all(|q| {
+                r[0] + r[2] <= q[0]
+                    || q[0] + q[2] <= r[0]
+                    || r[1] + r[3] <= q[1]
+                    || q[1] + q[3] <= r[1]
+            });
+            if free {
+                break;
+            }
+            l.at[1] += l.size + 4.;
+        }
         if !free || r[1] < oy + 4. || r[1] > oy + h {
             continue;
         }

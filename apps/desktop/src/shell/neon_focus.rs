@@ -13,7 +13,7 @@ use aivory_protocol::{AskKind, Pane, SessionState};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, FontWeight, SharedString, Subscription, Window,
-    div, px, relative, rgb, rgba,
+    deferred, div, px, relative, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, InputState};
 
@@ -71,6 +71,8 @@ pub(super) struct NightFocus {
     controls: Controls,
     /// The console output of the session: a calm tab next to the diff.
     console: Entity<SessionConsole>,
+    /// The list of hidden session tabs is open.
+    more: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -151,6 +153,7 @@ impl NightFocus {
             tools: Tools::default(),
             controls: Controls::default(),
             console,
+            more: false,
             _subs: vec![observe, events, open_file],
         }
     }
@@ -287,7 +290,7 @@ impl Render for NightFocus {
         let mut room = vw - 96. - 90. * k;
         let mut shown = 0;
         for (_, title, _) in &live {
-            let w = (title.chars().count() as f32 * 9.6 + 40.) * k;
+            let w = (title.chars().count() as f32 * 10.4 + 40.) * k;
             if room < w || shown >= TABS {
                 break;
             }
@@ -313,19 +316,59 @@ impl Render for NightFocus {
             );
         }
         if live.len() > shown {
-            menu.push(
-                div()
-                    .min_h(ui::sw(40.))
-                    .px(px(20.))
-                    .flex()
-                    .items_center()
-                    .child(label(format!("+{}", live.len() - shown), MIST))
-                    .into_any_element(),
+            let mut wrap = div().relative().child(
+                menu_tab(
+                    "nfo-more",
+                    &format!("+{} more", live.len() - shown),
+                    None,
+                    MIST,
+                    self.more,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.more = !this.more;
+                    cx.notify();
+                })),
             );
+            if self.more {
+                let mut list = div()
+                    .absolute()
+                    .top_full()
+                    .right_0()
+                    .w(px(280.))
+                    .max_h(px(360.))
+                    .occlude()
+                    .flex()
+                    .flex_col()
+                    .bg(rgb(BG))
+                    .border_1()
+                    .border_color(rgb(DIM))
+                    .on_mouse_down_out(cx.listener(|this, _, _, cx| {
+                        this.more = false;
+                        cx.notify();
+                    }));
+                for (i, (id, title, color)) in live.iter().enumerate().skip(shown) {
+                    let go = id.clone();
+                    list = list.child(
+                        menu_tab(
+                            SharedString::from(format!("nfo-hid-{i}")),
+                            title,
+                            None,
+                            *color,
+                            *id == self.id,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.more = false;
+                            cx.emit(NightFocusEvent::Open(go.clone()));
+                        })),
+                    );
+                }
+                wrap = wrap.child(deferred(list).with_priority(3));
+            }
+            menu.push(wrap.into_any_element());
         }
         let (pause, stop) = (p.id.clone(), p.id.clone());
         let actions = vec![
-            button("nfo-back", "◂ War room", CYAN, false)
+            button("nfo-back", "◂ Back", CYAN, false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(NightFocusEvent::Back)))
                 .into_any_element(),
             button("nfo-pause", "Pause", MIST, false)
@@ -340,16 +383,16 @@ impl Render for NightFocus {
                 .into_any_element(),
         ];
         let sub = format!(
-            "{} · {} / {} · {} · ${:.2}",
-            p.title, p.codebase, p.model, state_word, p.cost
+            "{} / {} · {} · ${:.2}",
+            p.codebase, p.model, state_word, p.cost
         );
 
         // ---- the chat: display lines, the decision, the composer -----------------------------
         // As many display lines as fit, from a message on, top-aligned (no half-cut line).
         let vh = f32::from(window.viewport_size().height);
         let spare =
-            vh - 56. - 190. - 60. - 80. - if p.ask.is_some() { 270. } else { 0. } - 90. - 40.;
-        let fit = ((spare / 22.).floor() as usize).max(6);
+            vh - 56. - 190. - 60. - 80. - if p.ask.is_some() { 140. } else { 0. } - 90. - 40.;
+        let fit = ((spare / 24.).floor() as usize).max(6);
         let mut chat = div()
             .id("nfo-chat")
             .flex_1()
@@ -359,7 +402,7 @@ impl Render for NightFocus {
             .flex_col()
             .gap(px(4.))
             .px(px(PAD))
-            .pb(px(PAD));
+            .pb(px(PAD + 12.));
         // A media line breaks the stream: the rows around it, and a preview between them.
         let media_style = MediaStyle {
             card: rgba(0x8C96BC22),
@@ -406,7 +449,8 @@ impl Render for NightFocus {
             }
         }
         blocks.reverse();
-        chat = chat.children(blocks);
+        // A spacer first: a short chat sits at the bottom, next to the decision and the composer.
+        chat = chat.child(div().flex_1().min_h(px(0.))).children(blocks);
         let waits = p.ask.is_some();
         let mut center = frame(if waits { YELLOW } else { CYAN }, "nfo-center", waits)
             .flex_1()
@@ -496,16 +540,16 @@ impl Render for NightFocus {
                 .items_center()
                 .cursor_pointer()
                 .border_1()
-                .border_color(rgba(if on { 0xF3E600FF } else { 0x8C96BC55 }))
+                .border_color(rgba(if on { 0x00E0F0FF } else { 0x8C96BC55 }))
                 .text_size(ui::ts(T_LABEL))
                 .font_weight(FontWeight::BOLD)
-                .text_color(rgb(if on { YELLOW } else { MIST }))
+                .text_color(rgb(if on { CYAN } else { MIST }))
                 .hover(|h| h.text_color(rgb(PALE)))
                 .child(text.to_uppercase())
         };
         let mut chips = div().flex().flex_wrap().items_center().gap(px(8.));
         let providers = self.model.read(cx).providers.clone();
-        let style = ControlStyle::console(PANEL, INK, YELLOW, Some(CHAKRA.into()));
+        let style = ControlStyle::console(PANEL, INK, CYAN, Some(CHAKRA.into()));
         chips = chips.child(self.controls.row(
             "nfo-ctl",
             &p,
@@ -599,7 +643,7 @@ impl Render for NightFocus {
                                 .flex_none()
                                 .overflow_hidden()
                                 .font_family(tk().mono)
-                                .text_size(ui::ts(T_LABEL + 1.))
+                                .text_size(ui::ts(T_ENTRY))
                                 .line_height(ui::ts(20.))
                                 .text_color(rgb(c))
                                 .child(text),
@@ -607,7 +651,91 @@ impl Render for NightFocus {
                     }
                 }
                 None => {
-                    body = body.child(label("The agent has not changed a file yet.", MIST));
+                    let calls: Vec<&aivory_protocol::Line> = p
+                        .tail
+                        .iter()
+                        .filter(|l| l.kind == aivory_protocol::LineKind::Tool)
+                        .collect();
+                    let skip = calls.len().saturating_sub(12);
+                    if calls.is_empty() {
+                        body = body.child(label(
+                            "No file changed yet. The latest rows of the session:",
+                            MIST,
+                        ));
+                        for row in stream_rows(&p.tail, 10) {
+                            body = body.child(row);
+                        }
+                    } else {
+                        body = body.child(label(
+                            "No file changed yet. The last tool calls of the agent:",
+                            MIST,
+                        ));
+                    }
+                    for l in calls.into_iter().skip(skip) {
+                        body = body.child(
+                            div()
+                                .flex_none()
+                                .truncate()
+                                .font_family(tk().mono)
+                                .text_size(ui::ts(T_ENTRY))
+                                .line_height(ui::ts(20.))
+                                .text_color(rgb(MIST))
+                                .child(format!(
+                                    "● {}  {}",
+                                    l.label.as_deref().unwrap_or(""),
+                                    l.text.lines().next().unwrap_or("")
+                                )),
+                        );
+                    }
+                    body = body.child(div().h(px(8.))).child(
+                        button("nfo-open-console", "Open console", CYAN, false).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.side = Side::Console;
+                                cx.notify();
+                            }),
+                        ),
+                    );
+                    // The session in numbers: fills the panel and answers "how far is it".
+                    body = body
+                        .child(div().h(px(12.)))
+                        .child(label("SESSION", MIST))
+                        .child(entry(format!("{} · {}", p.provider, p.model)))
+                        .child(label(
+                            format!(
+                                "Context {}%  ·  {} tok  ·  ${:.2}",
+                                p.context_pct,
+                                short_count(p.tokens),
+                                p.cost
+                            ),
+                            MIST,
+                        ))
+                        .child(bar(
+                            f32::from(p.context_pct) / 100.,
+                            if p.context_pct >= 85 { RED } else { CYAN },
+                            4.,
+                        ));
+                    let edited = touched(&p.tail);
+                    if !edited.is_empty() {
+                        body = body
+                            .child(div().h(px(8.)))
+                            .child(label("FILES EDITED", MIST));
+                        for f in edited.iter().take(6) {
+                            body = body.child(
+                                div()
+                                    .flex_none()
+                                    .truncate()
+                                    .font_family(tk().mono)
+                                    .text_size(ui::ts(T_LABEL))
+                                    .text_color(rgb(INK))
+                                    .child(f.clone()),
+                            );
+                        }
+                    }
+                    if !p.subagents.is_empty() {
+                        body = body
+                            .child(div().h(px(8.)))
+                            .child(label(format!("SUBAGENTS · {}", p.subagents.len()), MIST));
+                    }
                 }
             },
             Side::Console => {}
@@ -643,7 +771,7 @@ impl Render for NightFocus {
                     body = body.child(
                         div()
                             .font_family(tk().mono)
-                            .text_size(ui::ts(T_LABEL + 1.))
+                            .text_size(ui::ts(T_ENTRY))
                             .line_height(ui::ts(20.))
                             .text_color(rgb(if bad { RED } else { GREEN }))
                             .child(text),
@@ -693,7 +821,7 @@ impl Render for NightFocus {
         }
         let (sid, open_path) = (p.id.clone(), current.as_ref().map(|f| f.path.clone()));
         tabs = tabs.child(div().flex_1().min_w(px(0.))).child(
-            menu_tab("nfo-lens", "Open in Lens ›", None, CYAN, false).on_click(cx.listener(
+            menu_tab("nfo-lens", "Lens ›", None, CYAN, false).on_click(cx.listener(
                 move |_, _, _, cx| {
                     if let Some(path) = &open_path {
                         cx.emit(NightFocusEvent::OpenFile {
@@ -737,7 +865,7 @@ impl Render for NightFocus {
         let center = compose::media_target(center, |this: &mut Self| Some(&mut this.tools), cx);
 
         screen(
-            "Session",
+            &p.title,
             sub,
             state_color,
             (menu, actions),
@@ -830,12 +958,63 @@ pub(super) fn tag(text: &str, color: u32) -> Div {
 /// raw markdown marker, code and table rows in the mono face. Top-aligned: the list starts at
 /// a message. Shared with the Focus view.
 pub(super) fn stream_rows(tail: &[aivory_protocol::Line], max: usize) -> Vec<Div> {
+    stream_rows_with(tail, max, 14.)
+}
+
+/// The transcript as one dense column: whole chat lines, code lines in the mono inset, and
+/// little room between two messages. Used by the list screens.
+pub(super) fn chat_column(tail: &[aivory_protocol::Line], max: usize) -> Div {
+    let mut col = div().flex_none().flex().flex_col().gap(px(3.));
+    for r in stream_rows_with(tail, max, 6.) {
+        col = col.child(r);
+    }
+    col
+}
+
+/// What a session does now, in one line: the last tool call, else the last words.
+pub(super) fn doing_line(p: &aivory_protocol::Pane) -> String {
+    use crate::console::display::{DKind, steps};
+    if let Some(a) = &p.ask {
+        return format!("Asks: {}", a.text.lines().next().unwrap_or("").trim());
+    }
+    let lines = steps(&p.tail, 8);
+    match lines
+        .iter()
+        .rev()
+        .find(|d| d.kind == DKind::Tool)
+        .or(lines.last())
+    {
+        Some(d) if d.kind == DKind::Tool => {
+            format!("{} {}", d.label.as_deref().unwrap_or("Tool"), d.text)
+        }
+        Some(d) => d.text.clone(),
+        None => "Idle".to_string(),
+    }
+}
+
+/// The files that the agent edited, newest last, without doubles.
+pub(super) fn touched(tail: &[aivory_protocol::Line]) -> Vec<String> {
+    let mut v: Vec<String> = Vec::new();
+    for l in tail {
+        if l.kind == aivory_protocol::LineKind::Tool
+            && matches!(l.label.as_deref(), Some("Edit" | "Write" | "MultiEdit"))
+        {
+            let path = l.text.split_whitespace().next().unwrap_or("").to_string();
+            if !path.is_empty() && !v.contains(&path) {
+                v.push(path);
+            }
+        }
+    }
+    v
+}
+
+fn stream_rows_with(tail: &[aivory_protocol::Line], max: usize, gap: f32) -> Vec<Div> {
     use crate::console::display::{DKind, last};
     let mono = |color: u32| {
         div()
             .font_family(tk().mono)
-            .text_size(ui::ts(T_LABEL + 1.))
-            .line_height(ui::ts(20.))
+            .text_size(ui::ts(T_LABEL))
+            .line_height(ui::ts(17.))
             .text_color(rgb(color))
     };
     let mut out = Vec::new();
@@ -850,7 +1029,7 @@ pub(super) fn stream_rows(tail: &[aivory_protocol::Line], max: usize) -> Vec<Div
         };
         let mut cell = div().flex_none().flex().flex_col().gap(px(4.));
         if d.first {
-            cell = cell.mt(px(14.));
+            cell = cell.mt(px(gap));
             if let Some((name, color)) = who {
                 cell = cell.child(label(name, color).font_weight(FontWeight::BOLD));
             }
@@ -872,13 +1051,15 @@ pub(super) fn stream_rows(tail: &[aivory_protocol::Line], max: usize) -> Vec<Div
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(YELLOW)),
             DKind::Bullet => entry(text).pl(px(12.)),
-            DKind::Code => mono(PALE)
-                .px(px(16.))
-                .bg(rgba(0x00000099))
+            // Code: the small mono face on a dim inset, so it reads apart from the chat.
+            DKind::Code => mono(INK)
+                .px(px(14.))
+                .py(px(1.))
+                .bg(rgba(0x02030ACC))
                 .border_l_2()
-                .border_color(rgba(0xF3E60088))
+                .border_color(rgba(0x5A638899))
                 .child(text),
-            DKind::Table => mono(PALE).px(px(16.)).bg(rgba(0x0A0E22FF)).child(text),
+            DKind::Table => mono(INK).px(px(14.)).bg(rgba(0x02030ACC)).child(text),
             DKind::Tool => mono(MIST)
                 .line_clamp(1)
                 .child(format!("● {}  {text}", d.label.as_deref().unwrap_or(""))),

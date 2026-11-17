@@ -119,9 +119,13 @@ fn decode(bytes: &[u8]) -> RgbaImage {
 
 /// A GPUI image of RGBA pixels (GPUI keeps images in BGRA order).
 pub fn to_render(rgba: &RgbaImage) -> Arc<RenderImage> {
-    let mut bgra = rgba.clone();
-    for p in bgra.pixels_mut() {
-        p.0.swap(0, 2);
+    to_render_owned(rgba.clone())
+}
+
+/// The same for an image that the caller gives away: no copy of a large map.
+pub fn to_render_owned(mut bgra: RgbaImage) -> Arc<RenderImage> {
+    for p in (*bgra).chunks_exact_mut(4) {
+        p.swap(0, 2);
     }
     Arc::new(RenderImage::new(vec![Frame::new(bgra)]))
 }

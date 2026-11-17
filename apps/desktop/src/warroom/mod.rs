@@ -635,7 +635,8 @@ impl WarRoomScreen {
     /// Paint `el` above everything; a click outside closes the open overlay.
     pub(super) fn overlay(&self, el: Div, cx: &mut Context<Self>) -> AnyElement {
         deferred(
-            el.occlude()
+            el.map(crate::overlay_style::skin)
+                .occlude()
                 .on_mouse_down_out(cx.listener(|this, _, _, cx| {
                     let open = std::mem::replace(&mut this.open, Overlay::None);
                     this.closed = Some((open, Instant::now()));
@@ -1801,6 +1802,9 @@ impl Render for WarRoomScreen {
                         // The camera keys work when the 3D view has the focus, not a text field.
                         aivory_protocol::Look::Navigator if this.focus.is_focused(window) => {
                             this.nav_key(&ev.keystroke.key, cx)
+                        }
+                        aivory_protocol::Look::Neon if this.focus.is_focused(window) => {
+                            this.neon_key(&ev.keystroke.key, cx)
                         }
                         aivory_protocol::Look::Bridge => this.bridge_key(&ev.keystroke.key, cx),
                         aivory_protocol::Look::Tactical => this.hud_key(&ev.keystroke.key, cx),

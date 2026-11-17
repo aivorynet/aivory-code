@@ -23,7 +23,7 @@ use crate::media::{self, MediaStyle};
 use crate::model::Model;
 use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole};
 use crate::tactical_kit::{
-    self as tac, Btn, Frame, c, dots, entry, frame, label, navb, section, tbox, trow,
+    self as tac, Btn, Frame, c, dots, entry, frame, label, navb, tbox, trow,
 };
 use crate::theme::PaneTheme;
 use crate::ui;
@@ -43,7 +43,7 @@ pub enum TacFocusEvent {
 
 impl EventEmitter<TacFocusEvent> for TacticalFocus {}
 
-/// The console in phosphor green on the black of the panel.
+/// The console in the terminal palette on the glass of the panel.
 fn console_look() -> ConsoleLook {
     let o = |rgb: u32| (rgb << 8) | 0xFF;
     let theme = PaneTheme {
@@ -51,15 +51,15 @@ fn console_look() -> ConsoleLook {
         top: o(tac::PANEL),
         text: o(tac::TEXT),
         dim: o(tac::LABEL),
-        accent: o(tac::INK),
-        add: o(tac::INK),
-        del: o(tac::LABEL),
+        accent: o(tac::CYAN),
+        add: o(tac::OK),
+        del: o(tac::ALARM),
         tool: o(tac::MID),
         ..PaneTheme::DARK
     };
     ConsoleLook {
         theme: Some(theme),
-        size: 12.5,
+        size: 12.,
         pad_x: 4.,
         max_w: None,
     }
@@ -79,8 +79,11 @@ pub struct TacticalFocus {
     show_console: bool,
     /// Narrow window: the chat tab is on. Else the details tabs show.
     show_chat: bool,
+    /// The list of the hidden contact tabs is open.
+    more_open: bool,
     scroll: ScrollHandle,
     scrolled: String,
+    snap: u8,
     _subs: Vec<Subscription>,
 }
 
@@ -126,6 +129,7 @@ impl TacticalFocus {
             console,
             show_console: false,
             show_chat: true,
+            more_open: false,
             diff: None,
             busy: false,
             file: None,
@@ -133,6 +137,7 @@ impl TacticalFocus {
             tools: Tools::default(),
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
+            snap: 0,
             _subs: vec![observe, events, opened],
         }
     }
@@ -223,12 +228,12 @@ impl Render for TacticalFocus {
         let vp = window.viewport_size();
         let (vw, vh) = (f32::from(vp.width), f32::from(vp.height));
         let narrow = vw < 1100.;
-        let back = navb("tf-back", "< OPS", false)
+        let back = navb("tf-back", "< BACK", false)
             .on_click(cx.listener(|_, _, _, cx| cx.emit(TacFocusEvent::Back)))
             .into_any_element();
         let Some(p) = self.pane(cx) else {
             return frame(Frame {
-                title: "SESSION",
+                title: "SESSION".into(),
                 kicker: "THIS CONTACT IS GONE".into(),
                 stats: Vec::new(),
                 menu: vec![back],
@@ -238,7 +243,6 @@ impl Render for TacticalFocus {
         self.ensure(cx);
         let now = self.model.read(cx).war.as_ref().map_or(0, |w| w.now);
         let waits = p.ask.is_some();
-        let call = format!("{}/{}", p.codebase, p.title).to_uppercase();
 
         // ---- the menu: the contact tabs with full names ------------------------------------
         let mut contacts: Vec<(String, String, bool)> = self
@@ -259,16 +263,16 @@ impl Render for TacticalFocus {
             .unwrap_or_default();
         contacts.sort_by(|a, b| (!a.2, &a.0).cmp(&(!b.2, &b.0)));
         // Room for the tabs: the window less the page padding and the buttons at the right.
-        let room = vw - 64. - 260.;
+        let room = vw - 64. - 300. * ui::factor();
         let mut used = 0.;
         let mut shown: Vec<&(String, String, bool)> = Vec::new();
         if let Some(cur) = contacts.iter().find(|x| x.0 == self.id) {
-            used += cur.1.chars().count() as f32 * 7.5 + 40.;
+            used += cur.1.chars().count() as f32 * 7.5 * ui::factor() + 40. * ui::factor();
             shown.push(cur);
         }
         for x in contacts.iter().filter(|x| x.0 != self.id) {
-            let w = x.1.chars().count() as f32 * 7.5 + 40.;
-            if used + w + 60. > room {
+            let w = x.1.chars().count() as f32 * 7.5 * ui::factor() + 40. * ui::factor();
+            if used + w + 60. * ui::factor() > room {
                 break;
             }
             used += w;
@@ -292,15 +296,36 @@ impl Render for TacticalFocus {
                 .into_any_element(),
             );
         }
-        if let Some(first) = hidden.first() {
-            let sid = first.0.clone();
+        if !hidden.is_empty() {
+            let open = self.more_open;
             menu.push(
-                navb("tf-more", &format!("+{} >", hidden.len()), false)
-                    .on_click(cx.listener(move |_, _, _, cx| {
-                        cx.emit(TacFocusEvent::Open(sid.clone()));
-                    }))
-                    .into_any_element(),
+                navb(
+                    "tf-more",
+                    &format!("+{} {}", hidden.len(), if open { "<" } else { ">" }),
+                    open,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.more_open = !this.more_open;
+                    cx.notify();
+                }))
+                .into_any_element(),
             );
+            if open {
+                for (k, x) in hidden.iter().enumerate() {
+                    let sid = x.0.clone();
+                    let mut tab = navb(format!("tf-hid-{k}"), &x.1, false);
+                    if x.2 {
+                        tab = tab.text_color(c(tac::WHITE, 1.));
+                    }
+                    menu.push(
+                        tab.on_click(cx.listener(move |this, _, _, cx| {
+                            this.more_open = false;
+                            cx.emit(TacFocusEvent::Open(sid.clone()));
+                        }))
+                        .into_any_element(),
+                    );
+                }
+            }
         }
         menu.push(div().flex_1().into_any_element());
         menu.push(back);
@@ -311,6 +336,12 @@ impl Render for TacticalFocus {
         if self.scrolled != key {
             self.scroll.scroll_to_bottom();
             self.scrolled = key;
+            self.snap = 4;
+            window.request_animation_frame();
+        } else if self.snap > 0 {
+            self.snap -= 1;
+            crate::ui::snap_rows(&self.scroll);
+            window.request_animation_frame();
         }
         let mut log = div()
             .id("tf-log")
@@ -320,7 +351,8 @@ impl Render for TacticalFocus {
             .track_scroll(&self.scroll)
             .flex()
             .flex_col()
-            .gap(px(6.))
+            .gap(px(0.))
+            .pb(px(34.))
             .pr(px(12.));
         let media_style = MediaStyle {
             card: gpui::rgba(tac::PANEL << 8 | 0xFF),
@@ -328,6 +360,30 @@ impl Render for TacticalFocus {
             muted: gpui::rgba(tac::LABEL << 8 | 0xFF),
             radius: 0.,
         };
+        // Chat is text. Runs of tool calls, output and code are one continuous mono inset.
+        let flush = |log: gpui::Stateful<gpui::Div>,
+                     block: &mut Vec<AnyElement>|
+         -> gpui::Stateful<gpui::Div> {
+            if block.is_empty() {
+                return log;
+            }
+            log.child(
+                div()
+                    .flex_none()
+                    .mt(px(6.))
+                    .ml(px(64. * ui::factor()))
+                    .py(px(6.))
+                    .px(px(10.))
+                    .flex()
+                    .flex_col()
+                    .overflow_hidden()
+                    .bg(c(tac::INSET, 1.))
+                    .border_l(px(2.))
+                    .border_color(c(tac::DIM, 1.))
+                    .children(std::mem::take(block)),
+            )
+        };
+        let mut block: Vec<AnyElement> = Vec::new();
         for (n, d) in rows.iter().enumerate() {
             if d.kind == DKind::Meta {
                 let found = p
@@ -336,6 +392,7 @@ impl Render for TacticalFocus {
                     .rev()
                     .find(|l| l.media.is_some() && l.text.trim_end() == d.text);
                 if let Some(m) = found.and_then(|l| l.media.as_ref()) {
+                    log = flush(log, &mut block);
                     log = log.child(div().flex_none().pl(px(64.)).child(media::preview(
                         m,
                         ("tf-media", n),
@@ -344,9 +401,13 @@ impl Render for TacticalFocus {
                 }
                 continue;
             }
+            let mono = matches!(
+                d.kind,
+                DKind::Code | DKind::Table | DKind::Tool | DKind::Output
+            );
             let verb = match (d.first, d.kind) {
                 (false, _) => String::new(),
-                (true, DKind::You) => "ORD".to_string(),
+                (true, DKind::You) => "YOU".to_string(),
                 (true, DKind::Tool) => dots(
                     &d.label
                         .clone()
@@ -356,10 +417,10 @@ impl Render for TacticalFocus {
                 ),
                 (true, DKind::Error) => "ERR".to_string(),
                 (true, DKind::Output | DKind::Meta) => String::new(),
-                (true, _) => "SAY".to_string(),
+                (true, _) => "AGENT".to_string(),
             };
             let (text, color, bold) = match d.kind {
-                DKind::You => (d.text.clone(), tac::INK, false),
+                DKind::You => (d.text.clone(), tac::INK, true),
                 DKind::Tool => (d.text.clone(), tac::TEXT, false),
                 DKind::Output => (
                     format!(
@@ -369,35 +430,79 @@ impl Render for TacticalFocus {
                     tac::LABEL,
                     false,
                 ),
-                DKind::Error => (d.text.clone(), tac::WHITE, false),
+                DKind::Error => (d.text.clone(), tac::ALARM, false),
                 DKind::Heading => (d.text.clone(), tac::INK, true),
-                DKind::Code | DKind::Table => (d.text.clone(), tac::MID, false),
                 _ => (d.text.clone(), tac::TEXT, false),
             };
+            let verb_color = if d.kind == DKind::You {
+                tac::CYAN
+            } else if d.kind == DKind::Error {
+                tac::ALARM
+            } else {
+                tac::LABEL
+            };
+            if mono {
+                block.push(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .gap(px(10.))
+                        .font_family(tac::MONO)
+                        .text_size(ui::ts(tac::S_LABEL))
+                        .line_height(ui::ts(tac::S_LABEL) * 1.55)
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(px(48. * ui::factor()))
+                                .text_color(c(tac::MID, 1.))
+                                .child(verb),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .overflow_hidden()
+                                .when(d.kind == DKind::Table && d.head, |x| {
+                                    x.font_weight(FontWeight::BOLD)
+                                })
+                                .text_color(c(color, 1.))
+                                .child(text),
+                        )
+                        .into_any_element(),
+                );
+                continue;
+            }
+            log = flush(log, &mut block);
             log = log.child(
                 div()
                     .flex_none()
                     .flex()
                     .gap(px(12.))
-                    .text_size(ui::ts(tac::S_LABEL + 1.))
-                    .line_height(ui::ts(tac::S_LABEL + 1.) * 1.5)
+                    .when(d.first, |x| x.mt(px(12.)))
+                    .py(px(1.))
                     .child(
                         div()
                             .flex_none()
-                            .w(px(52.))
-                            .text_color(c(tac::WHITE, 0.8))
+                            .w(px(52. * ui::factor()))
+                            .pt(px(2.))
+                            .font_family(tac::MONO)
+                            .text_size(ui::ts(tac::S_LABEL))
+                            .text_color(c(verb_color, 1.))
                             .child(verb),
                     )
                     .child(
                         div()
                             .flex_1()
                             .min_w(px(0.))
-                            .when(bold, |d| d.font_weight(FontWeight::BOLD))
+                            .text_size(ui::ts(tac::S_ENTRY))
+                            .line_height(ui::ts(tac::S_ENTRY) * 1.45)
+                            .when(bold, |x| x.font_weight(FontWeight::BOLD))
                             .text_color(c(color, 1.))
                             .child(text),
                     ),
             );
         }
+        log = flush(log, &mut block);
         if rows.is_empty() {
             log = log.child(label("NO LINES YET"));
         }
@@ -406,13 +511,10 @@ impl Render for TacticalFocus {
         let ask_box = p.ask.as_ref().map(|ask| {
             let mut orders = div().flex().flex_wrap().gap(px(8.));
             if p.controlled {
-                let n = ask.options.len();
                 for (k, option) in ask.options.iter().enumerate() {
                     let (sid, aid, opt) = (p.id.clone(), ask.id.clone(), option.clone());
                     let kind = if k == 0 && !ask.risky {
                         Btn::On
-                    } else if k + 1 == n && n > 1 {
-                        Btn::Dim
                     } else {
                         Btn::Plain
                     };
@@ -454,8 +556,8 @@ impl Render for TacticalFocus {
                 .gap(px(10.))
                 .p(px(18.))
                 .border_1()
-                .border_color(c(tac::WHITE, 1.))
-                .bg(c(tac::WHITE, 0.04))
+                .border_color(c(tac::AMBER, 1.))
+                .bg(c(tac::AMBER, 0.05))
                 .child(
                     label(format!(
                         "ORDER REQUESTED · {}",
@@ -470,7 +572,7 @@ impl Render for TacticalFocus {
         // ---- the composer ------------------------------------------------------------------
         self.controls.sync(&p);
         let providers = self.model.read(cx).providers.clone();
-        let style = ControlStyle::console(tac::PANEL, tac::TEXT, tac::INK, Some(tac::MONO.into()));
+        let style = ControlStyle::console(tac::DEEP, tac::TEXT, tac::INK, Some(tac::MONO.into()));
         let palette = compose::Palette {
             text: tac::TEXT << 8 | 0xFF,
             dim: tac::LABEL << 8 | 0xFF,
@@ -496,7 +598,7 @@ impl Render for TacticalFocus {
             .py(px(6.))
             .border_1()
             .border_color(c(tac::DIM, 1.))
-            .child(label(if waits { "ANSWER:" } else { "ORDER:" }))
+            .child(label("REPLY:"))
             .child(div().flex_1().min_w(px(160.)).child(self.input.clone()))
             .child(
                 tac::order("tf-attach", "ATTACH", Btn::Plain).on_click(cx.listener(
@@ -558,7 +660,26 @@ impl Render for TacticalFocus {
                 ),
             )
         };
-        let mut left = tbox("INTERCEPT LOG")
+        let no_files = self
+            .diff
+            .as_ref()
+            .and_then(|(d, _)| d.as_ref())
+            .is_none_or(|d| d.files.is_empty());
+        let collapsed = !narrow && no_files && !self.show_console;
+        if !narrow && no_files {
+            let at = menu.len().saturating_sub(2);
+            let on = self.show_console;
+            menu.insert(
+                at,
+                navb("tf-console-key", "CONSOLE", on)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.show_console = !on;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        let mut left = tbox("SEC-01 / CHAT")
             .flex_1()
             .min_w(px(if narrow { 0. } else { 380. }))
             .min_h(px(0.))
@@ -572,19 +693,15 @@ impl Render for TacticalFocus {
                     .flex()
                     .flex_col()
                     .gap(px(4.))
-                    .child(section(call))
                     .child(label(format!(
-                        "{} · {} · LINES {} · CONTEXT {}%",
-                        p.provider.to_uppercase(),
-                        p.model.to_uppercase(),
-                        p.lines_total,
-                        p.context_pct
+                        "{} LINES · CONTEXT {}%",
+                        p.lines_total, p.context_pct
                     ))),
             )
             .child(crate::ui::with_thumb(
                 log,
                 &self.scroll,
-                gpui::rgba(0x39FF7A99),
+                gpui::rgba(0x9AA58699),
                 3.,
             ));
         if let Some(a) = ask_box {
@@ -661,7 +778,7 @@ impl Render for TacticalFocus {
         let open = cur.map(|f| f.path.clone());
         let sid = p.id.clone();
         let right_w = (vw * 0.4 * if self.show_console { 1.15 } else { 1. }).clamp(320., 720.);
-        let mut right = tbox(format!("CHANGES · {} FILES", files.len()))
+        let mut right = tbox(format!("SEC-02 / CHANGES · {} FILES", files.len()))
             .min_w(px(0.))
             .p(px(24.))
             .pt(px(28.))
@@ -698,21 +815,27 @@ impl Render for TacticalFocus {
         }
 
         frame(Frame {
-            title: "SESSION",
+            title: dots(&p.title.to_uppercase(), 48),
             kicker: format!(
-                "{} · ONE CONTACT IN FULL",
-                dots(&p.title.to_uppercase(), 60)
+                "{} · {} · {}",
+                p.codebase.to_uppercase(),
+                p.provider.to_uppercase(),
+                p.model.to_uppercase()
             ),
             stats: vec![
                 (
-                    if waits { "AWAITS ORDERS" } else { "ACTIVE" }.to_string(),
+                    if waits { "WAITS" } else { "WORKS" }.to_string(),
                     "STATE".to_string(),
-                    if waits { tac::WHITE } else { tac::INK },
+                    if waits { tac::AMBER } else { tac::CYAN },
                 ),
                 (
                     format!("{}%", p.context_pct),
                     "CONTEXT".to_string(),
-                    tac::INK,
+                    if p.context_pct >= 80 {
+                        tac::AMBER
+                    } else {
+                        tac::INK
+                    },
                 ),
                 (
                     tac::clock_ms(now - p.since),
@@ -743,7 +866,7 @@ impl Render for TacticalFocus {
                     .flex()
                     .gap(px(32.))
                     .child(left)
-                    .child(right)
+                    .when(!collapsed, |d| d.child(right))
                     .into_any_element()
             },
         })

@@ -91,7 +91,7 @@ pub(crate) fn scroll_area(
                 .size_full()
                 .overflow_y_scroll()
                 .track_scroll(handle)
-                .child(div().when(over, |d| d.pr(px(BAR_W))).child(body)),
+                .child(div().w_full().when(over, |d| d.pr(px(BAR_W))).child(body)),
         )
         // The thumb follows the text: one more frame when the handle moved after this render.
         .child(crate::ui::scroll_watch(handle, max, off));
@@ -235,7 +235,7 @@ pub(crate) fn frame(title: impl Into<SharedString>, bar: u32, ctl: Controls, bod
         .border_color(rgb(OUTLINE))
         .text_color(rgb(0xFFFFFF))
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(T_SMALL))
+        .text_size(ui::ts(S_ENTRY))
         .child(corner_box(
             format!("{k}-menu"),
             0,
@@ -296,7 +296,7 @@ pub(crate) fn button(id: impl Into<SharedString>, label: &str, primary: bool) ->
         .justify_center()
         .bg(rgb(BTN))
         .group_hover("nav-btn", |s| s.bg(rgb(BTN_HOT)))
-        .text_size(ui::ts(T_SMALL))
+        .text_size(ui::ts(S_ENTRY))
         .font_weight(if primary {
             FontWeight::BOLD
         } else {
@@ -463,7 +463,9 @@ pub(crate) fn list_row(
     }
     div()
         .id(id.into())
-        .h(px(if two { ROW_H2 } else { ROW_H }))
+        .h(px(
+            (if two { ROW_H2 } else { ROW_H }) * crate::ui::factor().max(1.)
+        ))
         .flex_none()
         .px(px(12.))
         .flex()
@@ -610,12 +612,12 @@ pub(crate) fn strip_chart(values: &[f32], color: u32, h: f32, floor: f32, captio
             .absolute()
             .left(px(4.))
             .right(px(4.))
-            .top(px(16.))
+            .top(px(24.))
             .bottom(px(2.))
             .flex()
             .items_end()
             .gap(px(1.));
-        let room = h - 20.;
+        let room = h - 28.;
         let few = values.len() <= 16;
         if few {
             bars = bars.gap(px(6.));
@@ -645,7 +647,10 @@ pub(crate) fn strip_chart(values: &[f32], color: u32, h: f32, floor: f32, captio
                 .right(px(6.))
                 .text_size(ui::ts(S_LABEL))
                 .text_color(rgb(color))
-                .child(short_value(values.last().copied().unwrap_or(0.))),
+                .child(match values.last().copied().unwrap_or(0.) {
+                    v if v > 0. => format!("now {}", short_value(v)),
+                    _ => "now idle".to_string(),
+                }),
         );
     } else {
         screen_box = screen_box.child(

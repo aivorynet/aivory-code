@@ -193,6 +193,9 @@ pub fn boxed() -> Div {
                 .text_color(rgb(0x111111))
         })
         .when(crate::ui::irix(), |d| crate::ui::bevel_edges(false, d))
+        .when(!crate::overlay_style::plain() && !crate::ui::irix(), |d| {
+            crate::overlay_style::field_box(d)
+        })
 }
 
 /// A button of a form. `busy` dims it.
@@ -233,7 +236,19 @@ pub fn button(
                 .when(primary, |d| d.border_2().border_color(rgb(0x111111)))
         })
         .when(crate::ui::irix(), |d| crate::ui::bevel_edges(true, d))
-        .child(label.into())
+        .when(!crate::overlay_style::plain() && !crate::ui::irix(), |d| {
+            crate::overlay_style::button(d, primary)
+        })
+        .child(look_label(label.into()))
+}
+
+/// A label in the case of the active look (upper case for LCARS).
+fn look_label(label: SharedString) -> SharedString {
+    if crate::overlay_style::plain() {
+        label
+    } else {
+        crate::overlay_style::caps_text(&label).into()
+    }
 }
 
 /// The line of an error under a form.
@@ -269,7 +284,10 @@ pub fn chip(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) 
                 .text_color(rgb(0x111111))
         })
         .when(crate::ui::irix(), |d| crate::ui::bevel_edges(!on, d))
-        .child(label.into())
+        .when(!crate::overlay_style::plain() && !crate::ui::irix(), |d| {
+            crate::overlay_style::chip(d, on)
+        })
+        .child(look_label(label.into()))
 }
 
 /// A path that does not fit: its tail with a leading `…`.

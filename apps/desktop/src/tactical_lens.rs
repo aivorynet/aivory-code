@@ -308,7 +308,7 @@ impl Render for TacticalLens {
             .into_any_element();
         let Some(codebase) = self.codebase_id(cx) else {
             return frame(Frame {
-                title: "LENS",
+                title: "LENS".into(),
                 kicker: "NO CODEBASE YET".into(),
                 stats: Vec::new(),
                 menu: vec![back],
@@ -586,7 +586,7 @@ impl Render for TacticalLens {
                 }
             }
         }
-        let left = panel(caption).child(list);
+        let left = panel(format!("SEC-01 / {caption}")).child(list);
 
         // ---- right: the file ----------------------------------------------------------------
         let outline: Vec<OutlineRow> = file
@@ -605,7 +605,7 @@ impl Render for TacticalLens {
             self.ensure_refs(&codebase, line, &name, cx);
         }
 
-        let mut right = panel("FILE");
+        let mut right = panel("SEC-02 / FILE");
         match (&self.path, &file) {
             (None, _) => {
                 right = right.child(section("PICK A FILE")).child(entry(
@@ -641,8 +641,8 @@ impl Render for TacticalLens {
                                     .flex()
                                     .gap(px(12.))
                                     .min_h(px(20.))
-                                    .text_size(ui::ts(tac::S_LABEL + 1.))
-                                    .line_height(ui::ts(tac::S_LABEL + 1.) * 1.5)
+                                    .text_size(ui::ts(tac::S_LABEL))
+                                    .line_height(ui::ts(tac::S_LABEL) * 1.5)
                                     .child(
                                         div()
                                             .flex_none()
@@ -724,7 +724,7 @@ impl Render for TacticalLens {
         }
 
         frame(Frame {
-            title: "LENS",
+            title: "LENS".into(),
             kicker: format!("{} · A CODEBASE AS A MAP", codebase.to_uppercase()),
             stats,
             menu,

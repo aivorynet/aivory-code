@@ -1,6 +1,6 @@
 //! The windows of the Command look over the village map (boards `docs/design/looks/rts/`): Tasks
 //! (building plans), Repos (villages), Setup and Unit (one session). Every control calls the
-//! daemon through `actions.rs`. "ALL FUNCTIONS" shows the full screen inside the window.
+//! daemon through `actions.rs`. "FULL SCREEN VIEW" shows the full screen inside the window.
 
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -24,7 +24,6 @@ use crate::model::Model;
 use crate::rts::{Sprite, sprites};
 use crate::session_console::{ConsoleEvent, ConsoleLook, SessionConsole};
 use crate::ui;
-use crate::warroom::skins::command::{last_lines, line_head};
 
 /// What a window asks the shell to do.
 #[derive(Debug, Clone)]
@@ -48,6 +47,19 @@ fn icon(s: &Sprite, size: f32) -> Div {
     let k = (size / s.w().max(s.h())).min(1.);
     div()
         .size(px(size))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(img(s.render.clone()).w(px(s.w() * k)).h(px(s.h() * k)))
+}
+
+/// A sprite at up to twice its size (a portrait), scaled to fit the box.
+fn icon_big(s: &Sprite, size: f32) -> Div {
+    let k = (size / s.w().max(s.h())).min(5.);
+    div()
+        .w_full()
+        .h(px(size))
         .flex_none()
         .flex()
         .items_center()
@@ -102,6 +114,7 @@ enum TaskTab {
     All,
     Queued,
     Building,
+    Waits,
     Review,
 }
 
@@ -110,7 +123,8 @@ impl TaskTab {
         match self {
             Self::All => true,
             Self::Queued => t.column == TaskColumn::Planned,
-            Self::Building => matches!(t.column, TaskColumn::Working | TaskColumn::Waiting),
+            Self::Building => t.column == TaskColumn::Working,
+            Self::Waits => t.column == TaskColumn::Waiting,
             Self::Review => t.column == TaskColumn::Review,
         }
     }
@@ -204,6 +218,7 @@ impl Render for CommandTasks {
             (TaskTab::All, "ALL"),
             (TaskTab::Queued, "QUEUED"),
             (TaskTab::Building, "BUILDING"),
+            (TaskTab::Waits, "WAITS"),
             (TaskTab::Review, "REVIEW"),
         ] {
             let n = tasks.iter().filter(|x| t.has(x)).count();
@@ -222,7 +237,7 @@ impl Render for CommandTasks {
             );
         }
         tabs = tabs.child(div().flex_1()).child(
-            cmd::plate("ct-new", "+ NEW UNIT", 150., 40., false)
+            cmd::plate("ct-new", "+ NEW SESSION", 200., 40., false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::NewUnit))),
         );
         let mut rows = list("ct-list");
@@ -265,7 +280,11 @@ impl Render for CommandTasks {
                             )
                             .child(cmd::label(t.codebase.clone())),
                     )
-                    .child(cmd::data(line, 18.).flex_none().text_color(c(col, 1.)))
+                    .child(
+                        cmd::data(line, cmd::S_LABEL)
+                            .flex_none()
+                            .text_color(c(col, 1.)),
+                    )
                     .when_some(TaskAct::of(t.column), |d, a| {
                         let id = t.id.clone();
                         d.child(
@@ -291,7 +310,7 @@ impl Render for CommandTasks {
             .flex()
             .flex_col()
             .child(tabs)
-            .child(rows)
+            .child(rows.child(div().flex_none().h(px(24.))))
             .child(
                 div()
                     .flex_none()
@@ -303,7 +322,7 @@ impl Render for CommandTasks {
                         "EACH TASK IS A HOUSE · AUTOPILOT STARTS A PLAN WHEN A SLOT IS FREE",
                     ))
                     .child(
-                        cmd::plate("ct-full", "ALL FUNCTIONS", 180., 36., false)
+                        cmd::plate("ct-full", "FULL SCREEN VIEW", 220., 36., false)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
                     ),
             )
@@ -409,10 +428,37 @@ impl Render for CommandRepos {
                             .child(cmd::entry(b.id.clone()))
                             .child(cmd::label(sub)),
                     )
+                    .child({
+                        let (wait, err) = war.as_ref().map_or((0, 0), |w| {
+                            let of = |st: SessionState| {
+                                w.sessions
+                                    .iter()
+                                    .filter(|p| p.codebase == b.id && p.state == st)
+                                    .count()
+                            };
+                            (of(SessionState::NeedsYou), of(SessionState::Error))
+                        });
+                        let (text, col) = if err > 0 {
+                            (format!("{err} FAULT"), cmd::RED)
+                        } else if wait > 0 {
+                            (format!("{wait} WAIT FOR YOU"), cmd::AMBER)
+                        } else if run > 0 {
+                            (format!("{run} AT WORK"), cmd::GREEN)
+                        } else {
+                            ("QUIET".to_string(), cmd::HINT)
+                        };
+                        cmd::data(text, cmd::S_ENTRY)
+                            .w(px(210.))
+                            .flex_none()
+                            .text_color(c(col, 1.))
+                    })
                     .child(
-                        cmd::data(format!("{n} UNIT{}", if n == 1 { "" } else { "S" }), 19.)
-                            .w(px(90.))
-                            .flex_none(),
+                        cmd::data(
+                            format!("{n} UNIT{}", if n == 1 { "" } else { "S" }),
+                            cmd::S_ENTRY,
+                        )
+                        .w(px(90.))
+                        .flex_none(),
                     )
                     .child(
                         cmd::data(
@@ -421,18 +467,18 @@ impl Render for CommandRepos {
                             } else {
                                 format!("{free} FREE")
                             },
-                            19.,
+                            cmd::S_ENTRY,
                         )
                         .w(px(100.))
                         .flex_none()
                         .text_color(c(if free > 0 { cmd::GREEN } else { cmd::WHITE }, 1.)),
                     )
                     .child(
-                        cmd::plate(("cr-go", k), "GO TO", 104., 40., false).on_click(cx.listener(
-                            move |_, _, _, cx| {
+                        cmd::plate(("cr-go", k), "OPEN MAP", 104., 40., false).on_click(
+                            cx.listener(move |_, _, _, cx| {
                                 cx.emit(CmdEvent::Village(name.clone()));
-                            },
-                        )),
+                            }),
+                        ),
                     ),
             );
         }
@@ -441,7 +487,7 @@ impl Render for CommandRepos {
             .flex()
             .flex_col()
             .child(tabs)
-            .child(rows)
+            .child(rows.child(div().flex_none().h(px(24.))))
             .child(
                 div()
                     .flex_none()
@@ -450,10 +496,10 @@ impl Render for CommandRepos {
                     .items_center()
                     .justify_between()
                     .child(cmd::label(
-                        "GO TO MOVES THE MAP · A VILLAGE GROWS WITH ITS UNITS",
+                        "OPEN MAP MOVES THE MAP · A VILLAGE GROWS WITH ITS UNITS",
                     ))
                     .child(
-                        cmd::plate("cr-full", "ALL FUNCTIONS", 180., 36., false)
+                        cmd::plate("cr-full", "FULL SCREEN VIEW", 220., 36., false)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
                     ),
             )
@@ -494,7 +540,7 @@ impl CommandSetup {
     ) -> Div {
         let share = (value.saturating_sub(lo)) as f32 / (hi - lo).max(1) as f32;
         div()
-            .h(px(44.))
+            .h(px(40.))
             .flex()
             .items_center()
             .gap(px(10.))
@@ -529,20 +575,28 @@ impl Render for CommandSetup {
         let auto = war.as_ref().map(|w| w.autopilot.clone());
         let on = auto.as_ref().is_some_and(|a| a.on);
         let here = crate::theme::tk().look;
-        let mut body = div().size_full().flex().flex_col().gap(px(8.)).child(
-            cmd::plate(
-                "cs-look",
-                format!("LOOK · {}", cmd::up(crate::look::name(here))),
-                960.,
-                44.,
-                self.looks,
-            )
-            .w_full()
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.looks = !this.looks;
-                cx.notify();
-            })),
-        );
+        let mut body = div()
+            .id("cs-body")
+            .flex_1()
+            .min_h(px(0.))
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(
+                cmd::plate(
+                    "cs-look",
+                    format!("LOOK · {}", cmd::up(crate::look::name(here))),
+                    960.,
+                    32.,
+                    self.looks,
+                )
+                .w_full()
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.looks = !this.looks;
+                    cx.notify();
+                })),
+            );
         if self.looks {
             let mut grid = div().flex().flex_wrap().gap(px(8.));
             for (k, (look, name)) in crate::look::LOOKS.into_iter().enumerate() {
@@ -560,16 +614,11 @@ impl Render for CommandSetup {
         }
         body = body
             .child(
-                cmd::plate("cs-agents", "AGENTS AND MODELS", 960., 44., false)
-                    .w_full()
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
-            )
-            .child(
                 cmd::plate(
                     "cs-auto",
                     format!("AUTOPILOT · {}", if on { "ON" } else { "OFF" }),
                     960.,
-                    44.,
+                    32.,
                     false,
                 )
                 .w_full()
@@ -584,10 +633,17 @@ impl Render for CommandSetup {
                     );
                 })),
             )
+            // "OTHER": the full settings screen (devices, machines, all other settings).
             .child(
-                cmd::plate("cs-notes", "NOTICES AND SOUND", 960., 44., false)
-                    .w_full()
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
+                cmd::plate(
+                    "cs-full",
+                    "ALL SETTINGS · AGENTS, NOTICES, DEVICES",
+                    960.,
+                    32.,
+                    false,
+                )
+                .w_full()
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
             );
         if let Some(a) = &auto {
             let (lo, hi) = Ap::MAX_RUNNING;
@@ -645,35 +701,136 @@ impl Render for CommandSetup {
                 |v| Action::SetUiScale(v as u16),
                 cx,
             );
-            body = body.child(
-                cmd::well()
-                    .px(px(14.))
-                    .py(px(8.))
-                    .flex()
-                    .flex_col()
-                    .child(run)
-                    .child(per)
-                    .child(park)
-                    .child(text),
-            );
+            body = body
+                .child(cmd::label("AUTOPILOT LIMITS").mt(px(8.)).mb(px(2.)))
+                .child(
+                    cmd::well()
+                        .px(px(14.))
+                        .py(px(8.))
+                        .flex()
+                        .flex_col()
+                        .child(run)
+                        .child(per)
+                        .child(park)
+                        .child(text),
+                );
         } else {
             body = body.child(cmd::label("WAITING FOR THE DAEMON"));
         }
-        body.child(div().flex_1()).child(
-            div()
-                .flex_none()
+        // Looks, providers and agents: three steel wells that fill the lower half.
+        if let Some(w) = &war {
+            let head =
+                |t: &str| cmd::data(t.to_string(), cmd::S_ENTRY).text_color(c(cmd::AMBER, 1.));
+            let mut looks = cmd::well()
+                .flex_1()
+                .min_w(px(0.))
+                .p(px(12.))
                 .flex()
-                .justify_end()
-                .gap(px(10.))
-                .child(
-                    cmd::plate("cs-full", "ALL SETTINGS", 170., 44., false)
-                        .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Full))),
-                )
-                .child(
-                    cmd::plate("cs-done", "DONE", 120., 44., true)
+                .flex_col()
+                .gap(px(6.))
+                .child(head("LOOKS"));
+            let mut cols = [
+                div().flex_1().flex().flex_col().gap(px(3.)),
+                div().flex_1().flex().flex_col().gap(px(3.)),
+            ];
+            for (k, (look, name)) in crate::look::LOOKS.into_iter().enumerate() {
+                let on = look == here;
+                let col = std::mem::replace(&mut cols[k / 4], div());
+                cols[k / 4] = col.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(8.))
+                        .child(
+                            div()
+                                .size(px(8.))
+                                .bg(c(if on { cmd::LAMP_RUN } else { cmd::RULE_2 }, 1.)),
+                        )
+                        .child(
+                            cmd::data(cmd::up(name), cmd::S_LABEL)
+                                .text_color(c(if on { cmd::WHITE } else { cmd::LABEL }, 1.)),
+                        ),
+                );
+            }
+            let [c0, c1] = cols;
+            looks = looks.child(div().flex().gap(px(10.)).child(c0).child(c1));
+            let mut prov = cmd::well()
+                .flex_1()
+                .min_w(px(0.))
+                .p(px(12.))
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .child(head("PROVIDERS"));
+            for u in w.usage.iter().take(3) {
+                prov = prov.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(3.))
+                        .child(
+                            div()
+                                .flex()
+                                .justify_between()
+                                .child(cmd::data(
+                                    cmd::up(&format!("{} {}", u.provider, u.label)),
+                                    cmd::S_LABEL,
+                                ))
+                                .child(cmd::data(format!("{}%", u.pct), cmd::S_LABEL).text_color(
+                                    c(if u.pct >= 80 { cmd::RED } else { cmd::LED }, 1.),
+                                )),
+                        )
+                        .child(cmd::bar(f32::from(u.pct) / 100.)),
+                );
+            }
+            let mut agents = cmd::well()
+                .flex_1()
+                .min_w(px(0.))
+                .p(px(12.))
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .child(head("AGENTS"));
+            for provider in ["claude", "codex", "gemini"] {
+                let live = w
+                    .sessions
+                    .iter()
+                    .filter(|s| s.provider == provider && s.state.is_live())
+                    .count();
+                agents = agents.child(
+                    div()
+                        .flex()
+                        .justify_between()
+                        .child(cmd::data(cmd::up(provider), cmd::S_ENTRY))
+                        .child(
+                            cmd::data(format!("{live} LIVE"), cmd::S_ENTRY)
+                                .text_color(c(if live > 0 { cmd::LED } else { cmd::HINT }, 1.)),
+                        ),
+                );
+            }
+            body = body.child(
+                div()
+                    .mt(px(10.))
+                    .flex_none()
+                    .flex()
+                    .gap(px(10.))
+                    .child(looks)
+                    .child(prov)
+                    .child(agents),
+            );
+        }
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(body)
+            .child(
+                div().flex_none().flex().justify_end().gap(px(10.)).child(
+                    cmd::plate("cs-done", "DONE", 120., 38., true)
                         .on_click(cx.listener(|_, _, _, cx| cx.emit(CmdEvent::Close))),
                 ),
-        )
+            )
     }
 }
 
@@ -758,7 +915,7 @@ impl CommandUnit {
                     dim: cmd::HINT << 8 | 0xFF,
                     ..crate::theme::PaneTheme::DARK
                 }),
-                size: 15.,
+                size: cmd::S_LABEL,
                 pad_x: 12.,
                 max_w: None,
             })
@@ -857,7 +1014,7 @@ impl CommandUnit {
                     DiffLineKind::Context => ("  ", cmd::INK_3),
                 };
                 col = col.child(
-                    cmd::data(format!("{mark}{}", l.text.trim_end()), 17.)
+                    cmd::data(format!("{mark}{}", l.text.trim_end()), cmd::S_LABEL)
                         .flex_none()
                         .whitespace_nowrap()
                         .overflow_hidden()
@@ -953,6 +1110,7 @@ impl CommandUnit {
         let id = self.id.clone();
         let mut side = div()
             .w(px(280.))
+            .h_full()
             .flex_none()
             .flex()
             .flex_col()
@@ -964,7 +1122,7 @@ impl CommandUnit {
                     .flex_col()
                     .items_center()
                     .gap(px(2.))
-                    .child(icon(sp, 120.))
+                    .child(icon_big(sp, 190.))
                     .child(cmd::entry(format!(
                         "{} · {}",
                         cmd::up(&p.provider),
@@ -979,10 +1137,104 @@ impl CommandUnit {
                     .flex_col()
                     .gap(px(4.))
                     .child(fact("CONTEXT", format!("{}%", p.context_pct)))
+                    .child(cmd::bar(f32::from(p.context_pct) / 100.))
                     .child(fact("COST", format!("${:.2}", p.cost)))
                     .child(fact("TOKENS", cmd::tokens(p.tokens)))
                     .child(fact("HELPERS", p.subagents.len().to_string())),
             );
+        let mut helpers = cmd::well()
+            .flex_1()
+            .min_h(px(0.))
+            .overflow_hidden()
+            .p(px(12.))
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .child(cmd::label(if p.subagents.is_empty() {
+                "NO HELPERS ON THIS UNIT"
+            } else {
+                "HELPERS"
+            }));
+        for h in p.subagents.iter().take(4) {
+            helpers = helpers.child(
+                cmd::entry(cmd::up(&h.name))
+                    .flex_none()
+                    .whitespace_nowrap()
+                    .overflow_hidden()
+                    .text_ellipsis(),
+            );
+        }
+        if p.subagents.len() > 4 {
+            helpers = helpers.child(cmd::label(format!("+{} MORE", p.subagents.len() - 4)));
+        }
+        if let Some(t) = p.task.as_ref().filter(|t| !t.trim().is_empty()) {
+            helpers = helpers.child(cmd::label("TASK").flex_none()).child(
+                cmd::entry(cmd::up(t))
+                    .flex_none()
+                    .whitespace_nowrap()
+                    .overflow_hidden()
+                    .text_ellipsis(),
+            );
+        }
+        // The well always shows the last orders: tool lines first, else the latest chat turns.
+        let mut orders: Vec<_> = p
+            .tail
+            .iter()
+            .filter(|l| l.kind == aivory_protocol::LineKind::Tool)
+            .rev()
+            .take(5)
+            .collect();
+        if orders.is_empty() {
+            orders = p
+                .tail
+                .iter()
+                .filter(|l| {
+                    matches!(
+                        l.kind,
+                        aivory_protocol::LineKind::User | aivory_protocol::LineKind::Agent
+                    ) && {
+                        let t = l.text.trim_start();
+                        !t.is_empty() && !t.starts_with(['|', '`', '#'])
+                    }
+                })
+                .rev()
+                .take(5)
+                .collect();
+        }
+        helpers = helpers.child(cmd::label("LAST ORDERS").mt(px(8.)));
+        if orders.is_empty() {
+            helpers = helpers.child(cmd::label("NO ORDERS YET"));
+        }
+        for l in orders.into_iter().rev() {
+            let tag = match l.kind {
+                aivory_protocol::LineKind::User => "YOU".to_string(),
+                aivory_protocol::LineKind::Agent => "AI".to_string(),
+                _ => cmd::up(l.label.as_deref().unwrap_or("TOOL")),
+            };
+            helpers = helpers.child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .gap(px(8.))
+                    .child(
+                        cmd::data(tag, cmd::S_LABEL)
+                            .flex_none()
+                            .text_color(c(cmd::LED, 1.)),
+                    )
+                    .child(
+                        cmd::data(
+                            l.text.lines().next().unwrap_or("").to_string(),
+                            cmd::S_LABEL,
+                        )
+                        .flex_1()
+                        .min_w(px(0.))
+                        .whitespace_nowrap()
+                        .overflow_hidden()
+                        .text_ellipsis(),
+                    ),
+            );
+        }
+        side = side.child(helpers);
         if p.state == SessionState::Parked {
             side = side.child(cmd::plate("cu-resume", "RESUME", 280., 40., true).on_click(
                 cx.listener(move |this, _, _, cx| act(&this.model, Action::Resume(id.clone()), cx)),
@@ -1106,28 +1358,72 @@ impl Render for CommandUnit {
             .flex_col()
             .gap(px(8.))
             .child(cmd::label("RADIO · THE LAST MESSAGES"));
-        for (k, l) in last_lines(&p.tail, 24).into_iter().enumerate() {
-            if let Some(m) = &l.media {
-                let rgba = |v: u32| gpui::rgba(v << 8 | 0xFF);
-                let style = crate::media::MediaStyle {
-                    card: rgba(cmd::CARD),
-                    text: rgba(cmd::INK),
-                    muted: rgba(cmd::HINT),
-                    radius: 0.,
-                };
-                msgs = msgs.child(crate::media::preview(m, ("cu-media", k), style));
+        for (k, d) in crate::console::display::last(&p.tail, 60)
+            .into_iter()
+            .enumerate()
+        {
+            use crate::console::display::DKind;
+            if d.kind == DKind::Meta {
+                let found = p
+                    .tail
+                    .iter()
+                    .rev()
+                    .find(|l| l.media.is_some() && l.text.trim_end() == d.text);
+                if let Some(m) = found.and_then(|l| l.media.as_ref()) {
+                    let rgba = |v: u32| gpui::rgba(v << 8 | 0xFF);
+                    let style = crate::media::MediaStyle {
+                        card: rgba(cmd::CARD),
+                        text: rgba(cmd::INK),
+                        muted: rgba(cmd::HINT),
+                        radius: 0.,
+                    };
+                    msgs = msgs.child(crate::media::preview(m, ("cu-media", k), style));
+                }
                 continue;
             }
-            let (who, col) = line_head(&l, &p.provider);
+            if d.kind == DKind::Output {
+                continue;
+            }
+            // The speaker shows once per message, on its first line.
+            let (who, col) = if !d.first {
+                (String::new(), cmd::INK)
+            } else {
+                match d.kind {
+                    DKind::You => ("YOU".to_string(), cmd::AMBER),
+                    DKind::Tool => (cmd::up(d.label.as_deref().unwrap_or("TOOL")), cmd::INK_3),
+                    DKind::Error => ("ERROR".to_string(), cmd::RED),
+                    _ => (cmd::up(&p.provider), cmd::GREEN),
+                }
+            };
+            let (text, color) = match d.kind {
+                DKind::Heading => (cmd::up(&d.text), cmd::WHITE),
+                DKind::Code | DKind::Table | DKind::Tool => (d.text.clone(), cmd::INK_3),
+                DKind::Error => (d.text.clone(), cmd::RED),
+                _ => (d.text.clone(), cmd::INK),
+            };
             msgs = msgs.child(
                 div()
                     .id(("cu-line", k))
                     .flex()
                     .gap(px(8.))
-                    .child(cmd::data(who, 20.).flex_none().text_color(c(col, 1.)))
-                    .child(cmd::data(l.text.clone(), 20.).flex_1().min_w(px(0.))),
+                    .child(
+                        cmd::data(who, cmd::S_ENTRY)
+                            .flex_none()
+                            .w(px(110.))
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_color(c(col, 1.)),
+                    )
+                    .child(
+                        cmd::data(text, cmd::S_ENTRY)
+                            .flex_1()
+                            .min_w(px(0.))
+                            .text_color(c(color, 1.)),
+                    ),
             );
         }
+        // Space under the last line, so the scroll area never cuts a row.
+        msgs = msgs.child(div().flex_none().h(px(12.)));
         let mut main = cmd::well()
             .flex_1()
             .min_w(px(0.))
@@ -1151,8 +1447,11 @@ impl Render for CommandUnit {
                     .border_t_2()
                     .border_color(c(cmd::RULE_2, 1.))
                     .child(
-                        cmd::data(format!("{} {}", cmd::up(a.kind.label()), a.text), 20.)
-                            .text_color(c(cmd::AMBER, 1.)),
+                        cmd::data(
+                            format!("{} {}", cmd::up(a.kind.label()), a.text),
+                            cmd::S_ENTRY,
+                        )
+                        .text_color(c(cmd::AMBER, 1.)),
                     ),
             );
             let n = a.options.len();

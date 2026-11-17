@@ -10,17 +10,29 @@
 
 mod error;
 mod git;
+mod git_sync;
+mod hg;
+mod jj;
 mod ledger;
+mod p4;
 mod prompt;
+mod svn;
+mod sync;
 mod types;
 mod vcs;
 
 pub use error::{Result, VcsError};
 pub use git::GitVcs;
+pub use git_sync::GitSync;
+pub use hg::HgSync;
+pub use jj::JjSync;
 pub use ledger::{Ledger, LedgerOp, SCHEMA_VERSION, Turn, TurnFile, TurnTool};
+pub use p4::P4Sync;
 pub use prompt::{
     PromptBlameLine, TimelineEvent, blame_by_prompt, file_timeline, finish_turn, revert_turn,
 };
+pub use svn::SvnSync;
+pub use sync::{RepoIdentity, SyncVcs, VcsKind, WipRef, detect};
 pub use types::{
     BASELINE_TURN, BlameLine, ChangeStatus, CommitInfo, FileChange, LogOptions, MergeMessage,
     MergeOutcome, PublishRequest, PublishedCommit, RefInfo, Snapshot, SnapshotRequest, StatusEntry,

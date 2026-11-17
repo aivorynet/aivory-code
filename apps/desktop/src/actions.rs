@@ -45,6 +45,8 @@ pub enum Action {
     SetLook(Look),
     /// `settings/set display.uiScale`: the text size in percent.
     SetUiScale(u16),
+    /// `settings/set providers.<provider>.model`: the default model of a provider.
+    SetDefaultModel { provider: String, model: String },
     /// A screen change: the Focus view of one session. No daemon call.
     Focus(String),
     /// `session/dispatch`: one line of work, started now or queued. The text comes from a
@@ -109,7 +111,9 @@ impl Action {
             Self::Stop(_) => method::SessionStop::NAME,
             Self::Resume(_) => method::SessionResume::NAME,
             Self::Autopilot(_) => method::AutopilotSet::NAME,
-            Self::SetLook(_) | Self::SetUiScale(_) => method::SettingsSet::NAME,
+            Self::SetLook(_) | Self::SetUiScale(_) | Self::SetDefaultModel { .. } => {
+                method::SettingsSet::NAME
+            }
             Self::Dispatch { .. } => method::SessionDispatch::NAME,
             Self::NewSession { .. } => method::SessionNew::NAME,
             Self::Focus(_) | Self::Open(_) => "screen",
@@ -183,6 +187,7 @@ pub fn act(model: &Entity<Model>, action: Action, cx: &mut App) {
                 composer,
                 task: None,
                 attachments: Vec::new(),
+                node: None,
             },
             cx,
         ),
@@ -203,6 +208,15 @@ pub fn act(model: &Entity<Model>, action: Action, cx: &mut App) {
                 aivory_protocol::rpc::SettingsSetParams {
                     key: "display.uiScale".into(),
                     value: serde_json::json!(percent),
+                },
+                cx,
+            );
+        }
+        Action::SetDefaultModel { provider, model: m } => {
+            model.send::<method::SettingsSet>(
+                aivory_protocol::rpc::SettingsSetParams {
+                    key: format!("providers.{provider}.model"),
+                    value: serde_json::json!(m),
                 },
                 cx,
             );

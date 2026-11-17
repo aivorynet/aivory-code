@@ -79,6 +79,7 @@ impl WarRoomScreen {
                 },
                 task: None,
                 attachments: Vec::new(),
+                node: None,
             },
             cx,
         );
@@ -185,7 +186,7 @@ impl WarRoomScreen {
                     div()
                         .flex_none()
                         .font_family(tk().display)
-                        .text_size(ui::ts(24.))
+                        .text_size(ui::ts(crate::theme::T_DISPLAY))
                         .font_weight(FontWeight::NORMAL)
                         .whitespace_nowrap()
                         .child("War room"),

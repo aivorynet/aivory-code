@@ -11,8 +11,8 @@ use aivory_protocol::rpc::{SessionRef, method};
 use aivory_protocol::session::{DiffFile, DiffLineKind, SessionDiff};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Context, Div, Entity, EventEmitter, ScrollHandle, SharedString, Subscription,
-    Window, div, px, rgb,
+    AnyElement, Context, Div, Entity, EventEmitter, Focusable, ScrollHandle, SharedString,
+    Subscription, Window, div, px, rgb,
 };
 use gpui_base::input::{InputEvent, InputState};
 
@@ -71,6 +71,7 @@ pub struct HoloFocus {
     scroll: ScrollHandle,
     /// The session and item count that the chat was last scrolled to the end for.
     scrolled: String,
+    snap: u8,
     opened: Instant,
     _subs: Vec<Subscription>,
 }
@@ -124,6 +125,7 @@ impl HoloFocus {
             file: None,
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
+            snap: 0,
             opened: Instant::now(),
             _subs: vec![observe, events, opened],
         }
@@ -217,13 +219,16 @@ impl HoloFocus {
     }
 }
 
+/// A lighter muted tone for chat rows and the composer: readable on the glass.
+const SOFT: u32 = 0xB4D8EE;
+
 /// The console in the colors of the glass: no fill, light cyan text.
 fn console_look() -> ConsoleLook {
     let theme = PaneTheme {
         bg: 0x00000000,
         top: 0x00000000,
         text: (TXT << 8) | 0xFF,
-        dim: (MUTED << 8) | 0xFF,
+        dim: (SOFT << 8) | 0xFF,
         accent: (PK << 8) | 0xFF,
         ..PaneTheme::NAVY
     };
@@ -233,6 +238,148 @@ fn console_look() -> ConsoleLook {
         pad_x: 4.,
         max_w: None,
     }
+}
+
+/// The last tool calls of the session, in mono on a dim glass inset: the content of a side panel
+/// that has no diff yet (R3: code looks different from the text).
+fn recent_steps(tail: &[aivory_protocol::Line]) -> Div {
+    let steps: Vec<display::DLine> = display::steps(tail, 40)
+        .into_iter()
+        .filter(|d| d.kind == display::DKind::Tool)
+        .collect();
+    let skip = steps.len().saturating_sub(6);
+    let mut inset = div()
+        .flex_1()
+        .min_h(px(200.))
+        .overflow_hidden()
+        .flex()
+        .flex_col()
+        .gap(px(6.))
+        .p(px(16.))
+        .rounded(px(8.))
+        .bg(ink(0x010A18, 0.6))
+        .border_1()
+        .border_color(ink(PK, 0.22))
+        .border_l_2()
+        .border_color(ink(PK, 0.5));
+    if steps.is_empty() {
+        inset = inset
+            .child(
+                div()
+                    .font_family(CODE)
+                    .text_size(ui::ts(S_CODE))
+                    .text_color(rgb(MUTED))
+                    .child("$ no tool call yet"),
+            )
+            .child(
+                div()
+                    .font_family(CODE)
+                    .text_size(ui::ts(S_CODE))
+                    .text_color(ink(MUTED, 0.6))
+                    .child("  the next call of the agent shows here"),
+            );
+    } else {
+        for d in &steps[skip..] {
+            inset = inset.child(
+                div()
+                    .flex()
+                    .gap(px(10.))
+                    .font_family(CODE)
+                    .text_size(ui::ts(S_CODE))
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_color(rgb(PK))
+                            .child(d.label.as_deref().unwrap_or("tool").to_lowercase()),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .truncate()
+                            .text_color(rgb(PA))
+                            .child(d.text.clone()),
+                    ),
+            );
+        }
+    }
+    div()
+        .flex_1()
+        .min_h(px(240.))
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .pt(px(12.))
+        .child(th("Latest tool calls"))
+        .child(inset)
+}
+
+/// The facts of a session that has no edit yet: six glass tiles that fill the detail panel.
+fn facts_block(p: &aivory_protocol::Pane, mins: impl std::fmt::Display) -> Div {
+    let tile = |label: &str, value: String, accent: u32| {
+        div()
+            .flex_1()
+            .min_w(px(0.))
+            .h(px(78.))
+            .flex()
+            .flex_col()
+            .justify_center()
+            .gap(px(4.))
+            .px(px(16.))
+            .rounded(px(10.))
+            .border_1()
+            .border_color(ink(accent, 0.45))
+            .bg(gpui::linear_gradient(
+                160.,
+                gpui::linear_color_stop(ink(0xBFEFFF, 0.14), 0.),
+                gpui::linear_color_stop(ink(0x1A5E92, 0.10), 1.),
+            ))
+            .shadow(vec![gpui::BoxShadow {
+                color: ink(accent, 0.12),
+                offset: gpui::point(px(0.), px(0.)),
+                blur_radius: px(14.),
+                spread_radius: px(0.),
+                inset: true,
+            }])
+            .child(th(label.to_string()))
+            .child(
+                div()
+                    .truncate()
+                    .font_family(LABEL)
+                    .font_weight(gpui::FontWeight::BOLD)
+                    .text_size(ui::ts(S_BIG))
+                    .text_color(rgb(PA))
+                    .child(value),
+            )
+    };
+    div()
+        .flex_none()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .pt(px(16.))
+        .child(th("This session"))
+        .child(
+            div()
+                .flex()
+                .gap(px(10.))
+                .child(tile("Provider", p.provider.clone(), PK))
+                .child(tile("Project", p.codebase.clone(), PK)),
+        )
+        .child(
+            div()
+                .flex()
+                .gap(px(10.))
+                .child(tile("Running", format!("{mins:.0} min"), PK))
+                .child(tile("Cost", format!("${:.2}", p.cost), OR)),
+        )
+        .child(
+            div()
+                .flex()
+                .gap(px(10.))
+                .child(tile("Agents", format!("{}", p.agents()), PK))
+                .child(tile("Context", format!("{}%", p.context_pct), PE)),
+        )
 }
 
 /// A scroll box that fills the rest of its parent.
@@ -373,7 +520,12 @@ impl Render for HoloFocus {
             self.scroll.scroll_to_bottom();
             if self.opened.elapsed() > std::time::Duration::from_millis(1200) {
                 self.scrolled = key;
+                self.snap = 4;
             }
+            window.request_animation_frame();
+        } else if self.snap > 0 {
+            self.snap -= 1;
+            crate::ui::snap_rows(&self.scroll);
             window.request_animation_frame();
         }
         let mut chat = scroll_box("lf-chat")
@@ -381,14 +533,14 @@ impl Render for HoloFocus {
             .track_scroll(&self.scroll)
             .gap(px(2.))
             .pr(px(16.))
-            .pb(px(18.));
+            .pb(px(34.));
         if shown.is_empty() {
             chat = chat.child(th("No rows yet"));
         }
         let media_style = MediaStyle {
             card: ink(PK, 0.08).into(),
             text: gpui::rgb(TXT),
-            muted: gpui::rgb(MUTED),
+            muted: gpui::rgb(SOFT),
             radius: 8.,
         };
         for (n, d) in shown.iter().enumerate() {
@@ -475,7 +627,7 @@ impl Render for HoloFocus {
 
         let palette = compose::Palette {
             text: TXT << 8 | 0xFF,
-            dim: MUTED << 8 | 0xFF,
+            dim: SOFT << 8 | 0xFF,
             line: PK << 8 | 0x66,
             chip_bg: PK << 8 | 0x14,
             hover: PK << 8 | 0x33,
@@ -488,42 +640,95 @@ impl Render for HoloFocus {
                 cx.notify();
             }))
         });
+        // The input is one piece of see-through glass: a translucent gradient over the rings,
+        // a bright top and left edge, an inner glow and a cyan bloom on focus. Attach and Send
+        // are glass pills inside it.
+        let glass_pill = |id: &'static str, label: &str, hot: bool| {
+            div()
+                .id(id)
+                .flex_none()
+                .h(px(34.))
+                .px(px(16.))
+                .flex()
+                .items_center()
+                .rounded_full()
+                .border_1()
+                .border_color(if hot { ink(PK, 0.9) } else { ink(PA, 0.4) })
+                .bg(ink(PK, if hot { 0.30 } else { 0.10 }))
+                .font_family(LABEL)
+                .font_weight(gpui::FontWeight::BOLD)
+                .text_size(ui::ts(S_SMALL))
+                .text_color(rgb(if hot { 0xFFFFFF } else { PA }))
+                .cursor_pointer()
+                .hover(|s| s.bg(ink(PK, 0.4)))
+                .child(label.to_uppercase())
+        };
+        let typing = self.input.focus_handle(cx).is_focused(window);
         let field = div()
+            .relative()
             .flex_none()
-            .min_h(px(40.))
+            .min_h(px(54.))
             .flex()
-            .flex_wrap()
+            .items_center()
             .gap(px(8.))
+            .pl(px(20.))
+            .pr(px(10.))
+            .rounded(px(12.))
+            .border_1()
+            .border_color(if typing { ink(PK, 1.0) } else { ink(PA, 0.7) })
+            .bg(gpui::linear_gradient(
+                160.,
+                gpui::linear_color_stop(ink(0xBFEFFF, if typing { 0.24 } else { 0.17 }), 0.),
+                gpui::linear_color_stop(ink(0x0A2846, 0.55), 1.),
+            ))
+            .shadow(vec![
+                gpui::BoxShadow {
+                    color: ink(PK, if typing { 0.6 } else { 0.22 }),
+                    offset: gpui::point(px(0.), px(0.)),
+                    blur_radius: px(if typing { 26. } else { 14. }),
+                    spread_radius: px(if typing { 2. } else { 0. }),
+                    inset: false,
+                },
+                gpui::BoxShadow {
+                    color: ink(0xFFFFFF, 0.16),
+                    offset: gpui::point(px(0.), px(0.)),
+                    blur_radius: px(18.),
+                    spread_radius: px(0.),
+                    inset: true,
+                },
+            ])
+            .font_family(BODY)
+            .text_size(ui::ts(S_BODY))
+            .text_color(rgb(TXT))
+            // The light edge: a bright hairline along the top and one along the left.
             .child(
-                div().flex_1().min_w(px(160.)).flex().child(
-                    div()
-                        .flex_1()
-                        .min_w(px(0.))
-                        .border_1()
-                        .border_color(ink(PK, 0.4))
-                        .bg(ink(PK, 0.04))
-                        .px(px(16.))
-                        .py(px(6.))
-                        .flex()
-                        .items_center()
-                        .font_family(BODY)
-                        .text_size(ui::ts(S_BODY))
-                        .text_color(rgb(TXT))
-                        .child(div().flex_1().min_w(px(0.)).child(self.input.clone())),
-                ),
+                div()
+                    .absolute()
+                    .top(px(0.))
+                    .left(px(14.))
+                    .right(px(14.))
+                    .h(px(2.))
+                    .bg(ink(0xFFFFFF, 0.85)),
             )
             .child(
-                pill("lf-attach", PU, "Attach")
-                    .min_h(px(40.))
-                    .min_w(ui::sw(88.))
-                    .on_click(cx.listener(|_, _, window, cx| {
+                div()
+                    .absolute()
+                    .left(px(0.))
+                    .top(px(12.))
+                    .bottom(px(12.))
+                    .w(px(2.))
+                    .bg(ink(0xFFFFFF, 0.6)),
+            )
+            .child(div().flex_1().min_w(px(80.)).child(self.input.clone()))
+            .child(
+                glass_pill("lf-attach", "Attach", false).on_click(cx.listener(
+                    |_, _, window, cx| {
                         compose::attach(|this: &mut Self| Some(&mut this.tools), window, cx)
-                    })),
+                    },
+                )),
             )
             .child(
-                pill("lf-send", PK, "Send")
-                    .min_h(px(40.))
-                    .min_w(ui::sw(88.))
+                glass_pill("lf-send", "Send", true)
                     .on_click(cx.listener(|this, _, window, cx| this.send(window, cx))),
             );
 
@@ -541,13 +746,15 @@ impl Render for HoloFocus {
             menu_hover: gpui::rgba(0x4FD8FF33),
             font: Some(BODY.into()),
             radius: None,
-            text: None,
+            text: Some(S_SMALL),
         };
         let composer = div()
             .flex_none()
             .flex()
             .flex_col()
             .gap(px(8.))
+            .pt(px(12.))
+            .child(th("Mode and model"))
             .child(self.controls.row(
                 "lf-ctl",
                 &p,
@@ -634,7 +841,7 @@ impl Render for HoloFocus {
                                 .map_or(1, |i| i + 1),
                             files.len()
                         ))),
-                    None => div().child(th("No change yet")),
+                    None => div().child(th("No edits yet. Edits of this session appear here.")),
                 });
                 if let Some(f) = current {
                     let mut lines_box = scroll_box("lf-diff").pr(px(8.));
@@ -662,6 +869,10 @@ impl Render for HoloFocus {
                         );
                     }
                     right = right.child(lines_box);
+                } else {
+                    right = right
+                        .child(facts_block(&p, mins))
+                        .child(recent_steps(&p.tail));
                 }
             }
             Side::Files => {
@@ -718,7 +929,7 @@ impl Render for HoloFocus {
                     );
                 }
                 if files.is_empty() {
-                    list = list.child(th("No change yet"));
+                    list = list.child(th("No edits yet")).child(recent_steps(&p.tail));
                 }
                 right = right.child(list);
             }
@@ -783,7 +994,8 @@ impl Render for HoloFocus {
             side_tab("lf-files-tab", "Files", Side::Files, cx),
             side_tab("lf-tests-tab", "Tests", Side::Tests, cx),
             side_tab("lf-console-tab", "Console", Side::Console, cx),
-            tab(SharedString::from("lf-lens"), "Open in Lens ›", PK, false)
+            link(SharedString::from("lf-lens"), "Open in Lens ›", PK)
+                .ml_auto()
                 .on_click(cx.listener(move |_, _, _, cx| {
                     if let Some(path) = &open_path {
                         cx.emit(HoloFocusEvent::OpenFile {
@@ -795,7 +1007,11 @@ impl Render for HoloFocus {
                 .into_any_element(),
         ];
 
-        let right_title = format!("Changes · {}", files.len());
+        let right_title = if files.is_empty() {
+            "Changes".to_string()
+        } else {
+            format!("Changes · {}", files.len())
+        };
         let color = if waits { RD } else { PK };
         if narrow {
             // One panel: the chat and the details are tabs of the same column.

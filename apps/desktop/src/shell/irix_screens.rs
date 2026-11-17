@@ -80,12 +80,20 @@ fn two_panes(list: Div, detail: Div) -> Div {
 
 /// The detail pane: a sunken white panel with a scroll bar.
 fn detail_pane(id: &'static str, handle: &ScrollHandle, body: Div) -> Div {
-    sunken(div().size_full().child(scroll_area(
-        id,
-        handle,
-        false,
-        div().p(px(PAD)).flex().flex_col().gap(px(20.)).child(body),
-    )))
+    sunken(
+        div().size_full().child(scroll_area(
+            id,
+            handle,
+            false,
+            div()
+                .p(px(PAD))
+                .pb(px(PAD + 28.))
+                .flex()
+                .flex_col()
+                .gap(px(20.))
+                .child(body),
+        )),
+    )
     .size_full()
 }
 
@@ -423,7 +431,11 @@ impl IrixTasks {
                     .child(strip_chart(&times, 0x3CE05A, 72., 1., "ms per step")),
             );
         }
-        if let Some(series) = self.spend.get(&t.id) {
+        if let Some(series) = self
+            .spend
+            .get(&t.id)
+            .filter(|s| s.list().iter().any(|v| *v > 0.))
+        {
             charts = charts.child(
                 div()
                     .flex_1()
@@ -756,7 +768,7 @@ impl IrixRepos {
                 .child(strip_chart(
                     &series.list(),
                     0x3CE05A,
-                    44.,
+                    72.,
                     1.,
                     "tokens per 2 s",
                 ));
@@ -856,7 +868,6 @@ impl Render for IrixRepos {
             )
         });
         let keys = menu_bar()
-            .child(div().flex_1())
             .child(
                 seg("ir-browse", "Browse", self.mode == Mode::Browse).on_click(cx.listener(
                     |this, _, _, cx| {
@@ -895,7 +906,16 @@ impl Render for IrixRepos {
                 .into_any_element()
             }
         };
-        page().child(heading("Repos", &sub)).child(keys).child(body)
+        page()
+            .child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .items_end()
+                    .child(heading("Repos", &sub).flex_1().min_w_0())
+                    .child(keys),
+            )
+            .child(body)
     }
 }
 
@@ -907,6 +927,37 @@ pub(super) struct IrixScreens {
     tasks: Option<(Entity<IrixTasks>, gpui::Subscription)>,
     repos: Option<(Entity<IrixRepos>, gpui::Subscription)>,
     pub(super) focus: Option<(Entity<super::irix_focus::IrixFocus>, gpui::Subscription)>,
+    inbox: Option<(Entity<IrixPage>, gpui::Subscription)>,
+    settings: Option<(Entity<IrixPage>, gpui::Subscription)>,
+}
+
+// ============================================================ Inbox and Settings ====
+
+/// A Navigator screen around a full screen of the Minimal layout (Inbox, Settings): the grey
+/// window and a sunken box that holds the screen.
+pub struct IrixPage {
+    inner: gpui::AnyView,
+}
+
+impl EventEmitter<IrixEvent> for IrixPage {}
+
+impl IrixPage {
+    fn new(inner: gpui::AnyView) -> Self {
+        Self { inner }
+    }
+}
+
+impl Render for IrixPage {
+    fn render(&mut self, _: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        // The screen has its own title and scroll bar: the page gives the grey window and the
+        // sunken box.
+        page().child(
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(sunken(div().size_full().child(self.inner.clone())).size_full()),
+        )
+    }
 }
 
 impl super::Shell {
@@ -945,6 +996,34 @@ impl super::Shell {
         }
     }
 
+    /// The Navigator Inbox screen.
+    pub(super) fn irix_inbox_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.irix_screens.inbox.is_none() {
+            let inner = self.inbox.clone();
+            let view = cx.new(|_| IrixPage::new(inner.into()));
+            let sub = cx.subscribe(&view, |this, _, e: &IrixEvent, cx| this.irix_event(e, cx));
+            self.irix_screens.inbox = Some((view, sub));
+        }
+        match &self.irix_screens.inbox {
+            Some((view, _)) => view.clone().into_any_element(),
+            None => div().into_any_element(),
+        }
+    }
+
+    /// The Navigator Settings screen.
+    pub(super) fn irix_settings_view(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.irix_screens.settings.is_none() {
+            let inner = self.settings.clone();
+            let view = cx.new(|_| IrixPage::new(inner.into()));
+            let sub = cx.subscribe(&view, |this, _, e: &IrixEvent, cx| this.irix_event(e, cx));
+            self.irix_screens.settings = Some((view, sub));
+        }
+        match &self.irix_screens.settings {
+            Some((view, _)) => view.clone().into_any_element(),
+            None => div().into_any_element(),
+        }
+    }
+
     /// The Navigator Focus view of the session on screen.
     pub(super) fn irix_focus_view(
         &mut self,
@@ -966,7 +1045,7 @@ impl super::Shell {
         let view = cx.new(|cx| IrixFocus::new(model, id, window, cx));
         let sub = cx.subscribe(&view, |this, _, e: &IrixFocusEvent, cx| match e {
             IrixFocusEvent::Open(id) => this.open_session(id, cx),
-            IrixFocusEvent::Back => this.go(super::Screen::WarRoom, cx),
+            IrixFocusEvent::Back => this.go_back(cx),
             IrixFocusEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         });
         self.irix_screens.focus = Some((view.clone(), sub));

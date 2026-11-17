@@ -20,10 +20,18 @@ pub mod push;
 /// The re-exported iroh crate, for the daemon side.
 pub use iroh;
 
-pub use client::{ConnectOptions, LinkClient, MessageSink, PathInfo, PathKind};
+pub use client::{ConnectOptions, LinkClient, MessageSink, PathInfo, PathKind, path_of};
 pub use error::LinkError;
-pub use hello::{HELLO_METHOD, Hello, HelloReply, UNAUTHORIZED};
-pub use pairlink::PairLink;
+pub use hello::{
+    HELLO_METHOD, Hello, HelloReply, MESH_HELLO_METHOD, MESH_PING_METHOD, MeshHello,
+    MeshHelloReply, UNAUTHORIZED,
+};
+pub use pairlink::{PairLink, PeerLink};
 
 /// The application protocol of the link.
 pub const ALPN: &[u8] = b"aivory/rpc/1";
+
+/// The application protocol between two daemons of the machine mesh (ADR 0026). The frames are
+/// the same as on [`ALPN`]; the first stream carries `mesh/hello`, and each later request has a
+/// stream of its own.
+pub const MESH_ALPN: &[u8] = b"aivory/mesh/1";

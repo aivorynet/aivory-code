@@ -28,11 +28,12 @@ use aivory_link::frame::{read_frame, write_frame};
 use aivory_link::hello::{HELLO_METHOD, Hello, HelloReply, UNAUTHORIZED};
 use aivory_link::iroh::endpoint::{Connection as QuicConnection, Incoming, RecvStream, SendStream};
 use aivory_link::iroh::{Endpoint, Watcher};
-use aivory_link::keys;
+use aivory_link::{MESH_ALPN, keys};
 use serde_json::{Value, json};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 use crate::endpoint::Connection;
+use crate::mesh::Mesh;
 use crate::remote::{Caller, Pairings, as_caller, lan_ip};
 use crate::rpc::Daemon;
 use crate::server::serve_connection;
@@ -57,6 +58,8 @@ pub struct IrohOptions {
     pub relay: RelayChoice,
     /// Bind one IPv4 socket on this address. `None`: all interfaces.
     pub bind: Option<SocketAddr>,
+    /// The machine mesh (ADR 0026): the endpoint also accepts and dials peer daemons.
+    pub mesh: Option<Arc<Mesh>>,
 }
 
 /// The running link. Dropping it closes the endpoint.
@@ -70,6 +73,7 @@ pub struct IrohLink {
 struct Context {
     daemon: Arc<Daemon>,
     pairings: Arc<Pairings>,
+    mesh: Option<Arc<Mesh>>,
     node: String,
 }
 
@@ -103,13 +107,24 @@ impl IrohLink {
             .map_err(io::Error::other)?;
         let node = endpoint.id().to_string();
         pairings.set_iroh(&node, options.relay.url());
-        pairings.set_direct(&dialable(&endpoint.bound_sockets()));
+        let direct = dialable(&endpoint.bound_sockets());
+        pairings.set_direct(&direct);
+        if let Some(mesh) = &options.mesh {
+            let direct: Vec<String> = direct.iter().map(ToString::to_string).collect();
+            mesh.set_addrs(options.relay.url(), &direct);
+            mesh.attach(endpoint.clone(), runtime.handle().clone());
+        }
         if options.relay == RelayChoice::Default {
-            runtime.spawn(publish_relay(endpoint.clone(), Arc::clone(&pairings)));
+            runtime.spawn(publish_relay(
+                endpoint.clone(),
+                Arc::clone(&pairings),
+                options.mesh.clone(),
+            ));
         }
         let ctx = Arc::new(Context {
             daemon,
             pairings,
+            mesh: options.mesh,
             node: node.clone(),
         });
         runtime.spawn(accept_loop(endpoint.clone(), ctx));
@@ -170,7 +185,7 @@ fn dialable(bound: &[SocketAddr]) -> Vec<SocketAddr> {
 }
 
 /// Wait for the home relay, then name it in the pairing links.
-async fn publish_relay(endpoint: Endpoint, pairings: Arc<Pairings>) {
+async fn publish_relay(endpoint: Endpoint, pairings: Arc<Pairings>, mesh: Option<Arc<Mesh>>) {
     if tokio::time::timeout(ONLINE_WAIT, endpoint.online())
         .await
         .is_err()
@@ -181,6 +196,9 @@ async fn publish_relay(endpoint: Endpoint, pairings: Arc<Pairings>) {
     let addr = endpoint.watch_addr().get();
     let relay = addr.relay_urls().next().map(ToString::to_string);
     pairings.set_iroh(&endpoint.id().to_string(), relay.as_deref());
+    if let Some(mesh) = mesh {
+        mesh.set_addrs(relay.as_deref(), &[]);
+    }
 }
 
 async fn accept_loop(endpoint: Endpoint, ctx: Arc<Context>) {
@@ -196,6 +214,15 @@ async fn accept_loop(endpoint: Endpoint, ctx: Arc<Context>) {
 
 async fn connection(incoming: Incoming, ctx: &Context) -> io::Result<()> {
     let conn = incoming.await.map_err(io::Error::other)?;
+    if conn.alpn() == MESH_ALPN {
+        return match &ctx.mesh {
+            Some(mesh) => Arc::clone(mesh).serve_inbound(conn).await,
+            None => {
+                conn.close(CLOSE_REJECTED.into(), b"no mesh");
+                Ok(())
+            }
+        };
+    }
     let peer = conn.remote_id().to_string();
     let (mut send, mut recv) = conn.accept_bi().await.map_err(io::Error::other)?;
     let first = tokio::time::timeout(HELLO_TIMEOUT, read_frame(&mut recv))

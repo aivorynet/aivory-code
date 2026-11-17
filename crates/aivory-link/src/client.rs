@@ -208,20 +208,7 @@ impl LinkClient {
         if self.is_closed() {
             return PathInfo::none();
         }
-        let paths = self.conn.paths();
-        let selected = paths.iter().find(|p| p.is_selected());
-        match selected {
-            Some(p) => PathInfo {
-                kind: if p.is_relay() {
-                    PathKind::Relay
-                } else {
-                    PathKind::Direct
-                },
-                addr: p.remote_addr().to_string(),
-                rtt_ms: u64::try_from(p.rtt().as_millis()).unwrap_or(u64::MAX),
-            },
-            None => PathInfo::none(),
-        }
+        path_of(&self.conn)
     }
 
     pub fn is_closed(&self) -> bool {
@@ -295,8 +282,26 @@ impl Drop for LinkClient {
     }
 }
 
+/// The selected path of an iroh connection.
+pub fn path_of(conn: &Connection) -> PathInfo {
+    let paths = conn.paths();
+    let selected = paths.iter().find(|p| p.is_selected());
+    match selected {
+        Some(p) => PathInfo {
+            kind: if p.is_relay() {
+                PathKind::Relay
+            } else {
+                PathKind::Direct
+            },
+            addr: p.remote_addr().to_string(),
+            rtt_ms: u64::try_from(p.rtt().as_millis()).unwrap_or(u64::MAX),
+        },
+        None => PathInfo::none(),
+    }
+}
+
 impl PathInfo {
-    fn none() -> Self {
+    pub fn none() -> Self {
         Self {
             kind: PathKind::None,
             addr: String::new(),

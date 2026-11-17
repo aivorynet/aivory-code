@@ -4,6 +4,7 @@
 //! for you, the decision with its answers, Its last steps, the district board and Budget. The
 //! app frame (`shell/neon.rs`) draws the header and the tabs.
 
+mod camera;
 mod city;
 mod hud;
 mod layout;
@@ -18,12 +19,15 @@ use std::time::Instant;
 
 use aivory_protocol::{Pane, SessionState, WarRoom};
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, MouseButton, MouseDownEvent, Window, canvas, div, rgb};
+use gpui::{
+    AnyElement, Context, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    ScrollWheelEvent, Window, canvas, div, px, rgb,
+};
 
-use self::city::{BG, BuildingPin, Hits, Light, Look, MIST, ORBITRON, Scene, top};
+use self::camera::Camera;
+use self::city::{BG, BuildingPin, Hits, Light, Look, MAGENTA, MIST, ORBITRON, PALE, Scene, top};
 use self::hud::wait_code;
 use self::layout::{BUILDING, layout};
-use crate::theme::*;
 use crate::ui;
 use crate::warroom::WarRoomScreen;
 use crate::warroom::decisions::decisions;
@@ -70,9 +74,27 @@ pub(in crate::warroom) struct NeonState {
     cache: Rc<RefCell<TextCache>>,
     /// The click targets, written by the canvas.
     hits: Rc<RefCell<Hits>>,
+    /// The camera of the city: turn, tilt, zoom.
+    cam: Camera,
+    /// The last mouse position of a drag on the city.
+    drag: Option<[f32; 2]>,
+    /// The start hooks of a screenshot run were read.
+    booted: bool,
 }
 
 impl NeonState {
+    /// Read the screenshot hooks once: `AIVORY_SELECT=<id>` and the `AIVORY_CITY_*` camera.
+    fn boot(&mut self) {
+        if self.booted {
+            return;
+        }
+        self.booted = true;
+        self.cam = Camera::from_env();
+        self.sel = std::env::var("AIVORY_SELECT")
+            .ok()
+            .filter(|v| !v.is_empty());
+    }
+
     /// Ease the bar `key` toward `target` (0 to 1) and give its value for this frame.
     fn eased(&mut self, key: &str, target: f32, dt: f32) -> f32 {
         let v = self.ease.entry(key.to_string()).or_insert(0.);
@@ -82,6 +104,13 @@ impl NeonState {
 }
 
 impl WarRoomScreen {
+    /// The keys of the city: Q/E and the arrows turn, Up/Down and + and - zoom, Home resets.
+    pub(in crate::warroom) fn neon_key(&mut self, key: &str, cx: &mut Context<Self>) {
+        if self.neon.cam.key(key) {
+            cx.notify();
+        }
+    }
+
     /// The whole war room area as the Neon.
     pub(in crate::warroom) fn render_neon(
         &mut self,
@@ -91,6 +120,13 @@ impl WarRoomScreen {
     ) -> AnyElement {
         let now = Instant::now();
         let st = &mut self.neon;
+        st.boot();
+        if st
+            .cam
+            .step((now - st.last.unwrap_or(now)).as_secs_f32().min(0.1))
+        {
+            cx.notify();
+        }
         let t = (now - *st.started.get_or_insert(now)).as_secs_f32();
         let dt = st.last.map_or(0.04, |l| (now - l).as_secs_f32()).min(0.1);
         st.last = Some(now);
@@ -305,6 +341,16 @@ impl WarRoomScreen {
                 }
             })
             .collect();
+        let picks: Vec<Option<String>> = docks.iter().map(|d| d.pick.clone()).collect();
+        let states: Vec<(String, u32)> = docks
+            .iter()
+            .map(|d| {
+                (
+                    d.state.to_uppercase(),
+                    if d.asks > 0 { MAGENTA } else { PALE },
+                )
+            })
+            .collect();
         let target = selected
             .as_deref()
             .and_then(|id| live.iter().copied().find(|s| s.id == id));
@@ -312,17 +358,32 @@ impl WarRoomScreen {
             city,
             hot,
             fault,
-            load,
             pins,
             lights,
             t,
             glitch,
             hits: st.hits.clone(),
             cache: st.cache.clone(),
+            yaw: st.cam.yaw(),
+            pitch: st.cam.pitch(),
+            zoom: st.cam.zoom(),
+            picks,
+            states,
         };
         crate::ui::animate(window, cx);
         let empty = live.is_empty();
-        let panels = self.neon_panels(war, &waits, target, &docks, dt, cx);
+        let panels = self.neon_panels(
+            war,
+            &waits,
+            target,
+            &docks,
+            dt,
+            (
+                f32::from(window.viewport_size().width),
+                f32::from(window.viewport_size().height),
+            ),
+            cx,
+        );
         div()
             .size_full()
             .relative()
@@ -331,7 +392,8 @@ impl WarRoomScreen {
             .cursor_crosshair()
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, ev: &MouseDownEvent, _, cx| {
+                cx.listener(|this, ev: &MouseDownEvent, window, cx| {
+                    this.focus.focus(window, cx);
                     let (x, y) = (f32::from(ev.position.x), f32::from(ev.position.y));
                     let hits = this.neon.hits.borrow();
                     let pin = hits
@@ -351,12 +413,36 @@ impl WarRoomScreen {
                             .map(|(id, _)| id.clone())
                     });
                     drop(hits);
-                    if let Some(id) = best {
-                        this.neon.sel = Some(id);
+                    match best {
+                        Some(id) => this.neon.sel = Some(id),
+                        // Nothing under the mouse: the drag turns the city.
+                        None => this.neon.drag = Some([x, y]),
                     }
                     cx.notify();
                 }),
             )
+            .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, _, cx| {
+                let st = &mut this.neon;
+                let Some(last) = st.drag else { return };
+                if ev.pressed_button != Some(MouseButton::Left) {
+                    st.drag = None;
+                    return;
+                }
+                let at = [f32::from(ev.position.x), f32::from(ev.position.y)];
+                st.cam.drag(at[0] - last[0], at[1] - last[1]);
+                st.drag = Some(at);
+                cx.notify();
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &MouseUpEvent, _, _| this.neon.drag = None),
+            )
+            .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, _, cx| {
+                this.neon
+                    .cam
+                    .wheel(f32::from(ev.delta.pixel_delta(px(40.)).y));
+                cx.notify();
+            }))
             .child(
                 canvas(
                     |_, _, _| (),
@@ -374,11 +460,22 @@ impl WarRoomScreen {
                         .items_center()
                         .justify_center()
                         .font_family(ORBITRON)
-                        .text_size(ui::ts(T_HEADING))
+                        .text_size(ui::ts(city::T_SECTION))
                         .text_color(rgb(MIST))
                         .child("NO LIVE AGENTS"),
                 )
             })
+            .child(
+                div()
+                    .absolute()
+                    .left(px(28. * crate::ui::factor()))
+                    .top(px(10. * crate::ui::factor()))
+                    .font_family(city::CHAKRA)
+                    .text_size(ui::ts(city::T_LABEL))
+                    .text_color(rgb(MIST))
+                    .opacity(0.7)
+                    .child("DRAG TURN  ·  WHEEL ZOOM  ·  Q E KEYS TURN  ·  HOME RESET"),
+            )
             .children(panels)
             .into_any_element()
     }

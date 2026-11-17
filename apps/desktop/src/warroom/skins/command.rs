@@ -5,9 +5,10 @@
 //! an error, and dozes at the main building when it is idle. A finished session leaves a cottage.
 //! Motion means work: the speed of a robot follows the work rate of its session.
 //!
-//! A click selects a session and shows the workshop window at the bottom. O or a double click
-//! opens the session. Space goes to the next wait, F finds, 1-9 go to a village, drag or the arrow
-//! keys move the view. The sidebar is in `shell/command.rs`.
+//! A click selects a session and shows the workshop window at the bottom. F (Focus) or a double
+//! click opens the session. Space goes to the next wait, / finds, L shows the list of waits (hidden
+//! by default), P parks, S stops, 1-9 go to a village, drag or the arrow keys move the view. The
+//! sidebar (the unit command card) is in `shell/command.rs`.
 
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -28,13 +29,14 @@ use crate::command_kit::{self as cmd, Btn, c};
 use crate::rts::layout::{Item, Layout, SITE_H, SITE_W, Tool, Village, layout, trail};
 use crate::rts::{
     ROBOT_FOOT, ROBOT_REST, ROBOT_WALK, ROBOT_WORK, Sprite, sprites, terrain, to_render,
+    to_render_owned,
 };
 use crate::warroom::{WarRoomEvent, WarRoomScreen};
 
 /// The width of the command sidebar (the map takes the rest of the window).
 pub const SIDE_W: f32 = 320.;
 /// The height of the workshop window.
-const SHOP_H: f32 = 204.;
+const SHOP_H: f32 = 150.;
 /// The redraw times: while robots work, and for a calm map.
 const TICK_WORK: u64 = 50;
 /// The names on the map are signs of dark wood, in the colors of the buildings.
@@ -62,6 +64,15 @@ struct Rate {
     per_min: f32,
 }
 
+/// A command of the card for the selected worker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unit {
+    Focus,
+    Park,
+    Stop,
+    Resume,
+}
+
 /// The state of the map.
 #[derive(Default)]
 pub struct RtsMap {
@@ -83,8 +94,8 @@ pub struct RtsMap {
     clock: f32,
     last: Option<Instant>,
     waiting: bool,
-    /// The box of waits is minimized to an icon.
-    log_small: bool,
+    /// The box of waits (top left) is hidden by default; the key L or the card shows it.
+    log_open: bool,
     /// The zoom; 0 until the first frame sets it to 1.
     pub zoom: f32,
 }
@@ -211,7 +222,7 @@ fn bubble(x: f32, y: f32) -> AnyElement {
         .bg(c(0xFFFFF0, 1.))
         .border_2()
         .border_color(c(0x141414, 1.))
-        .child(cmd::data("!", 20. * ZOOM.get()).text_color(c(0xD08A00, 1.)))
+        .child(cmd::data("!", cmd::S_ENTRY * ZOOM.get()).text_color(c(0xD08A00, 1.)))
         .into_any_element()
 }
 
@@ -352,7 +363,7 @@ fn draw_item(v: &Village, it: &Item, t: f32, p: f32, out: &mut Vec<(f32, AnyElem
             robot(it.x, it.y, 1, ROBOT_REST, None, &mut layer);
             let f = (t * 0.25 + shift).fract();
             layer.push(
-                cmd::data("Z", 18. * ZOOM.get())
+                cmd::data("Z", cmd::S_LABEL * ZOOM.get())
                     .absolute()
                     .left(z(it.x + 8. + f * 8.))
                     .top(z(it.y - 52. - f * 18.))
@@ -517,6 +528,52 @@ impl WarRoomScreen {
         cx.notify();
     }
 
+    /// The selected worker, if any (the command card reads it).
+    pub fn rts_selected(&self) -> Option<String> {
+        self.rts.selected.clone()
+    }
+
+    /// Show or hide the box of waits at the top left (key L, or the LIST button of the card).
+    pub fn rts_toggle_list(&mut self, cx: &mut Context<Self>) {
+        self.rts.log_open = !self.rts.log_open;
+        cx.notify();
+    }
+
+    /// Open the find box (the FIND button of the card).
+    pub fn rts_find_open(&mut self, cx: &mut Context<Self>) {
+        self.rts.find = Some(String::new());
+        cx.notify();
+    }
+
+    /// Whether the box of waits shows.
+    pub fn rts_list_open(&self) -> bool {
+        self.rts.log_open
+    }
+
+    /// A command for the selected worker (the buttons of the command card and their keys).
+    pub fn rts_unit(&mut self, what: Unit, cx: &mut Context<Self>) {
+        let Some(id) = self.rts.selected.clone() else {
+            return;
+        };
+        let Some(p) = self
+            .model
+            .read(cx)
+            .war
+            .as_ref()
+            .and_then(|w| w.session(&id))
+            .cloned()
+        else {
+            return;
+        };
+        match what {
+            Unit::Focus => cx.emit(WarRoomEvent::OpenSession(id)),
+            Unit::Park if p.controlled && p.state.is_live() => self.act(Action::Park(id), cx),
+            Unit::Stop if p.controlled && p.state.is_live() => self.act(Action::Stop(id), cx),
+            Unit::Resume if p.state == SessionState::Parked => self.act(Action::Resume(id), cx),
+            _ => {}
+        }
+    }
+
     /// Esc: close the find box, else the workshop window.
     pub(crate) fn rts_close(&mut self) {
         if self.rts.find.take().is_none() {
@@ -625,12 +682,29 @@ impl WarRoomScreen {
             "right" => self.rts.pan.0 += step,
             "up" => self.rts.pan.1 -= step,
             "down" => self.rts.pan.1 += step,
-            "o" => {
-                if let Some(id) = self.rts.selected.clone() {
-                    cx.emit(WarRoomEvent::OpenSession(id));
-                }
+            // Focus (F) opens the selected worker; without a selection F finds.
+            "o" | "enter" => {
+                self.rts_unit(Unit::Focus, cx);
                 return;
             }
+            "f" if self.rts.selected.is_some() => {
+                self.rts_unit(Unit::Focus, cx);
+                return;
+            }
+            "p" => {
+                self.rts_unit(Unit::Park, cx);
+                self.rts_unit(Unit::Resume, cx);
+                return;
+            }
+            "s" => {
+                self.rts_unit(Unit::Stop, cx);
+                return;
+            }
+            "l" => {
+                self.rts_toggle_list(cx);
+                return;
+            }
+            "/" => self.rts.find = Some(String::new()),
             "n" => {
                 cx.emit(WarRoomEvent::NewSession);
                 return;
@@ -730,7 +804,7 @@ impl WarRoomScreen {
             let g = terrain::ground(&l);
             let r = terrain::radar(&g, 264, 188);
             let size = (r.width() as f32, r.height() as f32);
-            (to_render(&g), to_render(&r), size)
+            (to_render_owned(g), to_render(&r), size)
         });
         cx.spawn(async move |this, cx| {
             let (image, radar, radar_size) = task.await;
@@ -833,6 +907,20 @@ impl WarRoomScreen {
         {
             self.rts.selected = None;
         }
+        // The first call of `sprites()` decodes all map images and blocks the thread. The ground
+        // task does that work in the background, so the window shows a calm state until it ends.
+        if self.rts.ground.is_none() {
+            return div()
+                .id("rts-map")
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(c(0x0A0C0A, 1.))
+                .font_family(cmd::SANS)
+                .child(cmd::data("PREPARING THE MAP", cmd::S_SECTION).text_color(c(0xD6E6C0, 1.)))
+                .into_any_element();
+        }
         let lay = self.rts.layout.clone();
         let (pan, (vw, vh)) = (self.rts.pan, self.rts.view);
         let seen = |x: f32, y: f32, w: f32, h: f32| {
@@ -903,9 +991,12 @@ impl WarRoomScreen {
                                 .bg(c(SIGN_WOOD, 0.9))
                                 .border_1()
                                 .border_color(c(SIGN_EDGE, 1.))
-                                .child(cmd::data(v.name.clone(), 19.).text_color(c(SIGN_TEXT, 1.)))
                                 .child(
-                                    cmd::data(v.slots.clone(), 19.).text_color(c(
+                                    cmd::data(v.name.clone(), cmd::S_ENTRY)
+                                        .text_color(c(SIGN_TEXT, 1.)),
+                                )
+                                .child(
+                                    cmd::data(v.slots.clone(), cmd::S_ENTRY).text_color(c(
                                         if v.free { 0xB4C68C } else { SIGN_TEXT },
                                         1.,
                                     )),
@@ -1002,7 +1093,7 @@ impl WarRoomScreen {
                 let far = self.rts.zoom < 0.75;
                 if it.site.is_some() && !it.is_house() && !far || hover || sel {
                     labels.push(
-                        cmd::data(cmd::up(&it.title), 16.)
+                        cmd::data(cmd::up(&it.title), cmd::S_LABEL)
                             .absolute()
                             .left(z(hx - 2. - pan.0))
                             .top(z(hy + hh + 2. - pan.1))
@@ -1054,7 +1145,7 @@ impl WarRoomScreen {
                     "DRAG MOVES · WHEEL ZOOMS · SPACE NEXT WAIT · F FIND · 1-9 VILLAGES · {} VILLAGES",
                     lay.villages.len()
                 ),
-                18.,
+                cmd::S_LABEL,
             )
             .absolute()
             .left(px(16.))
@@ -1111,7 +1202,9 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(cmd::data("PREPARING THE MAP", 24.).text_color(c(0xD6E6C0, 1.)))
+                    .child(
+                        cmd::data("PREPARING THE MAP", cmd::S_SECTION).text_color(c(0xD6E6C0, 1.)),
+                    )
             }))
             .children(labels)
             .child(zoom_box)
@@ -1151,34 +1244,8 @@ impl WarRoomScreen {
         if waits.is_empty() {
             return None;
         }
-        if self.rts.log_small {
-            // Minimized: only the mail icon and the number of waits.
-            return Some(
-                div()
-                    .id("rts-log")
-                    .absolute()
-                    .left(px(12.))
-                    .top(px(12.))
-                    .h(px(42.))
-                    .px(px(12.))
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .bg(c(0x1E2124, 0.97))
-                    .cursor_pointer()
-                    .hover(|st| st.bg(c(0x24301C, 1.)))
-                    .occlude()
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.rts.log_small = false;
-                        cx.notify();
-                    }))
-                    .child(crate::ui::icon(
-                        "icons/mail.svg",
-                        24.,
-                        gpui::rgba(0xFFFFFFFF),
-                    ))
-                    .child(cmd::data(waits.len().to_string(), 24.).text_color(c(cmd::AMBER, 1.))),
-            );
+        if !self.rts.log_open {
+            return None;
         }
         let mut list = div()
             .id("rts-log-list")
@@ -1227,7 +1294,7 @@ impl WarRoomScreen {
                                     .justify_between()
                                     .gap(px(10.))
                                     .child(
-                                        cmd::data(cmd::up(&p.title), 20.)
+                                        cmd::data(cmd::up(&p.title), cmd::S_ENTRY)
                                             .min_w(px(0.))
                                             .whitespace_nowrap()
                                             .overflow_hidden()
@@ -1235,7 +1302,7 @@ impl WarRoomScreen {
                                             .text_color(c(cmd::WHITE, 1.)),
                                     )
                                     .child(
-                                        cmd::data(cmd::mins(war.now, p.since), 18.)
+                                        cmd::data(cmd::mins(war.now, p.since), cmd::S_LABEL)
                                             .flex_none()
                                             .text_color(c(color, 1.)),
                                     ),
@@ -1276,20 +1343,22 @@ impl WarRoomScreen {
                         .cursor_pointer()
                         .hover(|st| st.bg(c(0x454B50, 1.)))
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.rts.log_small = true;
+                            this.rts.log_open = false;
                             cx.notify();
                         }))
-                        .child(cmd::data("NEEDS YOU", 20.).text_color(c(cmd::WHITE, 1.)))
+                        .child(cmd::data("NEEDS YOU", cmd::S_ENTRY).text_color(c(cmd::WHITE, 1.)))
                         .child(
                             div()
                                 .flex()
                                 .items_center()
                                 .gap(px(14.))
                                 .child(
-                                    cmd::data(waits.len().to_string(), 20.)
+                                    cmd::data(waits.len().to_string(), cmd::S_ENTRY)
                                         .text_color(c(cmd::AMBER, 1.)),
                                 )
-                                .child(cmd::data("-", 24.).text_color(c(cmd::WHITE, 1.))),
+                                .child(
+                                    cmd::data("-", cmd::S_SECTION).text_color(c(cmd::WHITE, 1.)),
+                                ),
                         ),
                 )
                 .child(list),
@@ -1306,7 +1375,10 @@ impl WarRoomScreen {
                 .items_center()
                 .justify_between()
                 .gap(px(12.))
-                .child(cmd::data(format!("FIND · {text}_"), 24.).text_color(c(cmd::WHITE, 1.)))
+                .child(
+                    cmd::data(format!("FIND · {text}_"), cmd::S_SECTION)
+                        .text_color(c(cmd::WHITE, 1.)),
+                )
                 .child(
                     cmd::button("rts-find-x", "X", Btn::Plain).on_click(cx.listener(
                         |this, _, _, cx| {
@@ -1380,14 +1452,14 @@ impl WarRoomScreen {
             .flex_col()
             .gap(px(3.))
             .child(
-                cmd::data(cmd::up(&p.title), 24.)
+                cmd::data(cmd::up(&p.title), cmd::S_SECTION)
                     .whitespace_nowrap()
                     .overflow_hidden()
                     .text_ellipsis()
                     .text_color(c(cmd::WHITE, 1.)),
             )
             .child(cmd::label(format!("{} · {}", p.codebase, p.provider)))
-            .child(cmd::data(work, 18.).text_color(c(state_color(p.state), 1.)))
+            .child(cmd::data(work, cmd::S_LABEL).text_color(c(state_color(p.state), 1.)))
             .child(cmd::label(format!(
                 "{} · CONTEXT {}%",
                 cmd::mins(war.now, p.since),
@@ -1405,24 +1477,32 @@ impl WarRoomScreen {
             .py(px(6.))
             .bg(c(cmd::WELL, 1.))
             .overflow_hidden();
-        let room = if p.ask.is_some() { 4 } else { 6 };
+        let room = if p.ask.is_some() { 3 } else { 5 };
         for l in last_lines(&p.tail, room) {
             let (who, col) = line_head(&l, &p.provider);
             mid = mid.child(
                 div()
                     .flex()
                     .gap(px(8.))
-                    .child(cmd::data(who, 18.).flex_none().text_color(c(col, 1.)))
                     .child(
-                        cmd::data(l.text.lines().next().unwrap_or("").to_string(), 18.)
-                            .min_w(px(0.))
-                            .whitespace_nowrap()
-                            .overflow_hidden()
-                            .text_ellipsis(),
+                        cmd::data(who, cmd::S_LABEL)
+                            .flex_none()
+                            .text_color(c(col, 1.)),
+                    )
+                    .child(
+                        cmd::data(
+                            l.text.lines().next().unwrap_or("").to_string(),
+                            cmd::S_LABEL,
+                        )
+                        .flex_1()
+                        .min_w(px(0.))
+                        .whitespace_nowrap()
+                        .overflow_hidden()
+                        .text_ellipsis(),
                     ),
             );
         }
-        let mut right = div().w(px(300.)).flex_none().flex().flex_col().gap(px(6.));
+        let mut right = div().w(px(380.)).flex_none().flex().flex_col().gap(px(6.));
         if let Some(a) = &p.ask {
             let n = a.options.len();
             let mut row = div().flex().flex_wrap().gap(px(6.));
@@ -1441,11 +1521,13 @@ impl WarRoomScreen {
             }
             right = right.child(row);
         }
-        let mut row = div().mt_auto().flex().flex_wrap().gap(px(6.));
+        let mut row = div().flex().flex_wrap().items_center().gap(px(6.));
         let open = id.clone();
-        row = row.child(cmd::button("rts-open", "O OPEN", Btn::Plain).on_click(
-            cx.listener(move |_, _, _, cx| cx.emit(WarRoomEvent::OpenSession(open.clone()))),
-        ));
+        row = row
+            .child(cmd::button("rts-open", "FOCUS", Btn::Go).on_click(
+                cx.listener(move |_, _, _, cx| cx.emit(WarRoomEvent::OpenSession(open.clone()))),
+            ))
+            .child(cmd::key("F"));
         let (a, b) = (id.clone(), id.clone());
         if p.controlled && p.state.is_live() {
             row = row

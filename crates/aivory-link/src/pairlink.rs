@@ -69,6 +69,68 @@ impl PairLink {
     }
 }
 
+const PEER_PREFIX: &str = "aivory://peer?";
+
+/// The invite link of the machine mesh (ADR 0026):
+/// `aivory://peer?node=<node id>&relay=<relay url>&direct=<ip:port,...>&code=<AIV-xxxxxx>&name=<machine>`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PeerLink {
+    pub node: String,
+    pub relay: Option<String>,
+    pub direct: Vec<String>,
+    pub code: String,
+    /// The machine name of the inviting daemon.
+    pub name: Option<String>,
+}
+
+impl PeerLink {
+    pub fn to_url(&self) -> String {
+        let mut query = vec![format!("node={}", encode(&self.node))];
+        if let Some(relay) = &self.relay {
+            query.push(format!("relay={}", encode(relay)));
+        }
+        if !self.direct.is_empty() {
+            let list: Vec<String> = self.direct.iter().map(|a| encode(a)).collect();
+            query.push(format!("direct={}", list.join(",")));
+        }
+        query.push(format!("code={}", encode(&self.code)));
+        if let Some(name) = &self.name {
+            query.push(format!("name={}", encode(name)));
+        }
+        format!("{PEER_PREFIX}{}", query.join("&"))
+    }
+
+    pub fn parse(url: &str) -> Result<Self, LinkError> {
+        let query = url
+            .trim()
+            .strip_prefix(PEER_PREFIX)
+            .ok_or_else(|| LinkError::Invalid("not an aivory://peer link".into()))?;
+        let mut link = Self::default();
+        for (k, raw) in query.split('&').filter_map(|kv| kv.split_once('=')) {
+            match k {
+                "node" => link.node = decode(raw),
+                "relay" => link.relay = Some(decode(raw)),
+                "direct" => {
+                    link.direct = raw
+                        .split(',')
+                        .map(decode)
+                        .filter(|a| !a.is_empty())
+                        .collect();
+                }
+                "code" => link.code = decode(raw),
+                "name" => link.name = Some(decode(raw)),
+                _ => {}
+            }
+        }
+        if link.node.is_empty() || link.code.is_empty() {
+            return Err(LinkError::Invalid(
+                "the peer link needs a node and a code".into(),
+            ));
+        }
+        Ok(link)
+    }
+}
+
 /// Percent-encode everything except unreserved characters and `:`.
 fn encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -123,6 +185,23 @@ mod tests {
         assert!(url.starts_with("aivory://pair?node="));
         assert!(!url.contains("https://"));
         assert_eq!(PairLink::parse(&url).unwrap(), link);
+    }
+
+    #[test]
+    fn a_peer_link_round_trips() {
+        let link = PeerLink {
+            node: "cd".repeat(32),
+            relay: Some("https://relay.example.com./".into()),
+            direct: vec!["10.0.0.2:4000".into()],
+            code: "AIV-ABCDEF".into(),
+            name: Some("Big Box".into()),
+        };
+        let url = link.to_url();
+        assert!(url.starts_with("aivory://peer?node="), "{url}");
+        assert!(url.ends_with("&code=AIV-ABCDEF&name=Big%20Box"), "{url}");
+        assert_eq!(PeerLink::parse(&url).unwrap(), link);
+        assert!(PeerLink::parse("aivory://peer?node=ab").is_err());
+        assert!(PeerLink::parse(&PairLink::default().to_url()).is_err());
     }
 
     #[test]

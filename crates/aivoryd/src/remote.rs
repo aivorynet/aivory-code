@@ -61,6 +61,9 @@ pub enum Caller {
     /// A paired phone, by device id. The LAN link knows it from the token, the iroh link from
     /// the key of the QUIC handshake.
     Device(String),
+    /// A paired machine of the mesh, by node id (`mesh/call`, ADR 0026). It reaches only
+    /// `aivory_protocol::mesh::PEER_METHODS`.
+    Peer(String),
 }
 
 thread_local! {
@@ -728,7 +731,7 @@ fn hash(token: &str) -> String {
     hex(&sha2::Sha256::digest(token.as_bytes()))
 }
 
-fn random_hex(bytes: usize) -> String {
+pub(crate) fn random_hex(bytes: usize) -> String {
     let mut buf = vec![0u8; bytes];
     getrandom::fill(&mut buf).expect("the OS random source works");
     hex(&buf)
@@ -738,7 +741,7 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn now_ms() -> UnixMs {
+pub(crate) fn now_ms() -> UnixMs {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as UnixMs)

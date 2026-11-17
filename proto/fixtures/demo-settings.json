@@ -254,6 +254,7 @@
     "remote": {
       "pushUrl": "",
       "relay": ""
-    }
+    },
+    "startWithSystem": false
   }
 }

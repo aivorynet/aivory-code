@@ -176,7 +176,7 @@ impl LensScreen {
                             .px(px(16.))
                             .bg(rgb(tk().page))
                             .font_family(tk().mono)
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(path.clone())
                             .when_some(part, |d, p| d.child(part_tag(p)))
@@ -226,7 +226,7 @@ impl LensScreen {
                                 .h(px(28.))
                                 .px(px(16.))
                                 .font_family(tk().mono)
-                                .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                                 .cursor_pointer()
                                 .when(on, |d| d.bg(rgb(SELECTED)))
                                 .when(!on, |d| d.hover(|s| s.bg(rgb(ROW_HOVER))))
@@ -319,7 +319,7 @@ impl LensScreen {
                             )
                             .child(
                                 div()
-                                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                                     .text_color(rgb(tk().ink_3))
                                     .child(meta),
                             )
@@ -512,7 +512,7 @@ impl LensScreen {
             list = list.child(
                 div()
                     .py(px(10.))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(if empty_query {
                         "Type a name."
@@ -615,7 +615,7 @@ fn refs_note(text: &str) -> Div {
         .flex_none()
         .px(px(16.))
         .py(px(12.))
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .text_color(rgb(tk().muted))
         .child(text.to_string())
 }

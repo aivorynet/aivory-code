@@ -3,6 +3,7 @@
 //! Windows named pipe or a Unix domain socket.
 
 pub mod actions;
+pub mod autostart;
 pub mod claude_usage;
 pub mod client;
 pub mod code;
@@ -17,6 +18,9 @@ pub mod gitdiff;
 pub mod iroh_link;
 pub mod ledger;
 pub mod live;
+pub mod mesh;
+pub mod mesh_host;
+pub mod mesh_sync;
 pub mod outbox;
 pub mod push;
 pub mod remote;

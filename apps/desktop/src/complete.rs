@@ -254,6 +254,14 @@ fn kind_word(kind: CompleteItemKind) -> &'static str {
 pub fn popup(cx: &App) -> Option<AnyElement> {
     let p = cx.try_global::<Completion>()?.popup.as_ref()?;
     let t = tk();
+    let (ink, ink3, muted, mono) = if crate::overlay_style::plain() {
+        (rgb(t.ink), rgb(t.ink_3), rgb(t.muted), t.mono)
+    } else {
+        let st = crate::overlay_style::style();
+        let (_, mono, _) = crate::overlay_style::fonts();
+        let c = crate::overlay_style::color;
+        (c(st.bright), c(st.text), c(st.muted), mono)
+    };
     let width = f32::from(p.anchor.size.width).clamp(320., 560.);
     let shown = p.items.len().min(ROWS);
     let first = p.selected.saturating_sub(ROWS - 1);
@@ -275,6 +283,15 @@ pub fn popup(cx: &App) -> Option<AnyElement> {
                 .rounded(px(4.))
                 .when(on, |d| d.bg(rgb(t.track)))
                 .hover(|h| h.bg(rgb(t.menu_hover)))
+                .when(!crate::overlay_style::plain(), |d| {
+                    let st = crate::overlay_style::style();
+                    let d = crate::overlay_style::menu_row(d, on);
+                    if on {
+                        d.bg(crate::overlay_style::color(st.sel_bg))
+                    } else {
+                        d
+                    }
+                })
                 .cursor_pointer()
                 .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     cx.stop_propagation();
@@ -283,8 +300,8 @@ pub fn popup(cx: &App) -> Option<AnyElement> {
                 .child(
                     div()
                         .flex_none()
-                        .font_family(t.mono)
-                        .text_color(rgb(t.ink))
+                        .font_family(mono)
+                        .text_color(ink)
                         .child(item.label.clone()),
                 )
                 .child(
@@ -294,13 +311,13 @@ pub fn popup(cx: &App) -> Option<AnyElement> {
                         .overflow_hidden()
                         .whitespace_nowrap()
                         .text_ellipsis()
-                        .text_color(rgb(t.ink_3))
+                        .text_color(ink3)
                         .child(item.detail.clone().unwrap_or_default()),
                 )
                 .child(
                     div()
                         .flex_none()
-                        .text_color(rgb(t.muted))
+                        .text_color(muted)
                         .child(kind_word(item.kind)),
                 )
                 .into_any_element()
@@ -327,14 +344,19 @@ pub fn popup(cx: &App) -> Option<AnyElement> {
                         .bg(rgb(t.card))
                         .text_size(ui::ts(T_CAPTION))
                         .font_family(t.sans)
+                        .map(crate::overlay_style::skin)
                         .children(rows)
-                        .child(div().px(px(10.)).pt(px(4.)).text_color(rgb(t.muted)).child(
-                            if more > 0 {
-                                format!("{more} more · ↑↓ move · Tab takes · Esc closes")
-                            } else {
-                                "↑↓ move · Tab takes · Esc closes".to_string()
-                            },
-                        )),
+                        .child(
+                            div()
+                                .px(px(10.))
+                                .pt(px(4.))
+                                .text_color(muted)
+                                .child(if more > 0 {
+                                    format!("{more} more · ↑↓ move · Tab takes · Esc closes")
+                                } else {
+                                    "↑↓ move · Tab takes · Esc closes".to_string()
+                                }),
+                        ),
                 ),
         )
         .with_priority(10)

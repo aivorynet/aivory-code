@@ -410,7 +410,7 @@ impl Render for NightLens {
                                     .flex()
                                     .gap(px(16.))
                                     .font_family(tk().mono)
-                                    .text_size(ui::ts(T_LABEL + 1.))
+                                    .text_size(ui::ts(T_ENTRY))
                                     .line_height(ui::ts(20.))
                                     .child(
                                         div()

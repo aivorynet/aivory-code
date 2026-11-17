@@ -2,9 +2,9 @@
 //! and scanlines, neon buttons that fill on hover, tags, barcodes and hex codes.
 
 use gpui::prelude::*;
-use gpui::{Bounds, Div, ElementId, FontWeight, Pixels, Stateful, canvas, div, px, rgb};
+use gpui::{Bounds, Div, ElementId, FontWeight, Pixels, Stateful, canvas, div, rgb};
 
-use super::city::{BG, CHAKRA, chamfer};
+use super::city::{BG, CHAKRA, T_LABEL, chamfer};
 use crate::ui;
 use crate::warroom::skins::common::{Painter, TextCache};
 
@@ -116,15 +116,15 @@ pub(super) fn button(
     div()
         .id(id)
         .relative()
-        .h(px(36.))
-        .px(px(20.))
+        .h(ui::sw(36.))
+        .px(ui::sw(20.))
         .flex()
         .flex_none()
         .items_center()
         .cursor_pointer()
         .font_family(CHAKRA)
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(13.))
+        .text_size(ui::ts(T_LABEL))
         .text_color(rgb(if solid { BG } else { color }))
         .hover(|s| s.text_color(rgb(BG)))
         .child(button_ground(color, solid))
@@ -135,14 +135,14 @@ pub(super) fn button(
 pub(super) fn tag(label: &str, color: u32) -> Div {
     div()
         .relative()
-        .h(px(20.))
-        .px(px(8.))
+        .h(ui::sw(20.))
+        .px(ui::sw(8.))
         .flex()
         .flex_none()
         .items_center()
         .font_family(CHAKRA)
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(12.))
+        .text_size(ui::ts(T_LABEL))
         .text_color(rgb(BG))
         .child(
             canvas(

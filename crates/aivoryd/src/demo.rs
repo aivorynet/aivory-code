@@ -95,7 +95,7 @@ impl DemoBackend {
         rpc::METHODS.contains(&method)
             && !matches!(
                 method,
-                "daemon/info" | "daemon/shutdown" | "daemon/restart" | "media/get"
+                "daemon/info" | "daemon/shutdown" | "daemon/restart" | "media/get" | "media/put"
             )
     }
 
@@ -674,6 +674,7 @@ impl State {
             lines_total: 0,
             composer: p.composer.clone(),
             task: p.task.clone(),
+            machine: None,
         };
         self.link_task_session(p.task.as_deref(), &pane);
         let mut first = carried;
@@ -737,6 +738,7 @@ impl State {
             return Ok(rpc::Dispatched {
                 session: None,
                 task: Some(task.id),
+                node: None,
             });
         }
         let prefs = self
@@ -765,10 +767,12 @@ impl State {
             composer,
             task: None,
             attachments: Vec::new(),
+            node: None,
         })?;
         Ok(rpc::Dispatched {
             session: Some(session),
             task: None,
+            node: None,
         })
     }
 
@@ -795,6 +799,7 @@ impl State {
             },
             task: old.task.clone(),
             attachments: Vec::new(),
+            node: None,
         })?;
         if old.state != SessionState::Parked {
             self.finish(
@@ -861,6 +866,7 @@ impl State {
                 composer: old.composer.clone(),
                 task: old.task.clone(),
                 attachments: Vec::new(),
+                node: None,
             },
             carried,
         )?;
@@ -1032,6 +1038,7 @@ impl State {
                 composer: composer.clone(),
                 task: Some(id.clone()),
                 attachments: Vec::new(),
+                node: None,
             })?;
             task.started = Some(self.now());
             task.agents = vec![provider];
@@ -1108,6 +1115,7 @@ impl State {
             composer,
             task: Some(task.id.clone()),
             attachments: Vec::new(),
+            node: None,
         })?;
         let now = self.now();
         let t = self
@@ -1490,6 +1498,7 @@ mod tests {
                 composer,
                 task: Some(task.id.clone()),
                 attachments: Vec::new(),
+                node: None,
             })
             .unwrap();
         let after = st.demo.tasks.iter().find(|t| t.id == task.id).unwrap();

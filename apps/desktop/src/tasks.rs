@@ -19,14 +19,13 @@ use aivory_protocol::{
 use gpui::prelude::*;
 use gpui::{
     AnyElement, BoxShadow, Context, Div, Entity, EventEmitter, FontWeight, Render, SharedString,
-    Subscription, Window, deferred, div, point, px, relative, rgb, rgba, svg,
+    Subscription, Window, deferred, div, point, px, relative, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, InputState, TextareaState};
 
 use crate::model::Model;
 use crate::theme::*;
 use crate::ui;
-use crate::vtext;
 
 #[derive(Debug, Clone)]
 #[allow(
@@ -49,7 +48,7 @@ const PANEL_W: f32 = 360.;
 /// The width of the folded Done column.
 const FOLDED_W: f32 = 56.;
 /// The text size of the folded Done label.
-const STRIP_TEXT: f32 = 13.;
+const STRIP_TEXT: f32 = T_CAPTION;
 const NO_PART: &str = "general";
 const NEW_TASK_W: f32 = 420.;
 const SCHEDULES_W: f32 = 480.;
@@ -112,7 +111,7 @@ impl Render for DragGhost {
             .px(px(12.))
             .py(px(8.))
             .bg(rgb(tk().card))
-            .rounded(px(10.))
+            .rounded(crate::look::rc(10.))
             .border_1()
             .border_color(rgb(tk().primary))
             .shadow(ui::popover_shadow())
@@ -188,6 +187,8 @@ pub struct TasksScreen {
     /// The pick of the user. [`resolve_selection`] decides what shows.
     selected: Option<String>,
     done_open: bool,
+    /// The user folded or opened the Done column: the wide auto-open stops.
+    done_touched: bool,
     open: Overlay,
     /// An overlay closed by a click outside, and when: the click on its own button must not
     /// open it again.
@@ -244,6 +245,7 @@ impl TasksScreen {
             filter: None,
             selected: None,
             done_open: false,
+            done_touched: false,
             open: Overlay::None,
             closed: None,
             new_task: NewTask::default(),
@@ -350,7 +352,8 @@ impl TasksScreen {
     /// Paint `el` above everything; a click outside closes the open overlay.
     fn overlay(&self, el: Div, cx: &mut Context<Self>) -> AnyElement {
         deferred(
-            el.occlude()
+            el.map(crate::overlay_style::skin)
+                .occlude()
                 .on_mouse_down_out(cx.listener(|this, _, _, cx| {
                     let open = std::mem::replace(&mut this.open, Overlay::None);
                     this.closed = Some((open, Instant::now()));
@@ -399,6 +402,7 @@ impl TasksScreen {
             composer: self.composer_for(provider),
             task: Some(task.id.clone()),
             attachments: Vec::new(),
+            node: None,
         }
     }
 
@@ -880,7 +884,7 @@ impl TasksScreen {
                 .filter(|f| codebases.contains(f))
                 .or_else(|| codebases.first().cloned());
         }
-        let small = crate::ui::ts(crate::theme::T_SMALL);
+        let small = crate::ui::ts(crate::theme::T_CAPTION);
         let mut list = div()
             .id("schedule-list")
             .flex()
@@ -1087,7 +1091,7 @@ impl TasksScreen {
                     .border_1()
                     .border_color(if on { rgb(tk().ink) } else { rgba(0x0D0D0E1F) })
                     .when(on, |d| d.bg(rgb(tk().ink)))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(if on { tk().card } else { tk().ink_2 }))
                     .whitespace_nowrap()
                     .cursor_pointer()
@@ -1098,7 +1102,7 @@ impl TasksScreen {
         }
         let open = self.open == Overlay::NewTask;
         let mut new = div().relative().flex_none().child(
-            ui::dark_button("new-task", "New task")
+            ui::dark_button("new-task", "New session")
                 .text_size(crate::ui::ts(crate::theme::T_BODY))
                 .on_click(cx.listener(|this, _, window, cx| this.open_new_task(window, cx))),
         );
@@ -1138,7 +1142,7 @@ impl TasksScreen {
             )
             .child(
                 div()
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(header_text(tasks)),
             )
@@ -1265,11 +1269,11 @@ impl TasksScreen {
                 .child(label)
         };
         ui::popover(NEW_TASK_W)
-            .child(div().font_weight(FontWeight::BOLD).child("New task"))
+            .child(div().font_weight(FontWeight::BOLD).child("New session"))
             .when(codebases.is_empty(), |d| {
                 d.child(
                     div()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().ink_3))
                         .child("No codebase yet. Start one agent in a repository, or add a repo."),
                 )
@@ -1313,7 +1317,7 @@ impl TasksScreen {
             .when_some(nt.error.clone(), |d, e| {
                 d.child(
                     div()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().e_text))
                         .child(e),
                 )
@@ -1353,7 +1357,7 @@ impl TasksScreen {
             .flex_col()
             .gap(px(10.))
             .min_h(px(220.))
-            .rounded(px(12.))
+            .rounded(crate::look::rc(12.))
             .when(narrow, |d| d.w_full().flex_none())
             .when(!narrow, |d| d.flex_1().min_w(px(0.)))
             .drag_over::<DragCard>(move |s, card, _, _| {
@@ -1400,6 +1404,7 @@ impl TasksScreen {
                                 .tooltip(ui::tip("Fold the Done column"))
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.done_open = false;
+                                    this.done_touched = true;
                                     cx.notify();
                                 }))
                                 .child(ui::icon("icons/twist-right.svg", 12., rgb(tk().ink_3))),
@@ -1414,19 +1419,18 @@ impl TasksScreen {
 
     /// The folded Done column (`.colx`): `Done · 5` turned 90 degrees clockwise, top to bottom.
     fn done_strip(&self, count: usize, cx: &mut Context<Self>) -> AnyElement {
-        let label = format!("Done · {count}");
-        let (w, h) = vtext::measure(&label, STRIP_TEXT);
         div()
             .id("done-strip")
             .flex_none()
             .w(px(FOLDED_W))
-            .min_h(px(420.))
+            .min_h(px(120.))
+            .pb(px(16.))
             .pt(px(16.))
             .flex()
             .flex_col()
             .items_center()
             .gap(px(8.))
-            .rounded(px(12.))
+            .rounded(crate::look::rc(12.))
             .bg(rgb(strip_bg()))
             .cursor_pointer()
             .hover(|s| s.bg(rgb(strip_hover())))
@@ -1445,16 +1449,13 @@ impl TasksScreen {
             ))
             .on_click(cx.listener(|this, _, _, cx| {
                 this.done_open = true;
+                this.done_touched = true;
                 cx.notify();
             }))
-            .child(
-                svg()
-                    .path(vtext::asset_path(&label, STRIP_TEXT as u32))
-                    .flex_none()
-                    .w(px(w))
-                    .h(px(h))
-                    .text_color(rgb(tk().ink_2)),
-            )
+            .text_size(ui::ts(STRIP_TEXT))
+            .text_color(rgb(tk().ink_2))
+            .child(div().child("Done"))
+            .child(div().child(count.to_string()))
             .into_any_element()
     }
 
@@ -1500,7 +1501,7 @@ impl TasksScreen {
             .gap(px(10.))
             .p(px(14.))
             .bg(rgb(tk().card))
-            .rounded(px(12.))
+            .rounded(crate::look::rc(12.))
             .border_1()
             .border_color(if on {
                 rgb(tk().primary)
@@ -1728,7 +1729,7 @@ impl TasksScreen {
                     .py(px(10.))
                     .border_1()
                     .border_color(rgba(tk().line))
-                    .rounded(px(10.))
+                    .rounded(crate::look::rc(10.))
                     .cursor_pointer()
                     .hover(|st| st.border_color(rgba(0x0D0D0E3D)))
                     .on_click(cx.listener(move |_, _, _, cx| {
@@ -1886,7 +1887,7 @@ impl TasksScreen {
             .flex_col()
             .gap(px(20.))
             .pt(px(22.))
-            .pb(px(28.))
+            .pb(px(72.))
             .px(px(24.))
             .bg(rgb(tk().card))
             .border_l_1()
@@ -1906,14 +1907,14 @@ impl TasksScreen {
                     .child(
                         div()
                             .mt(px(2.))
-                            .text_size(crate::ui::ts(crate::theme::T_HEADING))
+                            .text_size(crate::ui::ts(crate::theme::T_DISPLAY))
                             .font_weight(FontWeight::SEMIBOLD)
                             .line_height(relative(1.3))
                             .child(task.title.clone()),
                     )
                     .child(
                         div()
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .text_color(rgb(tk().ink_3))
                             .child(format!(
                                 "{} / {} · {started} · ${:.2}",
@@ -1926,7 +1927,7 @@ impl TasksScreen {
                     .flex_none()
                     .px(px(14.))
                     .py(px(12.))
-                    .rounded(px(10.))
+                    .rounded(crate::look::rc(10.))
                     .bg(rgb(tk().page))
                     .text_size(crate::ui::ts(crate::theme::T_BODY))
                     .line_height(relative(1.55))
@@ -1939,7 +1940,7 @@ impl TasksScreen {
                 d.child(
                     div()
                         .flex_none()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().e_text))
                         .child(e),
                 )
@@ -1965,6 +1966,10 @@ impl Render for TasksScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let now = self.now(cx);
         let width = window.viewport_size().width;
+        // A wide Minimal board has room for the Done column: it opens by itself.
+        if !self.done_touched && tk().look == aivory_protocol::Look::Minimal && width >= px(1700.) {
+            self.done_open = true;
+        }
         let Some(tasks) = self.tasks.clone() else {
             let header = self.header(&[], &[], window, cx);
             return div().size_full().flex().flex_col().child(header).child(
@@ -1973,7 +1978,7 @@ impl Render for TasksScreen {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().muted))
                     .child("Waits for aivoryd"),
             );
@@ -2066,7 +2071,7 @@ fn option_chip(
         } else {
             rgba(tk().line_2)
         })
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .cursor_pointer()
         .hover(|s| s.border_color(rgb(tk().muted)))
         .child(label.into())
@@ -2085,11 +2090,9 @@ fn card_shadows(on: bool, hot: bool) -> Vec<BoxShadow> {
         shadow(0x0D0D0E0A, 1., 2., 0., false),
         shadow(0x0D0D0E0D, 8., 24., 0., false),
     ];
-    if hot {
-        let mut v = vec![shadow(Q_RGBA, 2., 0., 0., true)];
-        v.extend(drops);
-        v
-    } else if on {
+    // A waiting card shows its state as a pill only: no colored line.
+    let _ = (hot, Q_RGBA);
+    if on {
         vec![shadow(0x3574F01F, 0., 0., 3., false)]
     } else {
         drops.to_vec()

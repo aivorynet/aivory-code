@@ -129,6 +129,12 @@ pub fn last(tail: &[Line], n: usize) -> Vec<DLine> {
         && at > 0
     {
         v.drain(..at);
+    } else if v.first().is_some_and(|d| !d.first)
+        && let Some(at) = v.iter().position(|d| d.first)
+        && v.len() - at >= 3
+    {
+        // A long code block fills the first half: start at the next message.
+        v.drain(..at);
     }
     v
 }

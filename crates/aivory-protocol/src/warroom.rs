@@ -81,6 +81,11 @@ pub struct Pane {
     /// The task that started this session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<String>,
+    /// The machine that runs the session, for a session of another machine of the mesh (ADR
+    /// 0026): the peer name. Its id is then `@<node8>/<id>`, and `session/*` calls with that id
+    /// go to the peer. `None`: this machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine: Option<String>,
 }
 
 impl Pane {
@@ -388,6 +393,7 @@ mod tests {
                 effort: Effort::High,
             },
             task: None,
+            machine: None,
         }
     }
 

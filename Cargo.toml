@@ -34,7 +34,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "2026.1.0"
+version = "2026.2.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -84,3 +84,19 @@ opt-level = 3
 lto = "thin"
 codegen-units = 4
 strip = true
+
+# Fast image decode in debug builds (the war room maps decode large PNG and JPEG files).
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.zune-core]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3

@@ -530,7 +530,7 @@ impl Render for CommandInbox {
                         .mt(px(8.))
                         .text_color(c(cmd::LABEL, 1.)),
                 )
-                .child(div().flex_1().min_h(px(32.)))
+                .child(div().flex_none().h(px(18.)))
                 .child(cmd::entry(wants(it)).text_color(c(cmd::LABEL, 1.)));
             if !it.text.is_empty() {
                 body = body.child(
@@ -563,8 +563,8 @@ impl Render for CommandInbox {
                 }
                 body = body.child(steps);
             }
-            body = body.child(div().flex_1().min_h(px(32.)));
-            let mut answers = div().flex().flex_wrap().gap(px(10.));
+            body = body.child(div().flex_none().h(px(24.)));
+            let mut answers = div().flex().gap(px(8.));
             if let Some(result) = &it.result {
                 answers = answers.child(cmd::section(format!("DONE · {}", cmd::up(result))));
             } else {
@@ -578,7 +578,7 @@ impl Render for CommandInbox {
                         Btn::Plain
                     };
                     answers = answers.child(
-                        cmd::button(("cmd-ans", j), format!("{} · {}", j + 1, cmd::up(o)), kind)
+                        cmd::button(("cmd-ans", j), format!("{} {}", j + 1, cmd::up(o)), kind)
                             .on_click(cx.listener(move |this, _, _, cx| this.answer(j, cx))),
                     );
                 }
@@ -671,7 +671,8 @@ impl Render for CommandInbox {
                             .gap(px(6.))
                             .cursor_pointer()
                             .child(cmd::entry("OPEN SESSION").text_color(c(cmd::GREEN, 1.)))
-                            .child(cmd::entry("O").text_color(c(cmd::HINT, 1.)))
+                            .items_center()
+                            .child(cmd::key("O"))
                             .on_click(cx.listener(|this, _, _, cx| this.open(cx))),
                     )
                     .child(div().flex_1())
@@ -682,10 +683,47 @@ impl Render for CommandInbox {
                             .gap(px(6.))
                             .cursor_pointer()
                             .child(cmd::entry("NEXT").text_color(c(cmd::INK_2, 1.)))
-                            .child(cmd::entry("J").text_color(c(cmd::HINT, 1.)))
+                            .items_center()
+                            .child(cmd::key("J"))
                             .on_click(cx.listener(|this, _, _, cx| this.step(1, cx))),
                     ),
             );
+        // Fill: the next orders in the queue, so a tall panel shows what comes after this one.
+        if let Some(k) = cur
+            && items.len() > 1
+        {
+            let mut next = div()
+                .mt(px(34.))
+                .pt(px(14.))
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .border_t_1()
+                .border_color(c(cmd::RULE, 1.))
+                .child(cmd::label("UP NEXT").text_color(c(cmd::HINT, 1.)));
+            for j in 1..items.len().min(4) {
+                let it = &items[(k + j) % items.len()];
+                let fault = matches!(it.kind, InboxKind::Error);
+                next = next.child(
+                    div()
+                        .flex()
+                        .gap(px(14.))
+                        .child(
+                            cmd::entry(cmd::up(&it.title))
+                                .flex_1()
+                                .min_w(px(0.))
+                                .truncate()
+                                .text_color(c(cmd::INK_2, 1.)),
+                        )
+                        .child(
+                            cmd::label(cmd::up(it.kind.label()))
+                                .text_color(c(if fault { cmd::RED } else { cmd::AMBER }, 1.)),
+                        )
+                        .child(cmd::data(cmd::mins(now, it.since), cmd::S_LABEL)),
+                );
+            }
+            body = body.child(next);
+        }
         let decision = cmd::panel(
             div()
                 .size_full()

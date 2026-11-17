@@ -83,7 +83,7 @@ impl Shell {
             .gap(px(6.))
             .font_family(LABEL)
             .font_weight(gpui::FontWeight::SEMIBOLD)
-            .text_size(ui::ts(15.))
+            .text_size(ui::ts(S_BODY))
             .cursor_pointer()
             .border_b_2()
             .border_color(ink(PK, if on { 1. } else { 0. }))
@@ -114,9 +114,18 @@ impl Shell {
             .as_ref()
             .map(|w| (w.counts(), w.inbox_open));
         let (c, inbox) = counts.unwrap_or_default();
-        let count = |n: u32, word: &str, color: u32| {
+        let count = |cx: &mut Context<Self>, n: u32, word: &str, color: u32| {
             div()
+                .id(SharedString::from(format!("holo-count-{word}")))
                 .flex_none()
+                .cursor_pointer()
+                .hover(|s| s.text_color(rgb(TXT)))
+                .tooltip(ui::tip("Open the Inbox"))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.look_menu = false;
+                    this.holo_screens.full_settings = false;
+                    this.go(Screen::Inbox, cx);
+                }))
                 .font_family(LABEL)
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_size(ui::ts(S_SMALL))
@@ -163,39 +172,65 @@ impl Shell {
                     .gap_x(px(30.))
                     .px(px(12.))
                     .bg(rgb(PAGE))
+                    .when(matches!(self.screen, Screen::Session(_)), |d| {
+                        d.child(
+                            div()
+                                .id("holo-back")
+                                .min_h(px(30.))
+                                .px(px(10.))
+                                .flex()
+                                .items_center()
+                                .font_family(LABEL)
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .text_size(ui::ts(S_SMALL))
+                                .text_color(ink(PA, 0.95))
+                                .bg(rgb(0x0E2835))
+                                .border_1()
+                                .border_color(ink(PK, 0.45))
+                                .rounded(px(4.))
+                                .cursor_pointer()
+                                .hover(|s| s.text_color(rgb(TXT)).border_color(ink(PK, 0.8)))
+                                .on_click(cx.listener(|this, _, _, cx| this.go_back(cx)))
+                                .child("BACK"),
+                        )
+                    })
                     .child(self.holo_entry("holo-war", "War room", Screen::WarRoom, 0, cx))
                     .child(self.holo_entry("holo-inbox", "Inbox", Screen::Inbox, inbox, cx))
                     .child(self.holo_entry("holo-tasks", "Tasks", Screen::Tasks, 0, cx))
                     .child(self.holo_entry("holo-repos", "Repos", Screen::Repos, 0, cx))
                     .child(self.holo_entry("holo-set", "Settings", Screen::Settings, 0, cx))
-                    .children(crate::new_session::launch_buttons("holo", |id, label| {
-                        div()
-                            .id(id)
-                            .flex_none()
-                            .min_h(px(30.))
-                            .px(px(10.))
-                            .flex()
-                            .items_center()
-                            .font_family(LABEL)
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_size(ui::ts(S_SMALL + 1.))
-                            // A glass button: a filled tint, so it reads as a button and
-                            // not as a nav entry.
-                            .text_color(ink(PA, 0.95))
-                            // Solid: PK at 16 % over PAGE, so no backdrop line shows through.
-                            .bg(rgb(0x0E2835))
-                            .border_1()
-                            .border_color(ink(PK, 0.45))
-                            .rounded(px(4.))
-                            .whitespace_nowrap()
-                            .cursor_pointer()
-                            .hover(|s| {
-                                s.text_color(rgb(TXT))
-                                    .bg(rgb(0x194657))
-                                    .border_color(ink(PK, 0.8))
-                            })
-                            .child(label)
-                    })),
+                    .children(crate::new_session::launch_buttons_open(
+                        "holo",
+                        self.launcher_open(cx),
+                        |id, label, on| {
+                            div()
+                                .id(id)
+                                .flex_none()
+                                .min_h(px(30.))
+                                .px(px(10.))
+                                .flex()
+                                .items_center()
+                                .font_family(LABEL)
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .text_size(ui::ts(S_SMALL))
+                                // A glass button: a filled tint, so it reads as a button and
+                                // not as a nav entry.
+                                .text_color(ink(PA, 0.95))
+                                // Solid: PK at 16 % over PAGE, so no backdrop line shows through.
+                                .bg(rgb(if on { 0x194657 } else { 0x0E2835 }))
+                                .border_1()
+                                .border_color(ink(PK, if on { 0.8 } else { 0.45 }))
+                                .rounded(px(4.))
+                                .whitespace_nowrap()
+                                .cursor_pointer()
+                                .hover(|s| {
+                                    s.text_color(rgb(TXT))
+                                        .bg(rgb(0x194657))
+                                        .border_color(ink(PK, 0.8))
+                                })
+                                .child(label)
+                        },
+                    )),
             )
             .child(
                 div()
@@ -206,13 +241,14 @@ impl Shell {
                     .items_center()
                     .justify_end()
                     .gap_x(px(22.))
-                    .child(count(c.working, "working", MUTED))
+                    .child(count(cx, c.working, "working", MUTED))
                     .child(count(
+                        cx,
                         c.needs_you + c.error,
                         "wait for you",
                         if c.needs_you + c.error > 0 { GD } else { MUTED },
                     ))
-                    .child(count(c.idle, "idle", GY))
+                    .child(count(cx, c.idle, "idle", GY))
                     .child(
                         div()
                             .id("holo-look")
@@ -223,7 +259,7 @@ impl Shell {
                             .items_center()
                             .font_family(LABEL)
                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_size(ui::ts(S_SMALL + 1.))
+                            .text_size(ui::ts(S_SMALL))
                             .text_color(ink(MUTED, 0.9))
                             .border_1()
                             .border_color(ink(PK, 0.3))
@@ -269,7 +305,7 @@ impl Shell {
                     .items_center()
                     .cursor_pointer()
                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_size(ui::ts(S_SMALL + 2.))
+                    .text_size(ui::ts(S_SMALL))
                     .text_color(if on { rgb(PK) } else { rgb(DIM) })
                     .hover(|s| s.bg(ink(PK, 0.12)))
                     .child(name.to_uppercase())
@@ -296,6 +332,16 @@ impl Shell {
         crate::ui::animate(window, cx);
         let bar = self.holo_bar(cx);
         let menu = self.holo_look_menu(cx);
+        // A click outside the open look menu closes it.
+        let shade = self.look_menu.then(|| {
+            div().absolute().top_0().left_0().size_full().on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.look_menu = false;
+                    cx.notify();
+                }),
+            )
+        });
         // A new screen, or a session view in the war room, opens with the pen's effect.
         let key = format!("{:?}", self.screen);
         let mut fx = std::mem::take(&mut self.holo_screens.fx);
@@ -315,6 +361,7 @@ impl Shell {
             .child(backdrop(t))
             .child(bar)
             .child(area)
+            .children(shade)
             .children(menu)
             .children(toasts)
     }

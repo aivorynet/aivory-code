@@ -20,6 +20,7 @@ pub mod demo;
 pub mod inbox;
 pub mod layout;
 pub mod media;
+pub mod mesh;
 pub mod repos;
 pub mod resources;
 pub mod rpc;

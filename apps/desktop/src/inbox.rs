@@ -537,7 +537,7 @@ impl InboxScreen {
                     .flex()
                     .items_center()
                     .gap(px(6.))
-                    .rounded(px(6.))
+                    .rounded(crate::look::rc(6.))
                     .text_size(crate::ui::ts(crate::theme::T_BODY))
                     .text_color(rgb(if on { tk().ink } else { tk().ink_2 }))
                     .cursor_pointer()
@@ -592,7 +592,7 @@ impl InboxScreen {
             )
             .child(
                 div()
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(header_text(items, now)),
             )
@@ -662,7 +662,7 @@ impl InboxScreen {
             } else {
                 rgba(tk().line)
             })
-            .rounded(px(10.))
+            .rounded(crate::look::rc(10.))
             .cursor_pointer()
             .when(ui::irix(), |d| {
                 d.rounded(px(0.))
@@ -817,7 +817,7 @@ impl InboxScreen {
             .border_1()
             .border_color(rgba(tk().line_2))
             .bg(rgb(tk().card))
-            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
             .when(ui::irix(), |d| {
                 d.rounded(px(0.))
                     .border_0()
@@ -882,7 +882,7 @@ impl InboxScreen {
                 .child(
                     div()
                         .mb(px(4.))
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .font_weight(FontWeight::BOLD)
                         .child(side.title.clone()),
                 );
@@ -914,7 +914,7 @@ impl InboxScreen {
                     .px(px(12.))
                     .bg(rgb(style.ask_head_bg))
                     .text_color(rgb(style.ask_head))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(heading),
             )
@@ -989,7 +989,7 @@ impl InboxScreen {
                         .px(px(12.))
                         .flex()
                         .items_center()
-                        .rounded(px(6.))
+                        .rounded(crate::look::rc(6.))
                         .border_1()
                         .text_size(crate::ui::ts(crate::theme::T_BODY))
                         .cursor_pointer()
@@ -1024,7 +1024,7 @@ impl InboxScreen {
                     div()
                         .px(px(12.))
                         .pb(px(10.))
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().e_text))
                         .child(text.clone()),
                 );
@@ -1050,7 +1050,7 @@ impl InboxScreen {
                 .flex()
                 .items_center()
                 .justify_center()
-                .rounded(px(6.))
+                .rounded(crate::look::rc(6.))
                 .cursor_pointer()
                 .hover(|s| s.bg(rgb(icon_hover())))
                 .child(ui::icon(icon, 15., rgb(tk().ink_3)))
@@ -1294,7 +1294,7 @@ impl InboxScreen {
                             .on_click(cx.listener(move |_, _, _, cx| {
                                 cx.emit(InboxEvent::OpenSession(session.clone()))
                             }))
-                            .child("Open deep dive →"),
+                            .child("Open deep dive"),
                     ),
             )
             .child(
@@ -1378,7 +1378,7 @@ impl InboxScreen {
                     .gap(px(10.))
                     .child(
                         div()
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .text_color(rgb(tk().ink_3))
                             .child(position_text(position)),
                     )
@@ -1408,7 +1408,7 @@ impl Render for InboxScreen {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().muted))
                         .child("Waits for aivoryd"),
                 );

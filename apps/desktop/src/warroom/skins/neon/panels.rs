@@ -7,7 +7,7 @@
 
 use aivory_protocol::{AskKind, Pane, SessionState, UsageWindow, WarRoom};
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Div, FontWeight, SharedString, div, px, relative, rgb, rgba};
+use gpui::{AnyElement, Context, Div, FontWeight, SharedString, div, relative, rgb, rgba};
 
 use super::city::{
     BOARD_GAP, BOARD_H, CHAKRA, CYAN, DIM, MAGENTA, MIST, ORBITRON, PALE, PANEL_W, RED, T_ENTRY,
@@ -18,18 +18,15 @@ use super::{Dock, NeonState};
 use crate::console::display::{DKind, steps};
 use crate::theme::tk;
 use crate::ui;
+use crate::ui::sw as s;
+use crate::warroom::WarRoomScreen;
 use crate::warroom::decisions::{question, terminal_note};
 use crate::warroom::skins::common::{kind_word, part_of, thousands};
-use crate::warroom::{WarRoomEvent, WarRoomScreen};
 
 /// The width of the panel column on the right.
 const COLUMN_W: f32 = 400.;
-/// The rows of the Waits panel.
-const ROWS: usize = 3;
 /// The districts on the board.
 const DISTRICTS: usize = 3;
-/// The lines of the steps panel.
-const STEPS: usize = 3;
 /// The gap between two panels.
 const GAP: f32 = 32.;
 /// The inner padding of a panel.
@@ -63,9 +60,9 @@ fn head(title: &str, color: u32, side: Option<(String, u32)>) -> Div {
         .flex_none()
         .items_center()
         .justify_between()
-        .px(px(PAD))
-        .pt(px(20.))
-        .pb(px(12.))
+        .px(s(PAD))
+        .pt(s(20.))
+        .pb(s(12.))
         .child(
             div()
                 .font_family(ORBITRON)
@@ -85,7 +82,7 @@ fn head(title: &str, color: u32, side: Option<(String, u32)>) -> Div {
 
 /// A bar on a dark track; `frac` is 0 to 1.
 fn bar(frac: f32, color: u32, h: f32) -> Div {
-    div().w_full().h(px(h)).bg(rgba(0x1A2142CC)).child(
+    div().w_full().h(s(h)).bg(rgba(0x1A2142CC)).child(
         div()
             .h_full()
             .w(relative(frac.clamp(0., 1.)))
@@ -138,23 +135,9 @@ fn reset_text(w: &UsageWindow, now: i64) -> String {
     }
 }
 
-/// One display line as steps text: the text and its color. The lines come from
-/// `console::display`, so no raw markdown marker shows.
-fn step_line(kind: DKind, label: Option<&str>, text: &str) -> (String, u32) {
-    match kind {
-        DKind::Tool => (format!("● {} {text}", label.unwrap_or("")), CYAN),
-        DKind::Output => (format!("  └ {text}"), MIST),
-        DKind::Error => (format!("! {text}"), RED),
-        DKind::You => (format!("› {text}"), 0xFFFFFF),
-        DKind::Heading => (text.to_string(), YELLOW),
-        DKind::Bullet | DKind::Agent => (text.to_string(), PALE),
-        DKind::Code | DKind::Table => (text.to_string(), MIST),
-        DKind::Meta => (text.to_string(), DIM),
-    }
-}
-
 impl WarRoomScreen {
     /// All panels of the Neon: the right column and the district board.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn neon_panels(
         &mut self,
         war: &WarRoom,
@@ -162,6 +145,7 @@ impl WarRoomScreen {
         target: Option<&Pane>,
         docks: &[Dock],
         dt: f32,
+        (width, height): (f32, f32),
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         // The context bar eases to its value.
@@ -175,98 +159,204 @@ impl WarRoomScreen {
         });
         st.ease.retain(|_, v| v.is_finite());
 
-        // The decision is the one bright panel. With no session on screen the waits panel is.
+        // The rows that fit: the height in design pixels, minus the selected panel (an
+        // estimate), the gap, the head and the padding of the sessions panel.
+        let design = height / ui::factor() - 24. - BOARD_GAP;
+        // A short window: the selected panel drops its chat.
+        let compact = design < 760.;
+        let base = if compact { 270. } else { 380. };
+        let selected = target.map_or(0., |p| base + if p.ask.is_some() { 150. } else { 0. });
+        let rows = ((design - selected - GAP - 70.) / ROW_H)
+            .floor()
+            .clamp(2., 9.) as usize;
+
+        // The selected panel is the bright one. With no session on screen the list is.
         let mut column = div()
             .absolute()
-            .right(px(24.))
-            .top(px(24.))
-            .bottom(px(BOARD_GAP))
-            .w(px(COLUMN_W))
+            .right(s(24.))
+            .top(s(24.))
+            .bottom(s(BOARD_GAP))
+            .w(s(COLUMN_W))
             .flex()
             .flex_col()
-            .gap(px(GAP))
-            .child(waits_panel(war, waits, target, target.is_none(), cx));
+            .gap(s(GAP))
+            .child(sessions_panel(
+                war,
+                waits,
+                target,
+                rows,
+                target.is_none(),
+                cx,
+            ));
         if let Some(p) = target {
-            column = column.child(decision_panel(war, p, ctx, cx));
+            column = column.child(decision_panel(war, p, ctx, compact, cx));
         }
-        column = column.child(steps_panel(target));
 
+        // The districts on the board: as many as the width allows next to the budget.
+        let room = width / ui::factor() - 448. - 48. - 280.;
+        let shown = ((room / 190.).floor().max(0.) as usize).min(DISTRICTS);
         vec![
             column.into_any_element(),
-            board_panel(war, docks, cx).into_any_element(),
+            board_panel(war, docks, shown, cx).into_any_element(),
         ]
     }
 }
 
-/// What waits for you, the longest wait first. A click selects the session.
-fn waits_panel(
+/// The height of one session row, in design pixels.
+const ROW_H: f32 = 54.;
+
+/// What a session does now, in one line: the open question, the last tool call, the last
+/// words of the agent. Never the raw output.
+fn doing(p: &Pane) -> String {
+    if let Some(a) = &p.ask {
+        let first = a.text.lines().next().unwrap_or("").trim();
+        return format!("{}: {first}", kind_word(a.kind));
+    }
+    if p.state == SessionState::Idle {
+        return "Idle".to_string();
+    }
+    let lines = steps(&p.tail, 8);
+    let want = if p.state == SessionState::Error {
+        DKind::Error
+    } else {
+        DKind::Tool
+    };
+    let pick = lines
+        .iter()
+        .rev()
+        .find(|d| d.kind == want)
+        .or_else(|| lines.iter().rev().find(|d| d.kind == DKind::Agent))
+        .or(lines.last());
+    match pick {
+        Some(d) if d.kind == DKind::Tool => {
+            format!("{} {}", d.label.as_deref().unwrap_or("Tool"), d.text)
+        }
+        Some(d) => d.text.clone(),
+        None if p.state == SessionState::Error => "Error".to_string(),
+        None => "Working".to_string(),
+    }
+}
+
+/// The newest chat lines of a session: what you said and what the agent said. `true` marks
+/// a line of yours. Tool calls and output stay out.
+fn chat(p: &Pane, n: usize) -> Vec<(bool, String)> {
+    let mut v: Vec<(bool, String)> = steps(&p.tail, 16)
+        .into_iter()
+        .filter(|d| !matches!(d.kind, DKind::Tool | DKind::Error))
+        .map(|d| (d.kind == DKind::You, d.text))
+        .collect();
+    let skip = v.len().saturating_sub(n);
+    v.drain(..skip);
+    v
+}
+
+/// The state of a session as the code of its row: the wait in minutes, or a word.
+fn row_code(war: &WarRoom, p: &Pane) -> (String, u32) {
+    match (&p.ask, p.state) {
+        (_, SessionState::Error) => ("ERR".into(), RED),
+        (Some(_), _) => (wait_code(p.minutes(war.now)), MAGENTA),
+        (None, SessionState::Idle) => ("IDLE".into(), DIM),
+        (None, _) => ("RUN".into(), CYAN),
+    }
+}
+
+/// All live sessions in one list: what needs you first (the longest wait first), then what
+/// works, then what idles. Each row says what the session does now. One click selects it;
+/// the selected panel then shows its chat and the keys. This is the overview of the city.
+fn sessions_panel(
     war: &WarRoom,
     waits: &[&Pane],
     target: Option<&Pane>,
+    rows: usize,
     lit: bool,
     cx: &mut Context<WarRoomScreen>,
 ) -> Div {
+    let mut rest: Vec<&Pane> = war
+        .sessions
+        .iter()
+        .filter(|s| s.state.is_live() && !waits.iter().any(|w| w.id == s.id))
+        .collect();
+    rest.sort_by_key(|p| {
+        (
+            p.state == SessionState::Idle,
+            p.codebase.clone(),
+            p.id.clone(),
+        )
+    });
+    let total = waits.len() + rest.len();
+    let side = if waits.is_empty() {
+        ("ALL CLEAR".to_string(), CYAN)
+    } else {
+        (format!("{} NEED YOU", waits.len()), MAGENTA)
+    };
     let mut p = panel(MAGENTA, 0.82, lit, "cy-waits")
-        .flex_none()
-        .pb(px(12.))
-        .child(head(
-            "Waits for you",
-            MAGENTA,
-            Some((
-                if waits.len() > ROWS {
-                    format!("+{} MORE", waits.len() - ROWS)
-                } else {
-                    format!("{}", waits.len())
-                },
-                MIST,
-            )),
-        ));
-    if waits.is_empty() {
-        p = p.child(
-            div()
-                .h(px(40.))
-                .px(px(PAD))
-                .flex()
-                .items_center()
-                .text_color(rgb(CYAN))
-                .child("All clear. Nothing waits for you."),
-        );
+        .flex_1()
+        .min_h(s(0.))
+        .overflow_hidden()
+        .pb(s(8.))
+        .child(head("Sessions", MAGENTA, Some(side)));
+    // A footer line takes the room of one row. The selected session always shows.
+    let shown = if total > rows {
+        rows.saturating_sub(1).max(1)
+    } else {
+        total
+    };
+    let mut list: Vec<&Pane> = waits.iter().chain(rest.iter()).copied().collect();
+    if let Some(at) = target.and_then(|t| list.iter().position(|q| q.id == t.id))
+        && at >= shown
+    {
+        let chosen = list.remove(at);
+        list.insert(shown - 1, chosen);
     }
-    for q in waits.iter().take(ROWS) {
+    for q in list.iter().take(shown) {
         let id = q.id.clone();
         let on = target.is_some_and(|t| t.id == q.id);
-        let color = if q.state == SessionState::Error {
-            YELLOW
-        } else {
-            MAGENTA
-        };
+        let (code, color) = row_code(war, q);
+        let asks = q.ask.is_some() || q.state == SessionState::Error;
         p = p.child(
             div()
                 .id(SharedString::from(format!("cy-w-{}", q.id)))
-                .h(px(40.))
-                .px(px(PAD))
+                .h(s(ROW_H))
+                .flex_none()
+                .px(s(PAD))
                 .flex()
                 .items_center()
-                .gap(px(16.))
+                .gap(s(14.))
                 .cursor_pointer()
+                .border_l_2()
+                .border_color(if on { rgb(color) } else { rgba(0x00000000) })
                 .when(on, |d| d.bg(rgba(0xFF2A6D26)))
-                .hover(|s| s.bg(rgba(0xFF2A6D1A)))
+                .when(!on && asks, |d| d.bg(rgba(0xFF2A6D0D)))
+                .hover(|st| st.bg(rgba(0x00F0FF1A)))
                 .child(
                     div()
-                        .w(px(44.))
+                        .w(s(46.))
                         .flex_none()
                         .font_weight(FontWeight::BOLD)
                         .text_size(ui::ts(T_LABEL))
                         .text_color(rgb(color))
-                        .child(wait_code(q.minutes(war.now))),
+                        .child(code),
                 )
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
-                        .truncate()
-                        .text_color(rgb(if on { 0xFFFFFF } else { PALE }))
-                        .child(q.title.clone()),
+                        .flex()
+                        .flex_col()
+                        .gap(s(2.))
+                        .child(
+                            div()
+                                .truncate()
+                                .text_color(rgb(if on { 0xFFFFFF } else { PALE }))
+                                .child(q.title.clone()),
+                        )
+                        .child(
+                            div()
+                                .truncate()
+                                .text_size(ui::ts(T_LABEL))
+                                .text_color(rgb(MIST))
+                                .child(format!("{} · {}", q.codebase, doing(q))),
+                        ),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.neon.sel = Some(id.clone());
@@ -274,24 +364,52 @@ fn waits_panel(
                 })),
         );
     }
+    if total > shown {
+        p = p.child(
+            div()
+                .px(s(PAD))
+                .pt(s(4.))
+                .text_size(ui::ts(T_LABEL))
+                .text_color(rgb(MIST))
+                .child(format!("+{} more sessions", total - shown)),
+        );
+    }
+    if total == 0 {
+        p = p.child(
+            div()
+                .h(s(40.))
+                .px(s(PAD))
+                .flex()
+                .items_center()
+                .text_color(rgb(CYAN))
+                .child("No live sessions."),
+        );
+    }
     p
 }
 
-/// The selected session: the kind, the title, the command or question, the answers, the
-/// context bar. The answers call the daemon through `act`. This is the bright panel.
-fn decision_panel(war: &WarRoom, p: &Pane, context: f32, cx: &mut Context<WarRoomScreen>) -> Div {
+/// The selected session: the kind, the title, what it does now, its chat, the command or
+/// question, the answers, Focus and the context bar. The answers call the daemon through
+/// `act`. This is the bright panel.
+fn decision_panel(
+    war: &WarRoom,
+    p: &Pane,
+    context: f32,
+    compact: bool,
+    cx: &mut Context<WarRoomScreen>,
+) -> Div {
     let (word, color) = kind_tag(p);
     let edge = if p.ask.is_some() { YELLOW } else { CYAN };
     let mut card = panel(edge, 0.88, true, "cy-decision")
         .flex_none()
-        .px(px(PAD))
-        .py(px(PAD))
-        .gap(px(14.))
+        .px(s(PAD))
+        .py(s(PAD))
+        .gap(s(12.))
         .child(
             div()
                 .flex()
                 .items_center()
-                .gap(px(12.))
+                .gap(s(12.))
                 .font_weight(FontWeight::BOLD)
                 .text_size(ui::ts(T_LABEL))
                 .child(tag(&word, color))
@@ -318,21 +436,58 @@ fn decision_panel(war: &WarRoom, p: &Pane, context: f32, cx: &mut Context<WarRoo
             div()
                 .text_size(ui::ts(T_LABEL))
                 .text_color(rgb(MIST))
+                .truncate()
                 .child(format!("{} · {} / {}", p.provider, p.codebase, part_of(p))),
+        )
+        .child(
+            div()
+                .flex()
+                .gap(s(8.))
+                .text_size(ui::ts(T_LABEL))
+                .child(div().flex_none().text_color(rgb(CYAN)).child("NOW"))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .line_clamp(2)
+                        .text_color(rgb(PALE))
+                        .child(doing(p)),
+                ),
         );
-    let mut row = div().flex().flex_wrap().gap(px(12.)).pt(px(4.));
+    // The chat: the last words of you and of the agent.
+    let lines = if compact { Vec::new() } else { chat(p, 3) };
+    if !lines.is_empty() {
+        let mut block = div()
+            .flex()
+            .flex_col()
+            .gap(s(4.))
+            .pl(s(12.))
+            .border_l_2()
+            .border_color(rgb(DIM));
+        for (you, text) in lines {
+            block = block.child(
+                div()
+                    .line_height(ui::ts(19.))
+                    .line_clamp(2)
+                    .text_color(rgb(if you { 0xFFFFFF } else { PALE }))
+                    .child(if you { format!("› {text}") } else { text }),
+            );
+        }
+        card = card.child(block);
+    }
+    let mut row = div().flex().flex_wrap().gap(s(12.)).pt(s(4.));
     if let Some(ask) = &p.ask {
         if ask.kind == AskKind::Permission {
             card = card.child(
                 div()
-                    .px(px(16.))
-                    .py(px(12.))
+                    .px(s(16.))
+                    .py(s(10.))
                     .bg(rgba(0x0000008C))
                     .border_l_2()
                     .border_color(rgb(YELLOW))
                     .font_family(tk().mono)
-                    .text_size(ui::ts(T_ENTRY - 1.))
-                    .line_height(ui::ts(20.))
+                    .text_size(ui::ts(T_LABEL))
+                    .line_height(ui::ts(17.))
                     .text_color(rgb(PALE))
                     .line_clamp(3)
                     .child(ask.text.clone()),
@@ -343,18 +498,8 @@ fn decision_panel(war: &WarRoom, p: &Pane, context: f32, cx: &mut Context<WarRoo
                     .text_size(ui::ts(T_ENTRY))
                     .line_height(ui::ts(21.))
                     .text_color(rgb(PALE))
-                    .line_clamp(4)
+                    .line_clamp(3)
                     .child(question(p, ask)),
-            );
-        }
-        for (i, step) in ask.steps.iter().take(3).enumerate() {
-            card = card.child(
-                div()
-                    .text_size(ui::ts(T_LABEL))
-                    .line_height(ui::ts(18.))
-                    .text_color(rgb(MIST))
-                    .truncate()
-                    .child(format!("{}  {step}", i + 1)),
             );
         }
         if p.controlled {
@@ -386,28 +531,16 @@ fn decision_panel(war: &WarRoom, p: &Pane, context: f32, cx: &mut Context<WarRoo
             card = card.child(terminal_note().text_color(rgb(MIST)));
         }
     }
-    let (open, focus) = (p.id.clone(), p.id.clone());
-    row = row
-        .child(
-            button(
-                SharedString::from(format!("cy-o-{}", p.id)),
-                "Open",
-                CYAN,
-                false,
-            )
-            .on_click(cx.listener(move |_, _, _, cx| {
-                cx.emit(WarRoomEvent::OpenSession(open.clone()));
-            })),
+    let focus = p.id.clone();
+    row = row.child(
+        button(
+            SharedString::from(format!("cy-f-{}", p.id)),
+            "Focus",
+            CYAN,
+            true,
         )
-        .child(
-            button(
-                SharedString::from(format!("cy-f-{}", p.id)),
-                "Focus",
-                CYAN,
-                false,
-            )
-            .on_click(cx.listener(move |this, _, _, cx| this.skin_focus(&focus, cx))),
-        );
+        .on_click(cx.listener(move |this, _, _, cx| this.skin_focus(&focus, cx))),
+    );
     card.child(row)
         .child(
             div()
@@ -430,60 +563,18 @@ fn decision_panel(war: &WarRoom, p: &Pane, context: f32, cx: &mut Context<WarRoo
         ))
 }
 
-/// The last lines of the selected session, newest at the bottom. Dim until the mouse is over.
-fn steps_panel(target: Option<&Pane>) -> Div {
-    let live = target.is_some_and(|p| p.state != SessionState::Idle);
-    let note = match target {
-        Some(_) if live => ("LIVE".to_string(), RED),
-        Some(_) => ("IDLE".to_string(), MIST),
-        None => ("NO SESSION".to_string(), MIST),
-    };
-    let mut body = div()
-        .flex_1()
-        .min_h(px(0.))
-        .overflow_hidden()
-        .flex()
-        .flex_col()
-        .gap(px(4.))
-        .px(px(PAD))
-        .pb(px(PAD))
-        .font_family(CHAKRA)
-        .text_size(ui::ts(T_LABEL + 1.));
-    if let Some(p) = target {
-        for d in steps(&p.tail, STEPS) {
-            let (text, color) = step_line(d.kind, d.label.as_deref(), &d.text);
-            let mono = matches!(d.kind, DKind::Code | DKind::Table);
-            body = body.child(
-                div()
-                    .flex_none()
-                    .line_height(ui::ts(20.))
-                    .line_clamp(2)
-                    .when(mono, |x| x.font_family(tk().mono))
-                    .text_color(rgb(color))
-                    .child(text),
-            );
-        }
-    }
-    panel(CYAN, 0.8, false, "cy-steps")
-        .flex_1()
-        .min_h(px(80.))
-        .overflow_hidden()
-        .child(head("Its last steps", CYAN, Some(note)))
-        .child(body)
-}
-
 /// One cell of the budget: the spend as a readout and the usage windows as text.
 fn budget_cell(war: &WarRoom) -> Div {
     let live: Vec<&Pane> = war.sessions.iter().filter(|s| s.state.is_live()).collect();
     let tokens: u64 = live.iter().map(|s| s.tokens).sum();
     let cost: f64 = live.iter().map(|s| s.cost).sum();
     let mut cell = div()
-        .w(px(280.))
+        .w(s(280.))
         .flex_none()
         .flex()
         .flex_col()
-        .gap(px(4.))
-        .pl(px(16.))
+        .gap(s(4.))
+        .pl(s(16.))
         .border_l_2()
         .border_color(rgb(YELLOW))
         .child(
@@ -526,17 +617,22 @@ fn budget_cell(war: &WarRoom) -> Div {
 /// The district board: per district who works and the spend, then the budget. The districts
 /// stay in the order of the city (by codebase id), so a cell never moves. A click selects the
 /// district's next ask, else a busy session.
-fn board_panel(war: &WarRoom, docks: &[Dock], cx: &mut Context<WarRoomScreen>) -> Div {
+fn board_panel(
+    war: &WarRoom,
+    docks: &[Dock],
+    limit: usize,
+    cx: &mut Context<WarRoomScreen>,
+) -> Div {
     let mut row = div()
         .absolute()
-        .left(px(PAD))
-        .right(px(PAD))
-        .top(px(PAD / 2.))
-        .bottom(px(PAD / 2.))
+        .left(s(PAD))
+        .right(s(PAD))
+        .top(s(PAD / 2.))
+        .bottom(s(PAD / 2.))
         .flex()
         .items_center()
-        .gap(px(24.));
-    if docks.is_empty() {
+        .gap(s(24.));
+    if docks.is_empty() || limit == 0 {
         row = row.child(
             div()
                 .flex_1()
@@ -544,22 +640,26 @@ fn board_panel(war: &WarRoom, docks: &[Dock], cx: &mut Context<WarRoomScreen>) -
                 .items_center()
                 .justify_center()
                 .text_color(rgb(MIST))
-                .child("No live districts"),
+                .child(if docks.is_empty() {
+                    "No live districts"
+                } else {
+                    "Districts: see the plates"
+                }),
         );
     }
-    for d in docks.iter().take(DISTRICTS) {
+    for d in docks.iter().take(limit) {
         let pick = d.pick.clone();
         let name_color = if d.asks > 0 { MAGENTA } else { d.color };
         row = row.child(
             div()
                 .id(SharedString::from(format!("cy-d-{}", d.name)))
                 .flex_1()
-                .min_w(px(0.))
+                .min_w(s(0.))
                 .flex()
                 .flex_col()
-                .gap(px(6.))
-                .pl(px(16.))
-                .py(px(8.))
+                .gap(s(6.))
+                .pl(s(16.))
+                .py(s(8.))
                 .border_l_2()
                 .border_color(rgb(name_color))
                 .cursor_pointer()
@@ -588,22 +688,26 @@ fn board_panel(war: &WarRoom, docks: &[Dock], cx: &mut Context<WarRoomScreen>) -
                 })),
         );
     }
-    if docks.len() > DISTRICTS {
+    if docks.len() > limit {
         row = row.child(
             div()
+                .id("cy-more-repos")
                 .flex_none()
                 .text_size(ui::ts(T_LABEL))
                 .text_color(rgb(MIST))
-                .child(format!("+{}", docks.len() - DISTRICTS)),
+                .tooltip(ui::tip(
+                    "More repos have live sessions. Open Repos in the header to see all.",
+                ))
+                .child(format!("+{} more repos", docks.len() - limit)),
         );
     }
     row = row.child(budget_cell(war));
     div()
         .absolute()
-        .left(px(24.))
-        .right(px(PANEL_W))
-        .bottom(px(BOARD_GAP))
-        .h(px(BOARD_H))
+        .left(s(24.))
+        .right(s(PANEL_W))
+        .bottom(s(BOARD_GAP))
+        .h(s(BOARD_H))
         .occlude()
         .font_family(CHAKRA)
         .text_color(rgb(PALE))

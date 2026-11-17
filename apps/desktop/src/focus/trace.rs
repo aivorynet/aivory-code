@@ -276,7 +276,7 @@ impl FocusScreen {
             .items_center()
             .gap(px(7.))
             .pl(px(row.depth as f32 * 14.))
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(T_CAPTION))
             .child(
                 div()
                     .size(px(8.))
@@ -337,7 +337,7 @@ impl FocusScreen {
                     .flex()
                     .justify_end()
                     .font_family(tk().mono)
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .whitespace_nowrap()
                     .child(fmt_dur(span.end.unwrap_or(self.trace.now) - span.start)),
@@ -370,7 +370,7 @@ impl FocusScreen {
             .py(px(12.))
             .border_t_1()
             .border_color(rgba(tk().line))
-            .text_size(ui::ts(T_SMALL));
+            .text_size(ui::ts(T_CAPTION));
         let Some(span) = self.picked() else {
             return panel;
         };

@@ -25,7 +25,7 @@ use image::RgbaImage;
 
 use super::planetgen;
 use crate::actions::Action;
-use crate::bridge_kit::{Art, LABEL, short_name};
+use crate::bridge_kit::{Art, LABEL, lit, short_name};
 use crate::warroom::decisions::decisions;
 use crate::warroom::{Overlay, WarRoomEvent, WarRoomScreen};
 
@@ -42,11 +42,13 @@ const BG: u32 = 0x000000;
 const WHITE: u32 = 0xFFFFFF;
 
 /// The left and top edge of the picture on the window.
-const VP_X: f32 = 224.;
-const VP_Y: f32 = 296.;
+const VP_X: f32 = 0.;
+const VP_Y: f32 = 250.;
+/// The overlay starts right of the key column of the frame.
+const KEYS_W: f32 = 172.;
 /// The size of the picture in the board.
-const VP_W: f32 = 1216.;
-const VP_H: f32 = 604.;
+const VP_W: f32 = 1440.;
+const VP_H: f32 = 650.;
 /// The size of the globe space and of a site crop.
 const SPACE_W: f32 = 1244.;
 const SPACE_H: f32 = 824.;
@@ -69,6 +71,8 @@ const TICK: Duration = Duration::from_millis(66);
 const DRIFT_S: f32 = 260.;
 
 /// The levels of the view.
+/// The y of the level pills (the header pills Organizer and New session sit above them).
+const PILL_Y: f32 = 150.;
 const PLANET: u8 = 0;
 const SITE: u8 = 1;
 const AGENT: u8 = 2;
@@ -409,6 +413,9 @@ impl Planet {
     }
 }
 
+/// A site tag before layout: want x, want y, color, name, doing, session id, fly target, index.
+type SiteTag = (f32, f32, u32, String, String, String, Boxed, usize);
+
 fn waits(p: &Pane) -> bool {
     matches!(p.state, SessionState::NeedsYou | SessionState::Error)
 }
@@ -448,24 +455,39 @@ fn text(size: f32, line: f32, color: u32, s: impl Into<SharedString>) -> Div {
         .child(s.into().to_uppercase())
 }
 
+/// A tight dark backing for header text: it keeps the text readable on the map.
+fn tag(c: impl IntoElement) -> Div {
+    div().flex_none().px(px(5.)).rounded(px(4.)).child(c)
+}
+
 fn spot(x: f32, y: f32, w: f32, h: f32) -> Div {
     div().absolute().left(px(x)).top(px(y)).w(px(w)).h(px(h))
 }
 
-/// A pill of the frame with its label at the lower right.
+/// A pill of the frame with its label in the centre.
 fn pill(id: impl Into<SharedString>, x: f32, y: f32, c: u32, label: &str) -> Stateful<Div> {
-    spot(x, y, 190., 62.)
+    pill_k(1., id, x, y, c, label)
+}
+
+/// A pill at the scale `k` of the frame (the header grows with the Bridge frame).
+fn pill_k(
+    k: f32,
+    id: impl Into<SharedString>,
+    x: f32,
+    y: f32,
+    c: u32,
+    label: &str,
+) -> Stateful<Div> {
+    spot(x * k, y * k, 150. * k, 44. * k)
         .id(id.into())
         .flex()
-        .justify_end()
-        .items_end()
-        .pr(px(26.))
-        .pb(px(8.))
-        .rounded(px(31.))
+        .justify_center()
+        .items_center()
+        .rounded(px(22. * k))
         .bg(rgb(c))
         .cursor_pointer()
-        .hover(|s| s.opacity(0.86))
-        .child(text(18., 24., BG, label.to_string()))
+        .hover(move |s| s.bg(rgb(lit(c))))
+        .child(text(18. * k, 24. * k, BG, label.to_string()))
 }
 
 fn arc(out: &mut Vec<(f32, f32)>, c: (f32, f32), r: (f32, f32), from: f32, to: f32) {
@@ -473,19 +495,6 @@ fn arc(out: &mut Vec<(f32, f32)>, c: (f32, f32), r: (f32, f32), from: f32, to: f
         let a = (from + (to - from) * k as f32 / 14.).to_radians();
         out.push((c.0 + r.0 * a.cos(), c.1 + r.1 * a.sin()));
     }
-}
-
-/// The two swept parts of the frame: thick column, thin bar, wide outer curve, tight inner curve.
-fn frame_shapes(end: f32) -> Vec<(Vec<(f32, f32)>, u32)> {
-    let mut a = vec![(0., 108.), (188., 108.)];
-    arc(&mut a, (234., 198.), (46., 34.), 180., 90.);
-    a.extend([(end, 232.), (end, 254.)]);
-    arc(&mut a, (124., 186.), (124., 68.), 90., 180.);
-    let mut b = vec![(end, 262.), (end, 284.)];
-    arc(&mut b, (234., 318.), (46., 34.), 270., 180.);
-    b.extend([(188., 378.), (0., 378.)]);
-    arc(&mut b, (124., 330.), (124., 68.), 180., 270.);
-    vec![(a, PE), (b, RS)]
 }
 
 /// One line or filled shape of the picture, in the space of its canvas.
@@ -658,11 +667,6 @@ impl WarRoomScreen {
             .or_else(|| decisions(w).first().map(|p| p.id.clone()))
     }
 
-    /// The level of the view: the shell colors its top segment by it.
-    pub(crate) fn bridge_level(&self) -> u8 {
-        self.bridge.planet.level
-    }
-
     /// Lock the brackets on a box; the camera moves after them.
     fn planet_fly(&mut self, level: u8, site: usize, agent: Option<String>, target: Boxed) {
         let p = &mut self.bridge.planet;
@@ -741,12 +745,32 @@ impl WarRoomScreen {
         }
         load_globe();
         let now = Instant::now();
-        let art = Art::of(window);
-        let (vw, vh) = (VP_W + art.dx, VP_H + art.dy);
+        let art = Art::raw(window);
+        // The picture fills the whole window; the camera still centres on the old picture area.
+        let (vw, vh0) = (VP_W + art.dx, VP_H + art.dy);
+        let vh = vh0 + VP_Y;
+        let vc = VP_Y + vh0 / 2.;
         let p = &mut self.bridge.planet;
+        let first = p.t0.is_none();
         let t0 = *p.t0.get_or_insert(now);
         let clock = (now - t0).as_secs_f32();
         p.update(war, now);
+        // Screenshot runs: `AIVORY_SELECT=<id>` starts with that session selected;
+        // `AIVORY_SITE=<id>` starts on the site of that session.
+        let hook = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+        if first
+            && let Some((id, agent)) = hook("AIVORY_SELECT")
+                .map(|v| (v, true))
+                .or_else(|| hook("AIVORY_SITE").map(|v| (v, false)))
+            && let Some(a) = war.session(&id)
+            && a.state.is_live()
+        {
+            let site = site_index(&p.sites, &a.codebase);
+            p.level = if agent { AGENT } else { SITE };
+            p.site = site;
+            p.agent = agent.then_some(id);
+            load_crop(site);
+        }
 
         // The lock ends: the level changes, and the camera leaves.
         if p.lock
@@ -775,11 +799,14 @@ impl WarRoomScreen {
             p.agent = None;
         }
         let sites = defs();
-        let fit = (vw / VP_W).min(vh / VP_H);
+        // The marks live right of the key column and below the header: centre there, with room
+        // for the labels at the edge.
+        let mx = KEYS_W + (vw - KEYS_W) / 2.;
+        let fit = ((vw - KEYS_W) / (VP_W - KEYS_W)).min(vh0 / VP_H) * 0.9;
         let zg = Z_GLOBE * fit;
         let home = Cam {
-            x: vw / 2. - zg * SPACE_W / 2.,
-            y: vh / 2. - zg * SPACE_H / 2.,
+            x: mx - zg * SPACE_W / 2.,
+            y: vc - zg * SPACE_H / 2.,
             z: zg,
         };
         let def = sites.get(p.site);
@@ -788,8 +815,8 @@ impl WarRoomScreen {
             (_, Some(d)) => {
                 let z = Z_SITE * fit;
                 Cam {
-                    x: vw / 2. - z * (SPACE_W / 2. + d.cx),
-                    y: vh / 2. - z * (SPACE_H / 2. + d.cy),
+                    x: mx - z * (SPACE_W / 2. + d.cx),
+                    y: vc - z * (SPACE_H / 2. + d.cy),
                     z,
                 }
             }
@@ -806,8 +833,9 @@ impl WarRoomScreen {
             let z = Z_AGENT * zs;
             surf_to = Cam {
                 // The crop always fills the picture: it has no ground beyond its edge.
-                x: (300. * fit - z * pad.x).min(0.),
-                y: (vh / 2. - z * pad.y).clamp(vh - SPACE_H * z, 0.),
+                // The selection sits in the middle of the map left of the panel.
+                x: ((vw - 616.) / 2. - z * pad.x).clamp(vw - SPACE_W * z, 0.),
+                y: (vc - z * pad.y).clamp(vh - SPACE_H * z, 0.),
                 z,
             };
         }
@@ -831,9 +859,9 @@ impl WarRoomScreen {
         // The brackets.
         let full = Boxed {
             x: 8.,
-            y: 8.,
+            y: VP_Y + 8.,
             w: vw - 16.,
-            h: vh - 16.,
+            h: vh0 - 16.,
         };
         // After the lock the brackets stay on the target while the camera zooms into it: the
         // box moves and grows with the same camera, then it fades.
@@ -911,11 +939,10 @@ impl WarRoomScreen {
         let mut view = div()
             .absolute()
             .left(px(VP_X))
-            .top(px(VP_Y))
+            .top(px(0.))
             .w(px(vw))
             .h(px(vh))
             .overflow_hidden()
-            .rounded_tl(px(34.))
             .bg(rgb(BG));
 
         // ---- the globe ----
@@ -959,7 +986,8 @@ impl WarRoomScreen {
                         .size(px(wide)),
                 );
             }
-            None => {
+            // The text shows while the planet loads, not for ever.
+            None if clock < 4. => {
                 view = view.child(
                     div()
                         .absolute()
@@ -970,7 +998,17 @@ impl WarRoomScreen {
                         .child(text(18., 24., OR, "Scanning the planet")),
                 );
             }
+            None => {}
         }
+
+        // The overlay: every label, line, pin and mark. It clips to the area under the header
+        // and right of the key column. Its inner box keeps the map coordinates.
+        let mut ov = div()
+            .absolute()
+            .left(px(0.))
+            .top(px(-VP_Y))
+            .w(px(vw))
+            .h(px(vh));
 
         // ---- the marks on the globe ----
         let mid = |x: f32, y: f32| globe.at(SPACE_W / 2. + x, SPACE_H / 2. + y);
@@ -1056,9 +1094,14 @@ impl WarRoomScreen {
                 }
             }
             let left = g < 4;
-            let y = ladder[g % 4] * fit;
+            // The labels stand in the visible map: below the header, right of the key column.
+            // The header and the key column grow with the frame (`art_k`); the map does not.
+            let ak = crate::bridge_kit::art_k();
+            let top = VP_Y * ak;
+            let y = top + 24. + ladder[g % 4] / 450. * (vh - top - 120. * ak);
+            let keys = KEYS_W * ak;
             let (lx, knee) = if left {
-                (150., 186.)
+                (keys + 150., keys + 186.)
             } else {
                 (vw - 150., vw - 186.)
             };
@@ -1106,7 +1149,7 @@ impl WarRoomScreen {
             let target = site_box(d);
             let word = |s: Div| if left { s } else { s.flex().justify_end() };
             labels.push(
-                spot(if left { 16. } else { vw - 192. }, y, 176., 44.)
+                spot(if left { keys + 16. } else { vw - 192. }, y, 176., 44.)
                     .id(("pl-lab", g))
                     .cursor_pointer()
                     .on_hover(cx.listener(move |t, on: &bool, _, cx| {
@@ -1140,7 +1183,7 @@ impl WarRoomScreen {
         } else {
             (1. - flown / 300.).clamp(0., 1.)
         };
-        view = view.child(
+        ov = ov.child(
             spot(0., 0., vw, vh)
                 .opacity(marks_alpha)
                 .child(layer(inks))
@@ -1152,12 +1195,12 @@ impl WarRoomScreen {
             let g = site_index(&names, &first.codebase);
             if let Some(d) = sites.get(g) {
                 let (x, y) = mid(d.cx, d.cy);
-                view = view
+                ov = ov
                     .child(spot(0., y, vw, 1.).bg(hsla(OR, 0.75)))
                     .child(spot(x, 0., 1., vh).bg(hsla(OR, 0.75)));
             }
         }
-        view = view.children(labels);
+        ov = ov.children(labels);
 
         // ---- the surface of a site ----
         if level >= SITE
@@ -1179,13 +1222,16 @@ impl WarRoomScreen {
             };
             let mut ground = div().absolute().size_full().opacity(alpha);
             if let Some(c) = shown {
-                ground = ground.child(
-                    img(c)
-                        .absolute()
-                        .left(px(surf.x))
-                        .top(px(surf.y))
-                        .w(px(SPACE_W * surf.z))
-                        .h(px(SPACE_H * surf.z)),
+                // The terrain picture belongs to the map layer, not to the overlay.
+                view = view.child(
+                    div().absolute().size_full().opacity(alpha).child(
+                        img(c)
+                            .absolute()
+                            .left(px(surf.x))
+                            .top(px(surf.y))
+                            .w(px(SPACE_W * surf.z))
+                            .h(px(SPACE_H * surf.z)),
+                    ),
                 );
             }
             let at = |x: f32, y: f32| surf.at(x, y);
@@ -1231,7 +1277,11 @@ impl WarRoomScreen {
                         .border_2()
                         .border_color(rgb(GOLD)),
                 );
-                if let (SITE, true, Some(module)) = (level, fade_late > 0., mods.get(k)) {
+                // A pad label under the header or the key column stays hidden.
+                let ak = crate::bridge_kit::art_k();
+                let free = q.1 + 14. >= VP_Y * ak + 4. && q.0 - 24. >= KEYS_W * ak;
+                if let (SITE, true, true, Some(module)) = (level, fade_late > 0., free, mods.get(k))
+                {
                     ground = ground.child(
                         spot(q.0 - 24., q.1 + 14., 110., 18.)
                             .opacity(fade_late)
@@ -1246,6 +1296,9 @@ impl WarRoomScreen {
             }
             let agents = self.bridge.planet.at_site(war, open);
             let picked = self.bridge.planet.agent.clone();
+            // Site tags: (want x, want y, color, name, doing, id, target, k). They are placed
+            // after the loop, so no tag covers another.
+            let mut tags: Vec<SiteTag> = Vec::new();
             for (k, a) in agents.iter().enumerate() {
                 if level == AGENT && picked.as_deref() != Some(a.id.as_str()) {
                     continue;
@@ -1313,32 +1366,85 @@ impl WarRoomScreen {
                                 cx.notify();
                             })),
                     );
-                    ground = ground.child(
-                        spot(tag, tag_y, 210., 44.)
-                            .id(("pl-tag", k))
-                            .opacity(fade_late)
-                            .px(px(8.))
-                            .py(px(2.))
-                            .bg(rgb(BG))
-                            .overflow_hidden()
-                            .cursor_pointer()
-                            .on_click(cx.listener(move |t, _, _, cx| {
-                                t.planet_fly(AGENT, open, Some(id.clone()), target);
-                                cx.notify();
-                            }))
-                            .child(text(18., 22., color, short_name(name, 26)))
-                            .child(text(14., 18., PE, doing)),
-                    );
+                    tags.push((
+                        tag,
+                        tag_y,
+                        color,
+                        short_name(name, 26),
+                        doing,
+                        id,
+                        target,
+                        k,
+                    ));
                 }
             }
-            view = view.child(ground);
+            // Lay the tags out: inside the map (below the header, right of the key column),
+            // top to bottom, each one below the tags it would cover. A tag with no room left
+            // joins a "+n more" note.
+            // The header and the key column grow with the frame (`art_k`); the map does not.
+            let ak = crate::bridge_kit::art_k();
+            let (tw, th) = (210., 44.);
+            let (x0, x1) = (KEYS_W * ak + 8., vw - tw - 8.);
+            let (y0, y1) = (VP_Y * ak + 8., vh - th - 24. * ak - 16.);
+            tags.sort_by(|a, b| a.1.total_cmp(&b.1));
+            let mut placed: Vec<(f32, f32)> = Vec::new();
+            let mut extra = 0usize;
+            let mut last: Option<(f32, f32)> = None;
+            for (want_x, want_y, color, name, doing, id, target, k) in tags {
+                let x = want_x.clamp(x0, x1.max(x0));
+                let mut y = want_y.clamp(y0, y1.max(y0));
+                while let Some(&(_, py)) = placed
+                    .iter()
+                    .find(|(px0, py0)| (x - px0).abs() < tw && (y - py0).abs() < th + 4.)
+                {
+                    y = py + th + 4.;
+                }
+                if y > y1 {
+                    extra += 1;
+                    continue;
+                }
+                placed.push((x, y));
+                last = Some((x, y));
+                ground = ground.child(
+                    spot(x, y, tw, th)
+                        .id(("pl-tag", k))
+                        .opacity(fade_late)
+                        .px(px(8.))
+                        .py(px(2.))
+                        .bg(rgb(BG))
+                        .overflow_hidden()
+                        .cursor_pointer()
+                        .on_click(cx.listener(move |t, _, _, cx| {
+                            t.planet_fly(AGENT, open, Some(id.clone()), target);
+                            cx.notify();
+                        }))
+                        .child(text(18., 22., color, name))
+                        .child(text(14., 18., PE, doing)),
+                );
+            }
+            if extra > 0
+                && let Some((x, y)) = last
+            {
+                let y = (y + th + 4.).min(vh - 64.);
+                ground = ground.child(
+                    spot(x, y, tw, 24.)
+                        .opacity(fade_late)
+                        .px(px(8.))
+                        .bg(rgb(BG))
+                        .child(text(14., 22., PE, format!("+{extra} more at this site"))),
+                );
+            }
+            ov = ov.child(ground);
         }
 
         // ---- the panel of an agent ----
         if let (AGENT, Some(a)) = (level, cur)
             && fade_late > 0.
         {
-            view = view.child(self.planet_panel(a, war, vw, vh, fade_late, cx));
+            ov = ov.child(
+                self.planet_panel(a, war, vw, vh0, fade_late, cx)
+                    .top(px(VP_Y)),
+            );
         }
 
         // ---- the brackets ----
@@ -1358,7 +1464,7 @@ impl WarRoomScreen {
                     d.right_0().border_r(px(10.)).rounded_r(px(26.))
                 }
             };
-            view = view.child(
+            ov = ov.child(
                 spot(brk.x, brk.y, brk.w, brk.h)
                     .opacity(br_alpha)
                     .child(side(true))
@@ -1372,12 +1478,22 @@ impl WarRoomScreen {
             .overflow_hidden()
             .bg(rgb(BG))
             .font_family(LABEL)
-            .child(self.planet_header(war, art, cx))
-            .child(view);
+            .child(view)
+            .child(
+                div()
+                    .absolute()
+                    .left(px(KEYS_W))
+                    .top(px(VP_Y))
+                    .w(px(vw - KEYS_W))
+                    .h(px(vh0))
+                    .overflow_hidden()
+                    .child(ov.left(px(-KEYS_W))),
+            )
+            .child(self.planet_header(war, Art::of(window), cx));
         if self.open == Overlay::NewSession {
             let form = self.new_session_popover(window, cx);
             out = out.child(self.overlay(
-                div().absolute().left(px(214.)).top(px(300.)).child(form),
+                div().absolute().right(px(24.)).top(px(144.)).child(form),
                 cx,
             ));
         }
@@ -1404,6 +1520,12 @@ impl WarRoomScreen {
 
     /// The header: the frame, the status line, the data block, the pills and the path.
     fn planet_header(&mut self, war: &WarRoom, art: Art, cx: &mut Context<Self>) -> Div {
+        // The header is part of the Bridge frame: it grows with the frame (`bridge_kit::art_k`),
+        // so the path bar meets the frame bar at every window size. `art` is the frame's art.
+        let k = crate::bridge_kit::art_k();
+        let px = |v: f32| gpui::px(v * k);
+        let spot = |x: f32, y: f32, w: f32, h: f32| spot(x * k, y * k, w * k, h * k);
+        let text = |sz: f32, lh: f32, c: u32, t: String| text(sz * k, lh * k, c, t);
         let (level, id) = (self.bridge.planet.level, self.bridge.planet.agent.clone());
         let name = self
             .bridge
@@ -1438,7 +1560,7 @@ impl WarRoomScreen {
             _ => (format!("{work} at work · {idle} idle"), false),
         };
         let title = match (level, cur) {
-            (AGENT, Some(a)) => short_name(if a.title.is_empty() { &a.id } else { &a.title }, 28),
+            (AGENT, Some(a)) => short_name(if a.title.is_empty() { &a.id } else { &a.title }, 52),
             (SITE, _) => format!("Site {name}"),
             _ => format!("War room {}", scope.len()),
         };
@@ -1506,7 +1628,7 @@ impl WarRoomScreen {
         for row in rows {
             let mut line = div().flex().h(px(26.));
             for (k, (a, b)) in row.into_iter().enumerate() {
-                let (wa, wb) = [(104., 124.), (124., 136.), (92., 84.)][k];
+                let (wa, wb) = [(110., 150.), (110., 130.), (110., 100.)][k];
                 // The state counters wear the colors of their dots on the map.
                 let legend = if k == 0 && level != AGENT {
                     legend_style(&a)
@@ -1528,28 +1650,22 @@ impl WarRoomScreen {
                                 .border_2()
                                 .border_color(rgb(ring)),
                         )
-                        .child(text(18., 24., color, a)),
-                    None => div().w(px(wa)).child(text(18., 24., OR, a)),
+                        .child(tag(text(18., 24., color, a))),
+                    None => div()
+                        .w(px(wa))
+                        .flex()
+                        .when(!a.is_empty(), |d| d.child(tag(text(18., 24., OR, a)))),
                 };
                 let value = legend.map_or(PE, |(color, _, _)| color);
-                line = line
-                    .child(label)
-                    .child(div().w(px(wb)).child(text(18., 24., value, b)));
+                line = line.child(label).child(
+                    div()
+                        .w(px(wb))
+                        .flex()
+                        .when(!b.is_empty(), |d| d.child(tag(text(18., 24., value, b)))),
+                );
             }
             block = block.child(line);
         }
-
-        // The frame.
-        let end = 700. + art.dx;
-        let shapes = frame_shapes(end)
-            .into_iter()
-            .map(|(points, color)| Ink {
-                points,
-                color,
-                alpha: 1.,
-                width: 0.,
-            })
-            .collect();
 
         // The pills of the level.
         let dx = art.dx;
@@ -1558,14 +1674,11 @@ impl WarRoomScreen {
         match level {
             PLANET => {
                 pills.push(
-                    pill("pl-p1", 1026. + dx, 84., PE, "New session")
-                        .on_click(cx.listener(|t, _, _, cx| t.toggle(Overlay::NewSession, cx))),
-                );
-                pills.push(
-                    pill(
+                    pill_k(
+                        k,
                         "pl-p2",
-                        1226. + dx,
-                        84.,
+                        1106. + dx,
+                        PILL_Y,
                         PK,
                         if on { "Autopilot on" } else { "Autopilot off" },
                     )
@@ -1580,7 +1693,7 @@ impl WarRoomScreen {
                     })),
                 );
                 pills.push(
-                    pill("pl-p4", 1226. + dx, 156., RS, "Pause all").on_click(cx.listener(
+                    pill_k(k, "pl-p4", 1266. + dx, PILL_Y, RS, "Pause all").on_click(cx.listener(
                         |t, _, _, cx| {
                             let ids: Vec<String> = t
                                 .war
@@ -1596,36 +1709,21 @@ impl WarRoomScreen {
                     )),
                 );
             }
-            SITE => {
-                pills.push(
-                    pill("pl-p1", 1026. + dx, 84., PE, "New session")
-                        .on_click(cx.listener(|t, _, _, cx| t.toggle(Overlay::NewSession, cx))),
-                );
-                pills.push(
-                    pill("pl-p4", 1226. + dx, 156., RS, "Back")
-                        .on_click(cx.listener(|t, _, _, cx| t.planet_to(PLANET, cx))),
-                );
-            }
             _ => {
-                if let Some(a) = cur {
-                    // Focus is the one way into the session: "Open session" did the same.
-                    let (focus, stop) = (a.id.clone(), a.id.clone());
-                    pills.push(
-                        pill("pl-p1", 1026. + dx, 84., SA, "Focus").on_click(cx.listener(
-                            move |_, _, _, cx| {
-                                cx.emit(WarRoomEvent::Focus(focus.clone()));
-                            },
-                        )),
-                    );
-                    if a.controlled {
-                        pills.push(pill("pl-p3", 1026. + dx, 156., PK, "Stop").on_click(
-                            cx.listener(move |t, _, _, cx| t.act(Action::Stop(stop.clone()), cx)),
-                        ));
-                    }
-                }
+                // One Back key goes up one level: agent -> site -> planet. Focus and Stop sit
+                // on the bottom edge of the right panel (`planet_panel`).
+                let up = level - 1;
                 pills.push(
-                    pill("pl-p4", 1226. + dx, 156., RS, "Back")
-                        .on_click(cx.listener(|t, _, _, cx| t.planet_to(SITE, cx))),
+                    pill_k(k, "pl-back", 1266. + dx, PILL_Y, SA, "Back")
+                        .tooltip(crate::ui::tip(
+                            if up == PLANET {
+                                "Back to the planet"
+                            } else {
+                                "Back to the site"
+                            }
+                            .to_string(),
+                        ))
+                        .on_click(cx.listener(move |t, _, _, cx| t.planet_to(up, cx))),
                 );
             }
         }
@@ -1635,64 +1733,90 @@ impl WarRoomScreen {
             .map(|a| short_name(if a.title.is_empty() { &a.id } else { &a.title }, 30))
             .unwrap_or_default();
         let slots = [
-            ("Fleet".to_string(), 740. + dx, 190.),
+            ("Fleet".to_string(), 292. + dx, 190.),
             (
                 if level == PLANET { String::new() } else { name },
-                934. + dx,
-                250.,
+                486. + dx,
+                220.,
             ),
-            (agent_name, 1188. + dx, 186.),
+            (agent_name, 710. + dx, 220.),
         ];
-        let mut path = div().absolute().size_full();
+        let mut path = div()
+            .absolute()
+            .size_full()
+            .child(spot(282., 234., 700. + dx, 16.).bg(rgb(crate::bridge_kit::PU)));
         for (k, (label, x, w)) in slots.into_iter().enumerate() {
+            // A level that is not open has no crumb.
+            if label.is_empty() {
+                continue;
+            }
             let here = k as u8 == level;
-            path = path
-                .child(
-                    spot(x, 232., w, 22.)
-                        .id(("pl-crumb", k))
-                        .flex()
-                        .items_center()
-                        .justify_end()
-                        .pr(px(10.))
-                        .bg(rgb(PK))
-                        .cursor_pointer()
-                        .on_click(cx.listener(move |t, _, _, cx| {
-                            if (k as u8) < t.bridge.planet.level {
-                                t.planet_to(k as u8, cx);
-                            }
-                        }))
-                        .child(text(14., 18., BG, label)),
-                )
-                .child(
-                    spot(x, 262., w, if here { 11. } else { 22. }).bg(rgb(if here {
-                        SA
-                    } else {
-                        PK
-                    })),
-                );
+            // Only a level above the current one is a link.
+            let live = (k as u8) < level;
+            let mut crumb = spot(x, 234., w, 16.)
+                .id(("pl-crumb", k))
+                .flex()
+                .items_center()
+                .justify_end()
+                .pr(px(10.))
+                .overflow_hidden()
+                .bg(rgb(if here { SA } else { PK }))
+                .child(text(14., 14., BG, label));
+            if live {
+                crumb = crumb
+                    .cursor_pointer()
+                    .tooltip(crate::ui::tip("Go back to this level".to_string()))
+                    .on_click(cx.listener(move |t, _, _, cx| t.planet_to(k as u8, cx)));
+            }
+            path = path.child(crumb);
         }
 
         div()
             .absolute()
             .size_full()
-            .child(layer(shapes))
-            .child(spot(706. + dx, 232., 28., 22.).bg(rgb(OR)))
-            .child(spot(706. + dx, 262., 28., 22.).bg(rgb(OR)))
-            .child(spot(1379. + dx, 262., 61., 22.).bg(rgb(RS)))
-            .child(div().absolute().left(px(248.)).top(px(16.)).child(text(
+            // The header is a solid black panel: the map shows only at the edges, never under
+            // the header text.
+            .child(spot(166., 0., 1440. + dx - 166., 234.).bg(rgb(BG)))
+            .child(div().absolute().left(px(248.)).top(px(16.)).child(tag(text(
                 28.,
                 36.,
                 if red { RED } else { OR },
                 head,
-            )))
+            ))))
             .child(block)
-            .child(
-                div()
+            .child({
+                // The title lives right of the data block and never reaches it. It steps down
+                // from 64 to 28 px and wraps to 2 lines when the box is too narrow.
+                let box_x = 940.;
+                let box_w = 1440. + dx - 24. - box_x;
+                let chars = title.chars().count() as f32;
+                let big = chars * 0.42 * 64. <= box_w;
+                let t = title.to_uppercase();
+                let el = div()
                     .absolute()
-                    .right(px(24.))
-                    .top_0()
-                    .child(text(64., 76., OR, title).font_weight(gpui::FontWeight::BOLD)),
-            )
+                    .left(px(box_x))
+                    .top(px(if big { 0. } else { 8. }))
+                    .w(px(box_w))
+                    .flex()
+                    .justify_end()
+                    .text_right()
+                    .font_family(LABEL)
+                    .text_color(rgb(OR));
+                if big {
+                    el.child(tag(div()
+                        .text_size(px(64.))
+                        .line_height(px(76.))
+                        .whitespace_nowrap()
+                        .font_weight(gpui::FontWeight::BOLD)
+                        .child(t)))
+                } else {
+                    el.text_size(px(28.))
+                        .line_height(px(32.))
+                        .max_h(px(64.))
+                        .overflow_hidden()
+                        .child(tag(div().max_w(px(box_w)).child(t)))
+                }
+            })
             .children(pills)
             .child(path)
     }
@@ -1750,14 +1874,11 @@ impl WarRoomScreen {
                 q.text.lines().next().unwrap_or("").to_string(),
                 q.text.lines().nth(1).unwrap_or("").to_string(),
             ),
-            None => {
-                let (verb, what) = last_step(a).unwrap_or(("At work".to_string(), String::new()));
-                (
-                    format!("{} · {} min", state_word(a.state), a.minutes(war.now)),
-                    format!("{verb} {what}"),
-                    a.title.clone(),
-                )
-            }
+            None => (
+                format!("{} · {} min", state_word(a.state), a.minutes(war.now)),
+                short_name(if a.title.is_empty() { &a.id } else { &a.title }, 52),
+                String::new(),
+            ),
         };
         let tone = if ask.is_some() { RED } else { OR };
         let mut body = div()
@@ -1774,13 +1895,15 @@ impl WarRoomScreen {
                     .font_family(LABEL)
                     .text_size(px(28.))
                     .line_height(px(36.))
+                    .max_h(px(72.))
+                    .overflow_hidden()
                     .text_color(rgb(OR))
                     .child(question.to_uppercase()),
             )
             .child(
                 div()
                     .mt(px(12.))
-                    .min_h(px(48.))
+                    .min_h(px(if detail.is_empty() { 0. } else { 48. }))
                     .font_family(LABEL)
                     .text_size(px(18.))
                     .line_height(px(24.))
@@ -1807,7 +1930,7 @@ impl WarRoomScreen {
                         .rounded(px(31.))
                         .bg(rgb(colors[k]))
                         .cursor_pointer()
-                        .hover(|s| s.opacity(0.86))
+                        .hover(move |s| s.bg(rgb(lit(colors[k]))))
                         .on_click(cx.listener(move |t, _, _, cx| t.planet_answer(&id, k, cx)))
                         .child(text(
                             18.,
@@ -1826,48 +1949,138 @@ impl WarRoomScreen {
                 "Answer this ask in its terminal",
             )));
         }
-        let mut steps = div().flex().flex_col().mt(px(24.));
-        for (verb, what) in steps_of(a, 5) {
-            steps = steps.child(
+        // The chat of the session (R2): the last user message and the latest agent text, in
+        // the order of the transcript. The current tool call is one small mono line (R3).
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        // Whole messages, newest last, as many as fit the height of the panel.
+        let mut chat = div().mt(px(14.)).flex().flex_col().gap(px(12.));
+        let avail = h - 230. - if ask.is_some() { 190. } else { 0. };
+        let mut used = 0.;
+        let mut order: Vec<(usize, bool)> = Vec::new();
+        for (i, l) in a.tail.iter().enumerate().rev() {
+            let is_user = match l.kind {
+                LineKind::User => true,
+                LineKind::Agent => false,
+                _ => continue,
+            };
+            if l.text.trim().is_empty() {
+                continue;
+            }
+            let chars = flat(&l.text)
+                .chars()
+                .count()
+                .min(if is_user { 120 } else { 520 });
+            let lines = (chars as f32 / 62.)
+                .ceil()
+                .clamp(1., if is_user { 2. } else { 8. });
+            let need = 18. + 24. * lines + 12.;
+            if used + need > avail && !order.is_empty() {
+                break;
+            }
+            used += need;
+            order.push((i, is_user));
+        }
+        order.reverse();
+        let none = order.is_empty();
+        let agent_name = super::data::provider_name(&a.provider);
+        for (i, is_user) in order {
+            let line = &a.tail[i];
+            if is_user {
+                chat = chat.child(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .gap(px(12.))
+                        .child(div().w(px(8.)).flex_none().rounded_full().bg(rgb(PK)))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .flex()
+                                .flex_col()
+                                .child(text(14., 18., PK, "You"))
+                                .child(
+                                    div()
+                                        .max_h(px(48.))
+                                        .overflow_hidden()
+                                        .font_family(LABEL)
+                                        .text_size(px(18.))
+                                        .line_height(px(24.))
+                                        .text_color(rgb(PALE))
+                                        .child(short_name(&flat(&line.text), 120)),
+                                ),
+                        ),
+                );
+            } else {
+                chat = chat.child(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .gap(px(12.))
+                        .child(div().w(px(8.)).flex_none().rounded_full().bg(rgb(PE)))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .flex()
+                                .flex_col()
+                                .child(text(14., 18., PE, agent_name.clone()))
+                                .child(
+                                    div()
+                                        .max_h(px(24. * 8.))
+                                        .overflow_hidden()
+                                        .font_family(LABEL)
+                                        .text_size(px(18.))
+                                        .line_height(px(24.))
+                                        .text_color(rgb(0xF2EDE4))
+                                        .child(short_name(&flat(&line.text), 520)),
+                                ),
+                        ),
+                );
+            }
+        }
+        if none {
+            chat = chat.child(text(14., 18., PE, "No chat yet"));
+        }
+        body = body.child(chat);
+        if let Some((verb, what)) = steps_of(a, 1).into_iter().next() {
+            body = body.child(
                 div()
-                    .flex()
-                    .items_center()
-                    .gap(px(14.))
-                    .h(px(32.))
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(62.))
-                            .h(px(22.))
-                            .flex()
-                            .items_center()
-                            .justify_end()
-                            .pr(px(8.))
-                            .rounded_r(px(11.))
-                            .bg(rgb(verb_color(&verb)))
-                            .child(text(14., 18., BG, short_name(&verb, 7))),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .overflow_hidden()
-                            .font_family(LABEL)
-                            .text_size(px(18.))
-                            .line_height(px(24.))
-                            .text_color(rgb(OR))
-                            .whitespace_nowrap()
-                            .child(what),
-                    ),
+                    .mt(px(14.))
+                    .flex_none()
+                    .truncate()
+                    .font_family(crate::bridge_kit::CODE)
+                    .text_size(px(14.))
+                    .line_height(px(20.))
+                    .text_color(rgb(0xBDB6AD))
+                    .child(format!("NOW · {} {}", verb.to_lowercase(), flat(&what))),
             );
         }
-        body = body.child(steps);
+        // Focus: the one key into the session screen, on the bottom edge of the panel.
+        let stop_id = a.id.clone();
+        let stop = a.controlled.then(|| {
+            pill("pl-stop", 10. + w - 190. - 160., h - 5., RS, "Stop")
+                .border_4()
+                .border_color(rgb(BG))
+                .on_click(cx.listener(move |t, _, _, cx| t.act(Action::Stop(stop_id.clone()), cx)))
+        });
+        let focus = a.id.clone();
         spot(x, 0., vw - x, vh)
             .opacity(alpha)
-            .bg(rgb(BG))
-            .occlude()
-            .child(spot(10., 22., w, h).child(layer(shapes)))
+            // The frame floats over the map: a black body, and the whole frame takes the
+            // pointer, so a click on it never reaches the map.
+            .child(spot(10. + 44., 22. + 10., w - 44., h - 20.).bg(rgb(BG)))
+            .child(spot(10., 22., w, h).occlude().child(layer(shapes)))
             .child(body)
+            .children(stop)
+            .child(
+                pill("pl-focus", 10. + w - 190., h - 5., SA, "Focus")
+                    .border_4()
+                    .border_color(rgb(BG))
+                    .on_click(cx.listener(move |_, _, _, cx| {
+                        cx.emit(WarRoomEvent::Focus(focus.clone()));
+                    })),
+            )
     }
 }
 
@@ -1913,15 +2126,6 @@ fn steps_of(p: &Pane, n: usize) -> Vec<(String, String)> {
 fn last_step(p: &Pane) -> Option<(String, String)> {
     let (verb, what) = steps_of(p, 1).into_iter().next()?;
     Some((verb, module_of(&what).unwrap_or(what)))
-}
-
-fn verb_color(verb: &str) -> u32 {
-    match verb.to_lowercase().as_str() {
-        "edit" | "write" | "multiedit" | "patch" => OR,
-        "read" | "grep" | "glob" => PE,
-        "bash" | "shell" | "run" => PALE,
-        _ => PK,
-    }
 }
 
 #[cfg(test)]

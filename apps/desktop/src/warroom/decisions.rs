@@ -384,6 +384,7 @@ impl WarRoomScreen {
             .bg(rgb(tk().card))
             .rounded(px(28.))
             .shadow(ui::popover_shadow())
+            .map(crate::overlay_style::skin)
             .occlude()
             .child(
                 div()

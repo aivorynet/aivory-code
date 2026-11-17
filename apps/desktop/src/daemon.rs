@@ -79,7 +79,7 @@ fn spawn_daemon(name: &str) -> anyhow::Result<()> {
         anyhow::bail!("{} is missing", daemon.display());
     }
     let mut cmd = std::process::Command::new(&daemon);
-    cmd.args(["serve", "--iroh", "--endpoint", name])
+    cmd.args(aivoryd::autostart::serve_args(name))
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());

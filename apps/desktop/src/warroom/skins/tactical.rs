@@ -1,30 +1,34 @@
-//! The Tactical look, war room (board `TacticalRadar`): a phosphor-green radar. The bearing
-//! sector is the codebase. The range from the center is the time since the session last moved
-//! (log rings 1, 5, 15 and 60 minutes), so an ignored waiting session drifts outward. The sweep
-//! turns in 6 s and it is the only free-running motion: a blip is brightest when the sweep
-//! passes it. White lock brackets mark a session that awaits orders. The left ruler shows the
-//! tokens per minute of each session. Green is the only color; white means "needs you".
+//! The Tactical look, war room: a calm radar scope and three panels (board `TacticalRadar`).
 //!
-//! The right column holds the tracking panel (the order request, the buttons), the mission
-//! route, the supply bars and the comms log. The dossier of one session is in `session.rs`.
+//! The scope shows every live session as one contact. The bearing is the codebase. The range
+//! from the center is the time since the session last moved (rings at 1, 5, 15 and 60 minutes),
+//! so an ignored session drifts outward. Color says the state and nothing else: amber needs
+//! you, cyan works, grey idles, red is a fault. Nothing on the scope moves.
+//!
+//! The right column has three panels: SELECTED (what the session says and does now, the order
+//! request with its buttons, Focus), SESSIONS (one row per session with its latest action,
+//! the ones that need you first) and BUDGET (the usage windows and the live spend).
 
 use std::f32::consts::TAU;
 use std::time::Instant;
 
-use aivory_protocol::{AskKind, LineKind, Pane, SessionState, WarRoom};
+use aivory_protocol::{AskKind, Pane, SessionState, WarRoom};
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Div, MouseButton, MouseDownEvent, Window, canvas, div, px};
+use gpui::{
+    AnyElement, Context, Div, FontWeight, MouseButton, MouseDownEvent, SharedString, Window,
+    canvas, div, px, relative,
+};
 
-use super::common::short_tool;
-use super::common::{Align, Painter, asks, key_label, next_ask};
+use super::common::{Align, Painter, asks, key_label, last_tool};
 use super::hud::{Contact, Hit, PaintFn, Rect, contacts};
 use crate::actions::Action;
-use crate::tactical_kit::{self as tac, Btn, c, dots, label, section, tbox};
+use crate::console::display::{DKind, last};
+use crate::tactical_kit::{self as tac, Btn, c, dots, label, tbox};
 use crate::ui;
 use crate::warroom::WarRoomScreen;
 
-/// The seconds of one turn of the sweep.
-const SWEEP_S: f32 = 6.;
+/// The width of the right column at fit 1.
+const COLUMN: f32 = 470.;
 
 /// The ring radius (0 to 1) of a number of minutes. The rings 1, 5, 15 and 60 minutes sit at
 /// 1/4, 2/4, 3/4 and 4/4 of the radius; between the rings the scale is logarithmic.
@@ -84,6 +88,26 @@ pub(super) fn layout(list: &[Contact], books: &[String]) -> Vec<Spot> {
     out
 }
 
+/// The color of a state.
+fn state_color(state: SessionState) -> u32 {
+    match state {
+        SessionState::NeedsYou => tac::AMBER,
+        SessionState::Error => tac::ALARM,
+        SessionState::Working => tac::CYAN,
+        _ => tac::MID,
+    }
+}
+
+/// `m:ss` of a wait, or `12m` of a longer time.
+fn span_text(ms: i64) -> String {
+    let s = (ms / 1000).max(0);
+    if s < 3600 {
+        format!("{}:{:02}", s / 60, s % 60)
+    } else {
+        format!("{}h{:02}", s / 3600, s / 60 % 60)
+    }
+}
+
 /// The point at a bearing (degrees from the top, clockwise) and a distance.
 fn at(center: [f32; 2], deg: f32, dist: f32) -> [f32; 2] {
     let a = deg.to_radians();
@@ -124,80 +148,12 @@ fn width_of(p: &mut Painter, s: &str, size: f32, bold: bool) -> f32 {
     )
 }
 
-/// A dashed segment.
-fn dashed(a: [f32; 2], b: [f32; 2], on: f32, off: f32) -> Vec<[f32; 4]> {
-    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let len = (dx * dx + dy * dy).sqrt().max(0.01);
-    let (ux, uy) = (dx / len, dy / len);
-    let mut segs = Vec::new();
-    let mut d = 0.;
-    while d < len {
-        let e = (d + on).min(len);
-        segs.push([a[0] + ux * d, a[1] + uy * d, a[0] + ux * e, a[1] + uy * e]);
-        d += on + off;
-    }
-    segs
-}
-
-/// The brackets of a lock around a point.
-fn lock(p: &mut Painter, at: [f32; 2], half: f32, rgb: u32, alpha: f32) {
-    let q = half * 0.5;
-    let mut segs = Vec::new();
-    for (sx, sy) in [(-1., -1.), (1., -1.), (-1., 1.), (1., 1.)] {
-        let (x, y) = (at[0] + sx * half, at[1] + sy * half);
-        segs.push([x, y, x - sx * q, y]);
-        segs.push([x, y, x, y - sy * q]);
-    }
-    p.strokes(&segs, rgb, 2., alpha);
-}
-
-/// A rectangle outline.
-fn frame_lines(p: &mut Painter, (x, y, w, h): (f32, f32, f32, f32), rgb: u32, alpha: f32) {
-    p.strokes(
-        &[
-            [x, y, x + w, y],
-            [x + w, y, x + w, y + h],
-            [x + w, y + h, x, y + h],
-            [x, y + h, x, y],
-        ],
-        rgb,
-        1.,
-        alpha,
-    );
-}
-
-/// The labels of the ruler: 0 and five steps up to `top` tokens per minute.
-fn ruler_top(rate: f32) -> f32 {
-    [1000., 2000., 5000., 10_000., 20_000., 50_000., 100_000.]
-        .into_iter()
-        .find(|&t| rate <= t)
-        .unwrap_or(200_000.)
-}
-
-fn k_text(v: f32) -> String {
-    if v < 1. {
-        "0".to_string()
-    } else if (v / 1000.).fract() == 0. {
-        format!("{}K", (v / 1000.) as u32)
-    } else {
-        format!("{:.1}K", v / 1000.)
-    }
-}
-
-/// The name of a contact on the scope: `CODEBASE/TITLE`.
-fn call_sign(s: &Contact) -> String {
-    format!("{}/{}", s.codebase, s.title).to_uppercase()
-}
-
-/// Everything the radar paints.
+/// Everything the scope paints.
 struct Scope {
     list: Vec<Contact>,
     books: Vec<String>,
     spots: Vec<Spot>,
     pick: Option<String>,
-    /// The sessions that get a name chip at the lock (the picked one and the first in line).
-    chips: Vec<String>,
-    t: f32,
 }
 
 fn radar(scope: Scope) -> PaintFn {
@@ -207,644 +163,334 @@ fn radar(scope: Scope) -> PaintFn {
             books,
             spots,
             pick,
-            chips,
-            t,
         } = &scope;
+        let k = ui::factor();
         let (ox, oy, w, h) = (r[0], r[1], r[2], r[3]);
-        let rcol = w - 20. - 452.;
-        let rad = (((h - 40.) / 2. - 34.).min((rcol - 168.) / 2. - 24.)).clamp(110., 370.);
-        let center = [ox + 160. + (rcol - 168.) / 2., oy + h / 2. - 10.];
+        let rad = ((h / 2. - 46. * k).min(w / 2. - 100. * k)).clamp(110., 900.);
+        let center = [ox + w / 2., oy + h / 2. - 6. * k];
+        let id = |q: [f32; 2]| q;
 
-        // ---- the ruler: tokens per minute --------------------------------------------------
-        let (ax, ry) = (ox + 82., oy + 32.);
-        let rh = (h - 32. - 54.).max(300.);
-        txt(
-            p,
-            "TOKENS / MIN",
-            12.,
-            false,
-            tac::LABEL,
-            1.,
-            (ox + 22., oy + 14.),
-            Align::Left,
-        );
-        let top = ruler_top(list.iter().map(|s| s.rate).fold(0., f32::max));
-        let y_of = |v: f32| ry + rh - (v / top).clamp(0., 1.) * rh;
-        p.strokes(&[[ax, ry, ax, ry + rh]], tac::MID, 1.5, 1.);
-        let mut ticks = Vec::new();
-        for k in 0..=50 {
-            let y = ry + rh - k as f32 / 50. * rh;
-            let len = if k % 10 == 0 {
-                22.
-            } else if k % 5 == 0 {
-                14.
-            } else {
-                8.
-            };
-            ticks.push([ax - len, y, ax, y]);
+        // ---- the scope: one disc, three rings, the sector lines -----------------------------
+        // The hairline grid of the backdrop, then the disc over it.
+        let step = 56. * k;
+        let mut grid = Vec::new();
+        let mut gx = ox + (center[0] - ox).rem_euclid(step);
+        while gx < ox + w {
+            grid.push([gx, oy, gx, oy + h]);
+            gx += step;
         }
-        p.strokes(&ticks, tac::DIM, 1., 1.);
-        for i in 0..=5 {
-            let v = top * i as f32 / 5.;
-            txt(
-                p,
-                &k_text(v),
-                12.,
-                false,
-                tac::LABEL,
-                1.,
-                (ax - 28., y_of(v)),
-                Align::Right,
-            );
+        let mut gy = oy + (center[1] - oy).rem_euclid(step);
+        while gy < oy + h {
+            grid.push([ox, gy, ox + w, gy]);
+            gy += step;
         }
-        let mut by_rate: Vec<&Contact> = list.iter().filter(|s| s.rate >= 0.5).collect();
-        by_rate.sort_by(|a, b| b.rate.total_cmp(&a.rate).then(a.id.cmp(&b.id)));
-        let mut last = -99.;
-        for s in by_rate.into_iter().take(((rh / 18.) as usize).min(14)) {
-            let mut y = y_of(s.rate);
-            if y - last < 18. {
-                y = last + 18.;
+        p.strokes(&grid, tac::DEEP, 1., 0.55);
+        p.dot(center, rad, tac::PANEL, 0.92);
+        // The bearing ring: a tick every 10 degrees, longer every 30.
+        let mut ring = Vec::new();
+        for d in (0..360).step_by(10) {
+            let len = if d % 30 == 0 { 9. } else { 5. } * k;
+            let (a1, a2) = (at(center, d as f32, rad), at(center, d as f32, rad + len));
+            ring.push([a1[0], a1[1], a2[0], a2[1]]);
+        }
+        p.strokes(&ring, tac::MID, 1., 0.7);
+        let nb = books.len().max(1);
+        let span = 360. / nb as f32;
+        if books.len() > 1 {
+            let mut lines = Vec::new();
+            for bi in 0..nb {
+                let to = at(center, bi as f32 * span, rad);
+                lines.push([center[0], center[1], to[0], to[1]]);
             }
-            last = y;
-            if y > ry + rh + 8. {
-                break;
-            }
-            let color = if s.waits() { tac::WHITE } else { tac::INK };
-            let picked = pick.as_deref() == Some(s.id.as_str());
-            p.polygon(
-                &[[ax, y], [ax + 9., y - 5.], [ax + 9., y + 5.]],
-                color,
-                if picked { 1. } else { 0.75 },
-            );
-            let name = dots(&s.title.to_uppercase(), 12);
-            let wd = txt(
-                p,
-                &name,
-                12.,
-                picked,
-                color,
-                if picked { 1. } else { 0.75 },
-                (ax + 15., y),
-                Align::Left,
-            );
-            hits.push((Hit::Pick(s.id.clone()), [ax, y - 9., wd + 20., 18.]));
+            p.strokes(&lines, tac::DIM, 1., 0.45);
         }
-
-        // ---- the scope ---------------------------------------------------------------------
-        p.dot(center, rad, 0x010C03, 1.);
-        let mut bearings = Vec::new();
-        for d in (0..360).step_by(30) {
-            let to = at(center, d as f32, rad);
-            bearings.push([center[0], center[1], to[0], to[1]]);
+        for f in [0.25, 0.5, 0.75] {
+            p.arc(center, rad * f, (0., TAU), 1., tac::DIM, 0.7, &id);
         }
-        p.strokes(&bearings, tac::DEEP, 1., 1.);
+        p.arc(center, rad, (0., TAU), 1.5, tac::DIM, 1., &id);
         p.strokes(
             &[
-                [center[0] - rad, center[1], center[0] + rad, center[1]],
-                [center[0], center[1] - rad, center[0], center[1] + rad],
+                [center[0] - 8. * k, center[1], center[0] + 8. * k, center[1]],
+                [center[0], center[1] - 8. * k, center[0], center[1] + 8. * k],
             ],
-            tac::DIM,
+            tac::MID,
             1.,
-            1.,
+            0.8,
         );
-        let id = |q: [f32; 2]| q;
-        for f in [0.25, 0.5, 0.75] {
-            p.arc(center, rad * f, (0., TAU), 1., tac::DIM, 1., &id);
-        }
-        p.arc(center, rad, (0., TAU), 6., tac::INK, 0.12, &id);
-        p.arc(center, rad, (0., TAU), 2., tac::INK, 1., &id);
+        let mut placed: Vec<[f32; 4]> = Vec::new();
         for (f, name) in [(0.25, "1M"), (0.5, "5M"), (0.75, "15M"), (1., "60M")] {
+            placed.push([center[0] + 2. * k, center[1] - rad * f, 34. * k, 18. * k]);
             txt(
                 p,
                 name,
                 12.,
                 false,
-                tac::DIM,
-                1.,
-                (center[0] + 8., center[1] - rad * f + 10.),
+                tac::LABEL,
+                0.8,
+                (center[0] + 6. * k, center[1] - rad * f + 9. * k),
                 Align::Left,
             );
         }
-        let mut rim = Vec::new();
-        for d in (0..360).step_by(5) {
-            let long = d % 30 == 0;
-            let a = at(center, d as f32, if long { rad - 18. } else { rad - 8. });
-            let b = at(center, d as f32, rad);
-            rim.push([a[0], a[1], b[0], b[1]]);
-        }
-        p.strokes(&rim, tac::MID, 1., 1.);
-        let nb = books.len().max(1);
-        let span = 360. / nb as f32;
-        let mut sectors = Vec::new();
-        for bi in 0..nb {
-            let to = at(center, bi as f32 * span, rad);
-            sectors.extend(dashed(center, to, 6., 6.));
-        }
-        p.strokes(&sectors, tac::MID, 1.5, 0.8);
-        p.strokes(
-            &[
-                [center[0] - 10., center[1], center[0] + 10., center[1]],
-                [center[0], center[1] - 10., center[0], center[1] + 10.],
-            ],
-            tac::INK,
-            1.5,
-            1.,
-        );
 
-        // ---- the sweep ---------------------------------------------------------------------
-        let turn = (t / SWEEP_S).fract();
-        let head = turn * 360.;
-        let slices = 28;
-        let width = 36.;
-        for k in 0..slices {
-            let d0 = head - k as f32 * width / slices as f32;
-            let d1 = head - (k + 1) as f32 * width / slices as f32;
-            let (a, b) = (at(center, d0, rad), at(center, d1, rad));
-            let fade = 1. - k as f32 / slices as f32;
-            p.polygon(&[center, a, b], tac::INK, 0.34 * fade.powf(1.6));
-        }
-        let tip = at(center, head, rad);
-        p.strokes(&[[center[0], center[1], tip[0], tip[1]]], 0xBEFFCD, 2., 0.9);
-
-        let mut tag_rects: Vec<[f32; 4]> = Vec::new();
-        // ---- the sector tags ---------------------------------------------------------------
+        // ---- the sector names, outside the rim ----------------------------------------------
         for (bi, b) in books.iter().enumerate() {
             let mid = (bi as f32 + 0.5) * span;
-            let q = at(center, mid, rad + 2.);
-            let members = list.iter().filter(|s| &s.codebase == b).count();
+            let q = at(center, mid, rad + 14. * k);
             let waits = list.iter().any(|s| &s.codebase == b && s.waits());
-            let name = dots(&b.to_uppercase(), 24);
-            let count = members.to_string();
-            let (wn, wc) = (
-                width_of(p, &name, 12., false),
-                width_of(p, &count, 12., false),
-            );
-            let bw = wn + wc + 8. + 20.;
-            let (bx, by) = (q[0] - bw / 2., q[1] - 12.);
-            tag_rects.push([bx, by, bw, 24.]);
-            p.rect((bx, by, bw, 24.), 0x000700, 1.);
-            frame_lines(p, (bx, by, bw, 24.), tac::DIM, 1.);
-            txt(
+            let members = list.iter().filter(|s| &s.codebase == b).count();
+            let text = format!("{} {}", dots(&b.to_uppercase(), 22), members);
+            let align = if mid.to_radians().sin() > 0.3 {
+                Align::Left
+            } else if mid.to_radians().sin() < -0.3 {
+                Align::Right
+            } else {
+                Align::Center
+            };
+            let wd = txt(
                 p,
-                &name,
+                &text,
                 12.,
                 false,
-                if waits { tac::WHITE } else { tac::INK },
+                if waits { tac::AMBER } else { tac::LABEL },
                 1.,
-                (bx + 10., q[1]),
-                Align::Left,
+                (q[0], q[1]),
+                align,
             );
-            txt(
-                p,
-                &count,
-                12.,
-                false,
-                tac::LABEL,
-                1.,
-                (bx + 18. + wn, q[1]),
-                Align::Left,
-            );
+            let x0 = match align {
+                Align::Left => q[0],
+                Align::Right => q[0] - wd,
+                Align::Center => q[0] - wd / 2.,
+            };
+            placed.push([x0, q[1] - 9. * k, wd, 18. * k]);
             if let Some(s) = list
                 .iter()
                 .find(|s| &s.codebase == b && s.waits())
                 .or_else(|| list.iter().find(|s| &s.codebase == b))
             {
-                hits.push((Hit::Pick(s.id.clone()), [bx, by, bw, 24.]));
+                hits.push((Hit::Pick(s.id.clone()), [x0, q[1] - 9. * k, wd, 18. * k]));
             }
         }
 
-        // ---- the blips ---------------------------------------------------------------------
-        let mut placed_labels: Vec<[f32; 4]> = tag_rects.clone();
-        // Keep the labels off the ring labels and off the two axes.
-        for (f, name) in [(0.25, "1M"), (0.5, "5M"), (0.75, "15M"), (1., "60M")] {
-            let wr = width_of(p, name, 12., false);
-            placed_labels.push([center[0] + 4., center[1] - rad * f + 1., wr + 8., 18.]);
-        }
-        placed_labels.push([center[0] - 3., center[1] - rad, 6., rad * 2.]);
-        placed_labels.push([center[0] - rad, center[1] - 3., rad * 2., 6.]);
-        let blip_pts: Vec<[f32; 2]> = (0..list.len())
+        // ---- the contacts -------------------------------------------------------------------
+        let pts: Vec<[f32; 2]> = (0..list.len())
             .map(|i| at(center, spots[i].deg, rad * spots[i].range))
             .collect();
         let mut order: Vec<usize> = (0..list.len()).collect();
-        order.sort_by_key(|&i| (!list[i].waits(), list[i].id.clone()));
+        // Draw the quiet ones first; the ones that need you lie on top and place their names first.
+        order.sort_by_key(|&i| (!list[i].waits(), list[i].state != SessionState::Working, i));
         for i in order {
-            let (s, spot) = (&list[i], spots[i]);
-            let q = blip_pts[i];
-            // The blip is brightest when the sweep passes and fades until the next turn.
-            let behind = ((head - spot.deg).rem_euclid(360.)) / 360.;
-            let glow = 1. - behind;
+            let (s, q) = (&list[i], pts[i]);
+            let color = state_color(s.state);
             let picked = pick.as_deref() == Some(s.id.as_str());
             if s.waits() {
-                p.dot(q, 9., tac::WHITE, 0.2 + 0.2 * glow);
-                p.dot(q, 4., tac::WHITE, 1.);
-                lock(p, q, 17., tac::WHITE, 0.65 + 0.35 * glow);
-                if chips.contains(&s.id) {
-                    let name = call_sign(s);
-                    let wait = format!(
-                        "AWAITING ORDERS {}",
-                        tac::clock_ms((s.minutes * 60_000.) as i64)
-                    );
-                    let wn = width_of(p, &name, 12., true) + 16.;
-                    let ww = width_of(p, &wait, 12., false);
-                    let right = q[0] < center[0] + rad * 0.54;
-                    let x0 = if right { q[0] - 17. } else { q[0] + 17. - wn };
-                    let xw = if right { q[0] - 17. } else { q[0] + 17. - ww };
-                    p.rect((x0, q[1] + 22., wn, 22.), tac::INK, 1.);
-                    txt(
-                        p,
-                        &name,
-                        12.,
-                        true,
-                        tac::DARK,
-                        1.,
-                        (x0 + 8., q[1] + 33.),
-                        Align::Left,
-                    );
-                    txt(
-                        p,
-                        &wait,
-                        12.,
-                        false,
-                        tac::WHITE,
-                        1.,
-                        (xw, q[1] + 56.),
-                        Align::Left,
-                    );
-                    placed_labels.push([x0, q[1] + 22., wn.max(ww), 40.]);
-                }
+                p.dot(q, 14. * k, color, 0.16);
+                p.dot(q, 7. * k, color, 1.);
+            } else if s.state == SessionState::Working {
+                let halo = 10. + (s.rate / 3000.).clamp(0., 1.) * 8.;
+                p.dot(q, halo * k, color, 0.12);
+                p.dot(q, 6. * k, color, 1.);
             } else {
-                let (color, text) = if s.state == SessionState::Working {
-                    (tac::INK, tac::INK)
-                } else {
-                    (tac::DIM, tac::DIM)
-                };
-                p.dot(q, 9., color, 0.22 * glow);
-                p.dot(q, 4., color, 0.3 + 0.7 * glow);
-                // A name only when it fits: fewer labels rather than crowded ones.
-                // The whole name where it fits: right of the blip, else left, else a line above
-                // or below. A short cut only when no place is free.
-                // Only a working or picked contact shows the whole name; idle ones a short one.
-                let full = if s.state == SessionState::Working || picked {
-                    s.title.to_uppercase()
-                } else {
-                    dots(&s.title.to_uppercase(), 16)
-                };
-                let wf = width_of(p, &full, 12., false);
-                let edge = ox + rcol - 8.;
-                let free_at = |r: [f32; 4], placed: &[[f32; 4]]| {
-                    let inside = [
-                        (r[0], r[1]),
-                        (r[0] + r[2], r[1]),
-                        (r[0], r[1] + r[3]),
-                        (r[0] + r[2], r[1] + r[3]),
-                    ]
-                    .iter()
-                    .all(|c| (c.0 - center[0]).hypot(c.1 - center[1]) <= rad - 6.);
-                    let off_blips = blip_pts.iter().enumerate().all(|(j, b)| {
-                        j == i
-                            || b[0] + 9. < r[0]
-                            || b[0] - 9. > r[0] + r[2]
-                            || b[1] + 9. < r[1]
-                            || b[1] - 9. > r[1] + r[3]
-                    });
-                    inside
-                        && off_blips
-                        && r[0] >= ox + 150.
-                        && r[0] + r[2] <= edge
-                        && placed.iter().all(|o| {
-                            r[0] > o[0] + o[2] + 4.
-                                || o[0] > r[0] + r[2] + 4.
-                                || r[1] > o[1] + o[3] + 2.
-                                || o[1] > r[1] + r[3] + 2.
-                        })
-                };
-                let spots_try = [
-                    [q[0] + 9., q[1] - 9., wf, 18.],
-                    [q[0] - 9. - wf, q[1] - 9., wf, 18.],
-                    [q[0] + 9., q[1] - 24., wf, 18.],
-                    [q[0] + 9., q[1] + 6., wf, 18.],
-                    [q[0] - 9. - wf, q[1] - 24., wf, 18.],
-                    [q[0] - 9. - wf, q[1] + 6., wf, 18.],
-                ];
-                let mut chosen = spots_try
-                    .into_iter()
-                    .find(|r| free_at(*r, &placed_labels))
-                    .map(|r| (full.clone(), r));
-                // No free place: cut the name at a word border until it fits.
-                let mut words: Vec<&str> = full.split_whitespace().collect();
-                while chosen.is_none() && words.len() > 1 {
-                    words.pop();
-                    let short = words.join(" ");
-                    let ws = width_of(p, &short, 12., false);
-                    for r in [
-                        [q[0] + 9., q[1] - 9., ws, 18.],
-                        [q[0] - 9. - ws, q[1] - 9., ws, 18.],
-                    ] {
-                        if chosen.is_none() && free_at(r, &placed_labels) {
-                            chosen = Some((short.clone(), r));
-                        }
-                    }
-                }
-                if let Some((name, rect)) = chosen {
-                    let wb = width_of(p, &name, 12., false);
-                    p.rect((rect[0] - 3., rect[1] + 1., wb + 6., 16.), 0x010C03, 0.9);
-                    txt(
-                        p,
-                        &name,
-                        12.,
-                        false,
-                        text,
-                        if picked || s.state == SessionState::Working {
-                            0.55 + 0.45 * glow
-                        } else {
-                            0.4 + 0.2 * glow
-                        },
-                        (rect[0], rect[1] + 9.),
-                        Align::Left,
-                    );
-                    placed_labels.push(rect);
-                }
+                p.dot(q, 5. * k, color, 0.9);
             }
             if picked {
-                let color = if s.waits() { tac::WHITE } else { tac::INK };
-                p.arc(q, 24., (0., TAU), 1., color, 0.8, &id);
+                p.arc(q, 18. * k, (0., TAU), 1.5, tac::INK, 1., &id);
             }
-            hits.push((Hit::Pick(s.id.clone()), [q[0] - 16., q[1] - 16., 32., 32.]));
+            hits.push((
+                Hit::Pick(s.id.clone()),
+                [q[0] - 16. * k, q[1] - 16. * k, 32. * k, 32. * k],
+            ));
+        }
+        // The names: the ones that need you, the working ones and the picked one first.
+        let mut named: Vec<usize> = (0..list.len()).collect();
+        named.sort_by_key(|&i| {
+            (
+                pick.as_deref() != Some(list[i].id.as_str()),
+                !list[i].waits(),
+                list[i].state != SessionState::Working,
+                i,
+            )
+        });
+        for i in named {
+            let (s, q) = (&list[i], pts[i]);
+            let picked = pick.as_deref() == Some(s.id.as_str());
+            let important = picked || s.waits() || s.state == SessionState::Working;
+            let mut name = s.title.to_uppercase();
+            if s.waits() {
+                name = format!(
+                    "{}  {}",
+                    dots(&name, 26),
+                    span_text((s.minutes * 60_000.) as i64)
+                );
+            }
+            let wd = width_of(p, &name, 12., picked);
+            let (th, off) = (16. * k, 10. * k);
+            let tries = [
+                [q[0] + off, q[1] - th / 2., wd, th],
+                [q[0] - off - wd, q[1] - th / 2., wd, th],
+                [q[0] - wd / 2., q[1] - off - th, wd, th],
+                [q[0] - wd / 2., q[1] + off, wd, th],
+                [q[0] + off, q[1] - off - th, wd, th],
+                [q[0] - off - wd, q[1] + off, wd, th],
+            ];
+            let free = |t: &[f32; 4], placed: &[[f32; 4]]| {
+                t[0] >= ox + 4.
+                    && t[0] + t[2] <= ox + w - 4.
+                    && t[1] >= oy + 4.
+                    && t[1] + t[3] <= oy + h - 4.
+                    && pts.iter().enumerate().all(|(j, b)| {
+                        j == i
+                            || b[0] + 9. * k < t[0]
+                            || b[0] - 9. * k > t[0] + t[2]
+                            || b[1] + 9. * k < t[1]
+                            || b[1] - 9. * k > t[1] + t[3]
+                    })
+                    && placed.iter().all(|o| {
+                        t[0] > o[0] + o[2] + 4.
+                            || o[0] > t[0] + t[2] + 4.
+                            || t[1] > o[1] + o[3] + 1.
+                            || o[1] > t[1] + t[3] + 1.
+                    })
+            };
+            let Some(t) = tries.iter().find(|t| free(t, &placed)) else {
+                continue;
+            };
+            if !important && (s.minutes > 30. || list.len() > 12) {
+                // A crowded scope names only what matters.
+                continue;
+            }
+            p.rect((t[0] - 3., t[1], t[2] + 6., t[3]), tac::BG, 0.78);
+            let text_color = if picked {
+                tac::INK
+            } else if s.waits() {
+                tac::AMBER
+            } else {
+                tac::TEXT
+            };
+            txt(
+                p,
+                &name,
+                12.,
+                picked,
+                text_color,
+                if important { 1. } else { 0.75 },
+                (t[0], t[1] + t[3] / 2.),
+                Align::Left,
+            );
+            placed.push(*t);
         }
         if list.is_empty() {
             txt(
                 p,
-                "NO CONTACTS",
-                14.,
+                "NO LIVE SESSIONS",
+                20.,
+                false,
+                tac::LABEL,
+                1.,
+                (center[0], center[1] + 40. * k),
+                Align::Center,
+            );
+        }
+
+        // ---- the legend (bottom) ------------------------------------------------------------
+        let ly = oy + h - 12. * k;
+        let mut x = ox + 4.;
+        for (color, name) in [
+            (tac::AMBER, "NEEDS YOU"),
+            (tac::CYAN, "WORKING"),
+            (tac::MID, "IDLE"),
+            (tac::ALARM, "FAULT"),
+        ] {
+            p.dot([x + 4. * k, ly], 4. * k, color, 1.);
+            let wd = txt(
+                p,
+                name,
+                12.,
+                false,
+                tac::LABEL,
+                1.,
+                (x + 14. * k, ly),
+                Align::Left,
+            );
+            x += 14. * k + wd + 22. * k;
+        }
+        let note = "DISTANCE = TIME SINCE THE LAST MOVE   /   SECTOR = CODEBASE";
+        if width_of(p, note, 12., false) + x + 24. * k < w {
+            txt(
+                p,
+                note,
+                12.,
                 false,
                 tac::DIM,
                 1.,
-                (center[0], center[1] + 40.),
-                Align::Center,
+                (ox + w - 4., ly),
+                Align::Right,
             );
         }
-
-        // ---- the count and the legend ------------------------------------------------------
-        let (rx, ry2) = (center[0] + rad * 0.72, center[1] - rad - 16.);
-        let num = list.len().to_string();
-        let nw = width_of(p, &num, 28., true);
-        let bw = nw + 24. + 92.;
-        let bx = (rx.min(ox + rcol - bw - 32.), ry2.max(oy + 8.), bw, 44.);
-        frame_lines(p, bx, tac::INK, 1.);
-        txt(
-            p,
-            &num,
-            28.,
-            true,
-            tac::INK,
-            1.,
-            (bx.0 + 12., bx.1 + 22.),
-            Align::Left,
-        );
-        p.strokes(
-            &[[bx.0 + nw + 24., bx.1, bx.0 + nw + 24., bx.1 + 44.]],
-            tac::INK,
-            1.,
-            1.,
-        );
-        txt(
-            p,
-            "LIVE",
-            12.,
-            false,
-            tac::INK,
-            1.,
-            (bx.0 + nw + 36., bx.1 + 14.),
-            Align::Left,
-        );
-        txt(
-            p,
-            "CONTACTS",
-            12.,
-            false,
-            tac::INK,
-            1.,
-            (bx.0 + nw + 36., bx.1 + 31.),
-            Align::Left,
-        );
-        txt(
-            p,
-            "RANGE = TIME SINCE LAST MOVE  /  BEARING = CODEBASE  /  SWEEP 6 S",
-            12.,
-            false,
-            tac::LABEL,
-            1.,
-            (ox + 196., center[1] + rad + 24.),
-            Align::Left,
-        );
     })
 }
 
-/// The bearing of the contact `id` in degrees.
-fn bearing(list: &[Contact], spots: &[Spot], id: &str) -> Option<f32> {
-    list.iter().position(|c| c.id == id).map(|i| spots[i].deg)
+/// A message of the chat.
+struct Msg {
+    you: bool,
+    text: String,
 }
 
-// ---- the route of a mission --------------------------------------------------------------
-
-/// The state of a waypoint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Wp {
-    Done,
-    Now,
-    Hold,
-    Todo,
-}
-
-/// The waypoints of a mission: the latest tool calls as done waypoints, then the plan steps or
-/// the order that waits (hold), or the call that runs now.
-pub(super) fn route_steps(pane: &Pane) -> Vec<(String, Wp)> {
-    let mut tools: Vec<String> = pane
-        .tail
-        .iter()
-        .filter(|l| l.kind == LineKind::Tool)
-        .map(|l| {
-            let name = l.label.clone().unwrap_or_else(|| {
-                short_tool("", &l.text)
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("")
-                    .to_string()
-            });
-            dots(&name.to_uppercase(), 10)
-        })
-        .collect();
-    let keep = if pane.ask.is_some() { 4 } else { 5 };
-    let skip = tools.len().saturating_sub(keep);
-    let tools = tools.split_off(skip);
-    let mut out: Vec<(String, Wp)> = vec![("START".to_string(), Wp::Done)];
-    out.extend(tools.into_iter().map(|n| (n, Wp::Done)));
-    match pane.ask.as_ref() {
-        Some(a) if !a.steps.is_empty() => {
-            for (i, s) in a.steps.iter().take(3).enumerate() {
-                let name = dots(&s.to_uppercase(), 10);
-                out.push((name, if i == 0 { Wp::Hold } else { Wp::Todo }));
-            }
+/// The last `n` messages of the chat: what the owner asked and what the agent said. Tool
+/// calls, code and output are not chat.
+fn chat(p: &Pane, n: usize) -> Vec<Msg> {
+    let mut out: Vec<Msg> = Vec::new();
+    for d in last(&p.tail, 80) {
+        let you = match d.kind {
+            DKind::You => true,
+            DKind::Agent | DKind::Heading | DKind::Bullet => false,
+            _ => continue,
+        };
+        let text = d.text.trim();
+        if text.is_empty() {
+            continue;
         }
-        Some(a) => {
-            let name = match a.kind {
-                AskKind::Permission => "PERMIT",
-                AskKind::Plan => "PLAN",
-                AskKind::Question => "ANSWER",
-                AskKind::Error => "ERROR",
-            };
-            out.push((name.to_string(), Wp::Hold));
-        }
-        None => {
-            if pane.state == SessionState::Working
-                && let Some(last) = out.last_mut()
-            {
-                last.1 = Wp::Now;
+        match out.last_mut() {
+            Some(m) if !d.first && m.you == you => {
+                m.text.push(' ');
+                m.text.push_str(text);
             }
+            _ => out.push(Msg {
+                you,
+                text: text.to_string(),
+            }),
         }
     }
-    out.push(("DONE".to_string(), Wp::Todo));
+    let skip = out.len().saturating_sub(n);
+    out.drain(..skip);
     out
 }
 
-/// The picture of a route: a grid, the legs (solid up to the waypoint that holds), the
-/// waypoints (filled = done, bracket = now or hold, open square = to do) and their names.
-pub(super) fn route_paint(steps: Vec<(String, Wp)>) -> PaintFn {
-    Box::new(move |p, r: Rect, _| {
-        let (ox, oy, w, h) = (r[0], r[1], r[2], r[3]);
-        let mut grid = Vec::new();
-        for k in 1..4 {
-            let y = oy + h * k as f32 / 4.;
-            grid.push([ox, y, ox + w, y]);
+/// What the session does now, in one short line.
+fn doing(p: &Pane) -> String {
+    match (p.state, p.ask.as_ref()) {
+        (SessionState::NeedsYou | SessionState::Error, Some(a)) => match a.kind {
+            AskKind::Permission => format!("asks to run {}", dots(&a.text, 60)),
+            AskKind::Plan => "asks you to approve a plan".to_string(),
+            AskKind::Question => format!("asks: {}", dots(&a.text, 60)),
+            AskKind::Error => format!("error: {}", dots(&a.text, 60)),
+        },
+        (SessionState::NeedsYou | SessionState::Error, None) => "waits for you".to_string(),
+        (SessionState::Working, _) => {
+            last_tool(p).map_or_else(|| "works".to_string(), |t| dots(&t, 60))
         }
-        for k in 1..6 {
-            let x = ox + w * k as f32 / 6.;
-            grid.push([x, oy, x, oy + h]);
-        }
-        p.strokes(&grid, 0x06280F, 1., 1.);
-        let n = steps.len();
-        if n == 0 {
-            return;
-        }
-        let pad = 48.;
-        let pts: Vec<[f32; 2]> = (0..n)
-            .map(|i| {
-                let x = if n == 1 {
-                    ox + w / 2.
-                } else {
-                    ox + pad + i as f32 * (w - 2. * pad) / (n - 1) as f32
-                };
-                [x, oy + h * (0.5 - 0.17 * (i as f32 * 1.1).sin())]
-            })
-            .collect();
-        let hold = steps
-            .iter()
-            .position(|s| matches!(s.1, Wp::Now | Wp::Hold))
-            .unwrap_or(n - 1);
-        for i in 1..n {
-            let (a, b) = (pts[i - 1], pts[i]);
-            if i <= hold {
-                p.strokes(&[[a[0], a[1], b[0], b[1]]], tac::INK, 6., 0.12);
-                p.strokes(&[[a[0], a[1], b[0], b[1]]], tac::INK, 2., 1.);
-            } else {
-                p.strokes(&dashed(a, b, 5., 6.), tac::MID, 1.5, 1.);
-            }
-        }
-        for (i, ((name, state), q)) in steps.iter().zip(pts.iter()).enumerate() {
-            let up = i % 2 == 1;
-            let (color, bold) = match state {
-                Wp::Done => (tac::INK, false),
-                Wp::Now => (tac::INK, true),
-                Wp::Hold => (tac::WHITE, true),
-                Wp::Todo => (tac::LABEL, false),
-            };
-            match state {
-                Wp::Done => p.dot(*q, 5., tac::INK, 1.),
-                Wp::Now => {
-                    p.dot(*q, 5., tac::INK, 1.);
-                    lock(p, *q, 14., tac::INK, 1.);
-                }
-                Wp::Hold => {
-                    p.dot(*q, 9., tac::WHITE, 0.25);
-                    p.dot(*q, 5., tac::WHITE, 1.);
-                    lock(p, *q, 14., tac::WHITE, 1.);
-                }
-                Wp::Todo => frame_lines(p, (q[0] - 7., q[1] - 7., 14., 14.), tac::MID, 1.),
-            }
-            let tag = match state {
-                Wp::Hold => " · HOLD",
-                Wp::Now => " · NOW",
-                _ => "",
-            };
-            let text = format!("WP{} {}{}", i + 1, name, tag);
-            txt(
-                p,
-                &text,
-                12.,
-                bold,
-                color,
-                1.,
-                (q[0], q[1] + if up { -26. } else { 26. }),
-                Align::Center,
-            );
-        }
-    })
-}
-
-// ---- the screen ----------------------------------------------------------------------------
-
-/// A label with the clock of a daemon time.
-fn log_line(time: i64, text: String, color: u32) -> Div {
-    div()
-        .flex_none()
-        .flex()
-        .gap(px(12.))
-        .h(px(22.))
-        .items_center()
-        .overflow_hidden()
-        .font_family(tac::MONO)
-        .text_size(ui::ts(tac::S_LABEL))
-        .child(
-            div()
-                .flex_none()
-                .text_color(c(tac::DIM, 1.))
-                .child(tac::utc(time)),
-        )
-        .child(
-            div()
-                .flex_1()
-                .min_w(px(0.))
-                .truncate()
-                .text_color(c(color, 1.))
-                .child(text),
-        )
-}
-
-/// `2.9M`, `410K`, `850`.
-fn compact(n: u64) -> String {
-    if n >= 1_000_000 {
-        format!("{:.1}M", n as f64 / 1e6)
-    } else if n >= 1000 {
-        format!("{}K", n / 1000)
-    } else {
-        n.to_string()
+        _ => "idle".to_string(),
     }
 }
 
-/// The order that a state of a session reports in the comms log.
-fn comms_text(s: &Pane) -> (String, u32) {
-    let name = format!("{}/{}", s.codebase, s.title).to_uppercase();
-    match (&s.state, s.ask.as_ref()) {
-        (SessionState::NeedsYou | SessionState::Error, Some(a)) => (
-            format!("{name}  REQ ORDER: {}", dots(&a.text.to_uppercase(), 60)),
-            tac::WHITE,
-        ),
-        (SessionState::NeedsYou | SessionState::Error, None) => {
-            (format!("{name}  AWAITS ORDERS"), tac::WHITE)
-        }
-        (SessionState::Working, _) => (format!("{name}  WORKING"), tac::INK),
-        _ => (format!("{name}  NO MOVEMENT"), tac::LABEL),
-    }
+/// A state word with its time: `WAITS 6:00`, `WORKS 3:12`, `IDLE 12:40`.
+fn state_text(p: &Pane, now: i64) -> String {
+    let word = match p.state {
+        SessionState::NeedsYou => "WAITS",
+        SessionState::Error => "ERROR",
+        SessionState::Working => "WORKS",
+        _ => "IDLE",
+    };
+    format!("{word} {}", span_text(now - p.since))
 }
 
 impl WarRoomScreen {
@@ -856,14 +502,22 @@ impl WarRoomScreen {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let now = Instant::now();
-        let st = &mut self.tactical;
-        let t = (now - *st.started.get_or_insert(now)).as_secs_f32();
-        st.observe(war, now);
-        crate::ui::animate(window, cx);
-        self.tactical_overview(war, t, cx)
+        self.tactical.started.get_or_insert(now);
+        self.tactical.observe(war, now);
+        let k = ui::factor();
+        let vh = f32::from(window.viewport_size().height);
+        // Whole rows only: the list is what the height allows under the selected panel.
+        let free = vh - 44. - 36. - 48. - 160. * k - 430. * k - 60. * k;
+        let rows = ((free / (55. * k)) as usize).clamp(3, 8);
+        self.tactical_overview(war, rows, cx)
     }
 
-    fn tactical_overview(&mut self, war: &WarRoom, t: f32, cx: &mut Context<Self>) -> AnyElement {
+    fn tactical_overview(
+        &mut self,
+        war: &WarRoom,
+        rows: usize,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let (mut list, _) = contacts(&self.tactical, war);
         // The contact title is cut at 30 characters with an ellipsis; use the whole title.
         for ct in &mut list {
@@ -880,31 +534,15 @@ impl WarRoomScreen {
             .tactical
             .pick
             .clone()
-            .filter(|id| queue.iter().any(|p| &p.id == id))
-            .or_else(|| queue.first().map(|p| p.id.clone()));
-        let pick = pick_id
-            .as_ref()
-            .and_then(|id| queue.iter().find(|p| &p.id == id).copied());
-        let next = next_ask(&queue, pick_id.as_deref());
-        let at_index = pick_id
-            .as_ref()
-            .and_then(|id| queue.iter().position(|p| &p.id == id));
-        let prev = at_index
-            .filter(|_| !queue.is_empty())
-            .map(|i| queue[(i + queue.len() - 1) % queue.len()].id.clone());
-        let brg = pick_id.as_deref().and_then(|id| bearing(&list, &spots, id));
-
-        let mut chips: Vec<String> = queue.iter().take(3).map(|p| p.id.clone()).collect();
-        if let Some(id) = &pick_id {
-            chips.push(id.clone());
-        }
+            .filter(|id| list.iter().any(|s| &s.id == id))
+            .or_else(|| queue.first().map(|p| p.id.clone()))
+            .or_else(|| list.first().map(|s| s.id.clone()));
+        let pick = pick_id.as_ref().and_then(|id| war.session(id));
         let paint = radar(Scope {
             list,
             books,
             spots,
             pick: pick_id.clone(),
-            chips,
-            t,
         });
         let (cache, hits) = (self.tactical.cache.clone(), self.tactical.hits.clone());
         let picture = canvas(
@@ -926,17 +564,10 @@ impl WarRoomScreen {
         .absolute()
         .inset_0();
 
-        let tracking = Self::tactical_tracking(
-            pick,
-            brg,
-            war.now,
-            (at_index.map_or(0, |i| i + 1), queue.len()),
-            (prev, next),
-            cx,
-        );
-        let route = Self::tactical_route(pick);
-        let supply = Self::tactical_supply(war);
-        let comms = Self::tactical_comms(war);
+        let k = ui::factor();
+        let selected = Self::tactical_selected(pick, war.now, cx);
+        let sessions = Self::tactical_sessions(war, pick_id.as_deref(), rows, cx);
+        let budget = Self::tactical_budget(war);
 
         div()
             .size_full()
@@ -945,6 +576,11 @@ impl WarRoomScreen {
             .bg(c(tac::BG, 1.))
             .font_family(tac::MONO)
             .text_color(c(tac::INK, 1.))
+            .px(px(28.))
+            .pt(px(18.))
+            .pb(px(20.))
+            .flex()
+            .gap(px(28.))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, ev: &MouseDownEvent, _, cx| {
@@ -965,281 +601,414 @@ impl WarRoomScreen {
                     }
                 }),
             )
-            .child(picture)
+            .child(div().flex_1().min_w(px(0.)).relative().child(picture))
             .child(
                 div()
-                    .absolute()
-                    .top(px(18.))
-                    .right(px(20.))
-                    .bottom(px(22.))
-                    .w(px(452.))
+                    .flex_none()
+                    .w(px(COLUMN * (1. + (k - 1.) * 0.5)))
                     .flex()
                     .flex_col()
                     .gap(px(24.))
-                    .child(tracking)
-                    .child(route)
-                    .child(supply)
-                    .child(comms),
+                    .child(selected)
+                    .child(sessions)
+                    .child(budget),
             )
-            .child(tac::scan())
             .into_any_element()
     }
 
-    /// The tracking panel: the contact that waits, its order request and the order buttons.
-    fn tactical_tracking(
-        pick: Option<&Pane>,
-        brg: Option<f32>,
-        now: i64,
-        (index, total): (usize, usize),
-        (prev, next): (Option<String>, Option<String>),
-        cx: &mut Context<Self>,
-    ) -> Div {
-        let caption = if total == 0 {
-            "TRACKING".to_string()
-        } else {
-            format!("TRACKING · CONTACT {index} OF {total}")
-        };
-        let panel = tbox(caption)
-            .flex_none()
-            .h(px(300.))
-            .p(px(24.))
+    /// SELECTED: the session in the middle of the screen. What it says, what it does now, the
+    /// request that waits for you with its buttons, and Focus.
+    fn tactical_selected(pick: Option<&Pane>, now: i64, cx: &mut Context<Self>) -> Div {
+        let panel = tbox("SEC-01 / SELECTED")
+            .flex_1()
+            .min_h(px(250. * ui::factor()))
+            .p(px(22.))
+            .pt(px(26.))
             .gap(px(12.));
         let Some(pane) = pick else {
             return panel
-                .child(section("ALL CLEAR"))
-                .child(tac::entry("No contact awaits orders."))
-                .child(label(
-                    "A white lock on the scope marks a contact that awaits orders.",
-                ));
+                .child(tac::section("NO SESSION"))
+                .child(tac::entry("Start a session with New session in the bar."));
         };
-        let Some(ask) = pane.ask.as_ref() else {
-            return panel.child(section(dots(&pane.title.to_uppercase(), 28)));
-        };
+        let color = state_color(pane.state);
+        let (open_id, park_id) = (pane.id.clone(), pane.id.clone());
+        let keys = div()
+            .flex_none()
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .child(tac::order("tac-park", "PARK", Btn::Plain).on_click(
+                cx.listener(move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx)),
+            ))
+            .child(
+                tac::order("tac-focus", "FOCUS >", Btn::On).on_click(cx.listener(
+                    move |_this, _, _, cx| {
+                        cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
+                    },
+                )),
+            );
         let mut panel = panel
             .child(
                 div()
-                    .self_start()
-                    .px(px(12.))
-                    .py(px(5.))
-                    .bg(c(tac::INK, 1.))
-                    .font_family(tac::SANS)
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_size(ui::ts(tac::S_SECTION))
-                    .text_color(c(tac::DARK, 1.))
-                    .child(dots(
-                        &format!("{}/{}", pane.codebase, pane.title).to_uppercase(),
-                        30,
-                    )),
-            )
-            .child(label(format!(
-                "BRG {:03.0}° · RNG {} · {} · LINES {}",
-                brg.unwrap_or(0.),
-                {
-                    let ms = (now - pane.since).max(0);
-                    format!("{}M{:02}S", ms / 60_000, ms / 1000 % 60)
-                },
-                pane.provider.to_uppercase(),
-                pane.lines_total
-            )));
-        match ask.kind {
-            AskKind::Permission => {
-                panel = panel
-                    .child(tac::entry(format!("{} asks to run:", pane.provider)))
-                    .child(tac::code(format!("$ {}", dots(&ask.text, 90))));
-            }
-            AskKind::Plan => {
-                panel = panel
-                    .child(tac::entry("Approve the plan?"))
-                    .child(tac::code(dots(&ask.steps.join("  >  "), 90)));
-            }
-            _ => {
-                panel = panel.child(tac::entry(dots(&ask.text, 150)));
-            }
-        }
-        let mut orders = div().flex().gap(px(8.));
-        let n = ask.options.len();
-        for (i, option) in ask.options.iter().enumerate() {
-            let (sid, aid, opt) = (pane.id.clone(), ask.id.clone(), option.clone());
-            let kind = if i == 0 && !ask.risky {
-                Btn::On
-            } else if i + 1 == n && n > 1 {
-                Btn::Dim
-            } else {
-                Btn::Plain
-            };
-            orders = orders.child(
-                tac::order(
-                    format!("tac-ans-{i}"),
-                    &format!("[{}] {}", i + 1, key_label(option)),
-                    kind,
-                )
-                .on_click(
-                    cx.listener(move |this, _, _, cx| this.skin_answer(&sid, &aid, &opt, cx)),
-                ),
-            );
-        }
-        let (open_id, park_id) = (pane.id.clone(), pane.id.clone());
-        let mut nav = div().flex().items_center().justify_between();
-        nav = nav.child(tac::navb("tac-prev", "< PREV", false).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.tactical.pick = prev.clone();
-                cx.notify();
-            },
-        )));
-        nav = nav.child(tac::navb("tac-park", "PARK", false).on_click(
-            cx.listener(move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx)),
-        ));
-        nav = nav.child(
-            tac::navb("tac-open", "OPEN SESSION >", false)
-                .border_1()
-                .border_color(c(tac::INK, 1.))
-                .text_color(c(tac::INK, 1.))
-                .on_click(cx.listener(move |_this, _, _, cx| {
-                    cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
-                })),
-        );
-        nav = nav.child(tac::navb("tac-next", "NEXT >", false).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.tactical.pick = next.clone();
-                cx.notify();
-            },
-        )));
-        panel.child(orders).child(nav)
-    }
-
-    /// The mission route of the contact in the tracking panel.
-    fn tactical_route(pick: Option<&Pane>) -> Div {
-        let caption = match pick {
-            Some(p) => format!(
-                "MISSION ROUTE · {}",
-                dots(&format!("{}/{}", p.codebase, p.title).to_uppercase(), 28)
-            ),
-            None => "MISSION ROUTE".to_string(),
-        };
-        let panel = tbox(caption).flex_none().h(px(172.));
-        let Some(pane) = pick else {
-            return panel.p(px(24.)).child(label("NO CONTACT IN TRACKING"));
-        };
-        let paint = route_paint(route_steps(pane));
-        panel.child(Self::tactical_picture(paint).absolute().inset_0())
-    }
-
-    /// A canvas that paints `paint` and takes no clicks.
-    pub(super) fn tactical_picture(paint: PaintFn) -> impl Styled + IntoElement {
-        let cache = std::rc::Rc::new(std::cell::RefCell::new(super::common::TextCache::default()));
-        canvas(
-            |_, _, _| (),
-            move |bounds, _, window, cx| {
-                let rect = [
-                    f32::from(bounds.origin.x),
-                    f32::from(bounds.origin.y),
-                    f32::from(bounds.size.width),
-                    f32::from(bounds.size.height),
-                ];
-                let mut cache = cache.borrow_mut();
-                let mut hits = Vec::new();
-                let mut p = Painter::new(window, cx, &mut cache);
-                paint(&mut p, rect, &mut hits);
-            },
-        )
-    }
-
-    /// The supply bars: one column per usage window, and the spend of the live sessions.
-    fn tactical_supply(war: &WarRoom) -> Div {
-        let mut cols = div().flex().gap(px(14.));
-        for u in war.usage.iter().take(3) {
-            let lit = ((u.pct as f32) / 12.5).ceil().min(8.) as usize;
-            let mut bar = div().flex().flex_col().gap(px(2.));
-            for k in (0..8).rev() {
-                let on = k < lit;
-                let warn = (k + 1) as f32 * 12.5 > 75.;
-                let color = if warn { tac::WHITE } else { tac::INK };
-                bar = bar.child(
-                    div()
-                        .h(px(9.))
-                        .border_1()
-                        .border_color(c(if on { color } else { tac::DEEP }, 1.))
-                        .when(on, |d| d.bg(c(color, 1.))),
-                );
-            }
-            cols = cols.child(
-                div()
-                    .w(px(58.))
+                    .flex_none()
                     .flex()
-                    .flex_col()
-                    .gap(px(6.))
-                    .child(bar)
+                    .items_start()
+                    .justify_between()
+                    .gap(px(12.))
                     .child(
                         div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .font_family(tac::SANS)
+                            .font_weight(FontWeight::BOLD)
+                            .text_size(ui::ts(tac::S_SECTION))
+                            .line_height(ui::ts(tac::S_SECTION) * 1.25)
+                            .text_color(c(tac::INK, 1.))
+                            .line_clamp(2)
+                            .child(if pane.title.is_empty() {
+                                pane.id.clone()
+                            } else {
+                                pane.title.clone()
+                            }),
+                    )
+                    .child(keys),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.))
+                    .child(tac::dot(color))
+                    .child(
+                        div()
+                            .flex_none()
                             .text_size(ui::ts(tac::S_LABEL))
-                            .text_color(c(tac::LABEL, 1.))
-                            .child(dots(&u.provider.to_uppercase(), 7)),
+                            .text_color(c(color, 1.))
+                            .child(state_text(pane, now)),
                     )
                     .child(
                         div()
+                            .min_w(px(0.))
+                            .truncate()
                             .text_size(ui::ts(tac::S_LABEL))
-                            .text_color(c(tac::INK, 1.))
+                            .text_color(c(tac::LABEL, 1.))
+                            .child(format!(
+                                "{} · {} · {}",
+                                pane.codebase.to_uppercase(),
+                                pane.provider.to_uppercase(),
+                                pane.model.to_uppercase()
+                            )),
+                    ),
+            );
+        if let Some(ask) = pane.ask.as_ref() {
+            let kind = match ask.kind {
+                AskKind::Permission => "PERMISSION",
+                AskKind::Plan => "PLAN",
+                AskKind::Question => "QUESTION",
+                AskKind::Error => "ERROR",
+            };
+            let mut req = div()
+                .flex_none()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .pl(px(12.))
+                .border_l(px(2.))
+                .border_color(c(color, 1.))
+                .child(
+                    label(format!("{} ASKS · {kind}", pane.provider.to_uppercase()))
+                        .text_color(c(color, 1.)),
+                );
+            req = match ask.kind {
+                AskKind::Permission => req.child(tac::code(format!("$ {}", dots(&ask.text, 140)))),
+                AskKind::Plan => req
+                    .child(tac::entry("Approve the plan?"))
+                    .child(tac::code(dots(&ask.steps.join("  >  "), 140))),
+                _ => req.child(tac::entry(dots(&ask.text, 200)).line_clamp(4)),
+            };
+            let mut orders = div().flex().flex_wrap().gap(px(8.));
+            for (i, option) in ask.options.iter().enumerate() {
+                let (sid, aid, opt) = (pane.id.clone(), ask.id.clone(), option.clone());
+                let kind = if i == 0 && !ask.risky {
+                    Btn::On
+                } else {
+                    Btn::Plain
+                };
+                orders = orders.child(
+                    tac::order(
+                        format!("tac-ans-{i}"),
+                        &format!("[{}] {}", i + 1, key_label(option)),
+                        kind,
+                    )
+                    .on_click(
+                        cx.listener(move |this, _, _, cx| this.skin_answer(&sid, &aid, &opt, cx)),
+                    ),
+                );
+            }
+            panel = panel.child(req.child(orders));
+        } else {
+            panel = panel.child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(label("NOW"))
+                    .child(tac::code(doing(pane))),
+            );
+        }
+        // The chat: the last words of the owner and of the agent, in the text font.
+        let has_ask = pane.ask.is_some();
+        let msgs = chat(pane, if has_ask { 1 } else { 3 });
+        let mut talk = div()
+            .flex_1()
+            .min_h(px(0.))
+            .overflow_hidden()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(label("CHAT"));
+        if msgs.is_empty() {
+            talk = talk.child(label("NO MESSAGES YET"));
+        }
+        for m in msgs {
+            talk = talk.child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .gap(px(10.))
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(46. * ui::factor()))
+                            .pt(px(3.))
+                            .text_size(ui::ts(tac::S_LABEL))
+                            .text_color(c(if m.you { tac::CYAN } else { tac::LABEL }, 1.))
+                            .child(if m.you { "YOU" } else { "AGENT" }),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .font_family(tac::SANS)
+                            .text_size(ui::ts(tac::S_ENTRY))
+                            .line_height(ui::ts(tac::S_ENTRY) * 1.4)
+                            .text_color(c(tac::TEXT, 1.))
+                            .line_clamp(if has_ask { 4 } else { 3 })
+                            .child(m.text),
+                    ),
+            );
+        }
+        panel.child(talk)
+    }
+
+    /// SESSIONS: one row per live session with its latest action. The ones that need you first.
+    fn tactical_sessions(
+        war: &WarRoom,
+        pick: Option<&str>,
+        rows: usize,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let mut live: Vec<&Pane> = war.sessions.iter().filter(|s| s.state.is_live()).collect();
+        let rank = |s: SessionState| match s {
+            SessionState::NeedsYou | SessionState::Error => 0,
+            SessionState::Working => 1,
+            _ => 2,
+        };
+        live.sort_by(|a, b| {
+            rank(a.state)
+                .cmp(&rank(b.state))
+                .then(a.since.cmp(&b.since))
+                .then(a.id.cmp(&b.id))
+        });
+        let total = live.len();
+        let need = live.iter().filter(|s| s.ask.is_some()).count();
+        let caption = if need > 0 {
+            format!("SEC-02 / SESSIONS · {total} LIVE · {need} NEED YOU")
+        } else {
+            format!("SEC-02 / SESSIONS · {total} LIVE")
+        };
+        let mut panel = tbox(caption)
+            .flex_none()
+            .py(px(12.))
+            .pt(px(16.))
+            .gap(px(0.));
+        if live.is_empty() {
+            panel = panel.child(div().px(px(20.)).child(label("NO LIVE SESSIONS")));
+        }
+        let hidden = total.saturating_sub(rows);
+        for (i, s) in live.into_iter().take(rows).enumerate() {
+            let on = pick == Some(s.id.as_str());
+            let color = state_color(s.state);
+            let sid = s.id.clone();
+            let title = if s.title.is_empty() {
+                s.id.clone()
+            } else {
+                s.title.clone()
+            };
+            panel = panel.child(
+                div()
+                    .id(SharedString::from(format!("tac-row-{i}")))
+                    .flex_none()
+                    .px(px(18.))
+                    .py(px(5.))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .cursor_pointer()
+                    .border_l(px(2.))
+                    .border_color(c(tac::CYAN, if on { 1. } else { 0. }))
+                    .bg(c(tac::CYAN, if on { 0.08 } else { 0. }))
+                    .hover(|h| h.bg(c(tac::INK, 0.05)))
+                    .child(tac::dot(color))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .truncate()
+                                    .font_family(tac::SANS)
+                                    .text_size(ui::ts(tac::S_ENTRY))
+                                    .line_height(ui::ts(tac::S_ENTRY) * 1.3)
+                                    .text_color(c(if on { tac::INK } else { tac::TEXT }, 1.))
+                                    .child(title),
+                            )
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_size(ui::ts(tac::S_LABEL))
+                                    .text_color(c(tac::LABEL, 1.))
+                                    .child(doing(s)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_size(ui::ts(tac::S_LABEL))
+                            .text_color(c(color, 1.))
+                            .child(span_text(war.now - s.since)),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.tactical.pick = Some(sid.clone());
+                        cx.notify();
+                    })),
+            );
+        }
+        if hidden > 0 {
+            panel = panel.child(
+                div()
+                    .px(px(20.))
+                    .pt(px(4.))
+                    .child(label(format!("+{hidden} MORE ON THE SCOPE"))),
+            );
+        }
+        panel
+    }
+
+    /// BUDGET: the usage windows as thin bars, and the spend of the live sessions.
+    fn tactical_budget(war: &WarRoom) -> Div {
+        let live: Vec<&Pane> = war.sessions.iter().filter(|s| s.state.is_live()).collect();
+        let spend: f64 = live.iter().map(|s| s.cost).sum();
+        let tokens: u64 = live.iter().map(|s| s.tokens).sum();
+        let mut panel = tbox("SEC-03 / BUDGET")
+            .flex_none()
+            .p(px(16.))
+            .pt(px(20.))
+            .gap(px(8.));
+        for u in war.usage.iter().take(3) {
+            let pct = f32::from(u.pct).min(100.);
+            let color = if pct >= 95. {
+                tac::ALARM
+            } else if pct >= 75. {
+                tac::AMBER
+            } else {
+                tac::CYAN
+            };
+            panel = panel.child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .text_size(ui::ts(tac::S_LABEL))
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(130. * ui::factor()))
+                            .truncate()
+                            .text_color(c(tac::LABEL, 1.))
+                            .child(format!(
+                                "{} · {}",
+                                dots(&u.provider.to_uppercase(), 8),
+                                win_tag(&u.label)
+                            )),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .h(px(6.))
+                            .bg(c(tac::DEEP, 1.))
+                            .child(div().h_full().w(relative(pct / 100.)).bg(c(color, 1.))),
+                    )
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(38. * ui::factor()))
+                            .text_color(c(if pct >= 75. { color } else { tac::TEXT }, 1.))
                             .child(format!("{}%", u.pct)),
                     ),
             );
         }
-        let live: Vec<&Pane> = war.sessions.iter().filter(|s| s.state.is_live()).collect();
-        let spend: f64 = live.iter().map(|s| s.cost).sum();
-        let tokens: u64 = live.iter().map(|s| s.tokens).sum();
-        let readout = div()
-            .flex_none()
-            .w(px(160.))
-            .h(px(96.))
-            .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap(px(4.))
-            .bg(c(0x0A2A12, 1.))
-            .border_1()
-            .border_color(c(tac::DIM, 1.))
-            .child(label("SPEND, LIVE"))
-            .child(
-                div()
-                    .font_family(tac::SANS)
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_size(ui::ts(tac::S_BIG))
-                    .text_color(c(tac::INK, 1.))
-                    .child(format!("${spend:05.2}")),
-            )
-            .child(label(format!(
-                "{} LIVE · {} TOK",
-                live.len(),
-                compact(tokens)
-            )));
-        tbox("SUPPLY")
-            .flex_none()
-            .h(px(150.))
-            .px(px(24.))
-            .py(px(20.))
-            .flex_row()
-            .items_center()
-            .justify_between()
-            .child(cols)
-            .child(readout)
+        panel.child(
+            div()
+                .flex_none()
+                .flex()
+                .items_baseline()
+                .gap(px(10.))
+                .child(
+                    div()
+                        .font_family(tac::SANS)
+                        .font_weight(FontWeight::BOLD)
+                        .text_size(ui::ts(tac::S_SECTION))
+                        .text_color(c(tac::INK, 1.))
+                        .child(format!("${spend:.2}")),
+                )
+                .child(label(format!(
+                    "LIVE SPEND · {} SESSIONS · {} TOK",
+                    live.len(),
+                    compact(tokens)
+                ))),
+        )
     }
+}
 
-    /// The comms log: the latest move of each live session, newest first.
-    fn tactical_comms(war: &WarRoom) -> Div {
-        let mut live: Vec<&Pane> = war.sessions.iter().filter(|s| s.state.is_live()).collect();
-        live.sort_by(|a, b| b.since.cmp(&a.since).then(a.id.cmp(&b.id)));
-        let mut log = div()
-            .flex_1()
-            .min_h(px(0.))
-            .flex()
-            .flex_col()
-            .overflow_hidden()
-            .px(px(24.))
-            .py(px(20.));
-        for s in live.into_iter().take(5) {
-            let (text, color) = comms_text(s);
-            log = log.child(log_line(s.since, text, color));
-        }
-        tbox("COMMS · AIVORYD").flex_1().min_h(px(120.)).child(log)
+/// A short name of a usage window: `5H`, `7D`, `1D`, `MONTH`.
+fn win_tag(label: &str) -> String {
+    let l = label.to_lowercase();
+    if l.contains("5 h") || l.contains("5h") {
+        "5H".to_string()
+    } else if l.contains("week") || l.contains("7 d") {
+        "7D".to_string()
+    } else if l.contains("day") || l.contains("daily") {
+        "1D".to_string()
+    } else if l.contains("month") {
+        "MONTH".to_string()
+    } else {
+        dots(&l.split_whitespace().next().unwrap_or("").to_uppercase(), 5)
+    }
+}
+
+/// `2.9M`, `410K`, `850`.
+fn compact(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1e6)
+    } else if n >= 1000 {
+        format!("{}K", n / 1000)
+    } else {
+        n.to_string()
     }
 }

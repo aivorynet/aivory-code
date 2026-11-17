@@ -16,7 +16,7 @@ use aivory_protocol::{
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, FontWeight, Subscription, Task as GpuiTask,
-    Window, div, px, rgb,
+    Window, div, px, relative, rgb, rgba,
 };
 
 use super::neon_kit::*;
@@ -136,7 +136,8 @@ fn detail_body(id: &'static str) -> gpui::Stateful<Div> {
         .min_h(px(0.))
         .overflow_y_scroll()
         .px(px(24.))
-        .py(px(20.))
+        .pt(px(20.))
+        .pb(px(56.))
         .flex()
         .flex_col()
         .gap(px(16.))
@@ -268,7 +269,7 @@ impl Render for NightInbox {
             .and_then(|d| d.items.iter().map(|i| i.since).min())
             .map_or("none".to_string(), |s| minutes(now, s));
         let sub = format!(
-            "{} decisions wait for you · oldest {oldest}",
+            "{all} items wait for you ({} need an answer) · oldest {oldest}",
             count(InboxFilter::Answers)
         );
 
@@ -407,13 +408,20 @@ impl Render for NightInbox {
             }
             match self.side {
                 Side::Details => {
-                    body = body.child(label("COMMAND OR QUESTION", MIST));
-                    body = body.child(code(&it.text, color));
+                    // The preview above the buttons already shows the same text.
+                    if it.text.trim() != it.preview.trim() && !it.text.trim().is_empty() {
+                        body = body.child(label("COMMAND OR QUESTION", MIST));
+                        body = body.child(code(&it.text, color));
+                    }
                     if !it.steps.is_empty() {
                         body = body.child(label("PLAN", MIST));
                         for (k, s) in it.steps.iter().take(6).enumerate() {
                             body = body.child(entry(format!("{}  {s}", k + 1)));
                         }
+                    }
+                    if !it.tail.is_empty() {
+                        body = body.child(label("LATEST IN THE CHAT", MIST));
+                        body = body.child(super::neon_focus::chat_column(&it.tail, 10));
                     }
                 }
                 Side::Files => {
@@ -424,9 +432,7 @@ impl Render for NightInbox {
                 }
                 Side::Chat => {
                     body = body.child(label("LAST ROWS OF THE CHAT", MIST));
-                    for r in chat_text(&it.tail, 8) {
-                        body = body.child(entry(r));
-                    }
+                    body = body.child(super::neon_focus::chat_column(&it.tail, 24));
                 }
             }
             let open = it.session.clone();
@@ -473,26 +479,6 @@ impl Render for NightInbox {
                 .into_any_element(),
         )
     }
-}
-
-/// The last prose rows of a transcript as `You: text` lines.
-fn chat_text(tail: &[aivory_protocol::Line], n: usize) -> Vec<String> {
-    use aivory_protocol::LineKind;
-    let mut rows: Vec<String> = tail
-        .iter()
-        .filter_map(|l| {
-            let t = l.text.lines().next().unwrap_or("").trim();
-            match l.kind {
-                LineKind::User if !t.is_empty() => Some(format!("You: {t}")),
-                LineKind::Agent if t.chars().next().is_some_and(char::is_alphabetic) => {
-                    Some(format!("Agent: {t}"))
-                }
-                _ => None,
-            }
-        })
-        .collect();
-    let skip = rows.len().saturating_sub(n);
-    rows.split_off(skip)
 }
 
 // =============================================================================== Tasks ====
@@ -589,7 +575,7 @@ impl NightTasks {
 
 fn step_color(s: StepState) -> u32 {
     match s {
-        StepState::Done => GREEN,
+        StepState::Done => MIST,
         StepState::Working => CYAN,
         StepState::Waiting => RED,
         StepState::NotStarted => DIM,
@@ -644,11 +630,11 @@ impl Render for NightTasks {
             button(
                 "nt-autopilot",
                 if autopilot {
-                    "Autopilot on"
+                    "Autopilot: on, click to stop"
                 } else {
-                    "Autopilot off"
+                    "Autopilot: off, click to start"
                 },
-                if autopilot { GREEN } else { CYAN },
+                CYAN,
                 autopilot,
             )
             .on_click(cx.listener(move |this, _, _, cx| {
@@ -707,7 +693,48 @@ impl Render for NightTasks {
         if rows.is_empty() {
             rows.push(nothing("No task here"));
         }
-        let rows = cap_rows(rows, fit_rows(window, 350., 54.), 54.);
+        let mut rows = cap_rows(rows, fit_rows(window, 350., 54.), 54.);
+        // The totals fill the room under the list.
+        let all: Vec<Task> = [
+            TaskTab::Queued,
+            TaskTab::Running,
+            TaskTab::Review,
+            TaskTab::Done,
+        ]
+        .into_iter()
+        .flat_map(|t| self.of(t))
+        .collect();
+        let spend: f64 = all.iter().map(|t| t.cost).sum();
+        let asking = all.iter().filter(|t| t.waiting_for.is_some()).count();
+        rows.push(
+            div()
+                .flex_none()
+                .px(px(24.))
+                .pt(px(24.))
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .child(label("ALL TASKS", MIST))
+                .child(entry(format!("{} tasks · ${spend:.2} spent", all.len())))
+                .child(label(
+                    if asking > 0 {
+                        format!("{asking} wait for your answer")
+                    } else {
+                        "No task waits for you".to_string()
+                    },
+                    if asking > 0 { RED } else { CYAN },
+                ))
+                .child(super::neon_focus::bar(
+                    if all.is_empty() {
+                        0.
+                    } else {
+                        1. - asking as f32 / all.len() as f32
+                    },
+                    CYAN,
+                    4.,
+                ))
+                .into_any_element(),
+        );
         let left = list_panel(
             "nt-list",
             ("Tasks", YELLOW),
@@ -721,6 +748,13 @@ impl Render for NightTasks {
             .min_w(px(0.))
             .h_full();
         if let Some(t) = &cur {
+            let war = self.model.read(cx).war.clone();
+            let pane: Option<Pane> = war.as_ref().and_then(|w| {
+                t.sessions
+                    .iter()
+                    .find_map(|s| w.sessions.iter().find(|p| p.id == s.session))
+                    .cloned()
+            });
             right = right.child(section(
                 "Task",
                 if waits { RED } else { CYAN },
@@ -752,28 +786,56 @@ impl Render for NightTasks {
             match self.side {
                 TaskSide::Plan => {
                     body = body.child(label(format!("PLAN · {} STEPS", t.steps.len()), MIST));
+                    let mut strip = div().flex_none().flex().gap(px(10.));
                     for (k, s) in t.steps.iter().enumerate() {
-                        body = body.child(
+                        strip = strip.child(
                             div()
-                                .flex_none()
-                                .h(px(40.))
+                                .flex_1()
+                                .min_w(px(0.))
                                 .flex()
-                                .items_center()
-                                .gap(px(16.))
-                                .border_b_1()
-                                .border_color(gpui::rgba(0x8C96BC1A))
+                                .flex_col()
+                                .gap(px(2.))
+                                .px(px(10.))
+                                .py(px(6.))
+                                .border_t_2()
+                                .border_color(rgb(step_color(s.state)))
+                                .bg(gpui::rgba(0x8C96BC0F))
                                 .child(
                                     div()
-                                        .w(px(28.))
-                                        .flex_none()
                                         .font_weight(FontWeight::BOLD)
                                         .text_size(crate::ui::ts(T_LABEL))
                                         .text_color(rgb(step_color(s.state)))
-                                        .child(format!("{:02}", k + 1)),
+                                        .child(format!("{:02} · {}", k + 1, step_word(s.state))),
                                 )
-                                .child(div().flex_1().child(entry(s.name.clone())))
-                                .child(label(step_word(s.state), step_color(s.state))),
+                                .child(entry(s.name.clone())),
                         );
+                    }
+                    body = body.child(strip);
+                    // The detail of the current step, the chat of its session, the files.
+                    if let Some((k, s)) =
+                        t.steps.iter().enumerate().find(|(_, s)| {
+                            matches!(s.state, StepState::Working | StepState::Waiting)
+                        })
+                    {
+                        body = body
+                            .child(label(
+                                format!("NOW · STEP {:02} · {}", k + 1, s.name.to_uppercase()),
+                                step_color(s.state),
+                            ))
+                            .child(entry(t.prompt.clone()));
+                    }
+                    if let Some(p) = &pane {
+                        body = body
+                            .child(label("LATEST CHAT", MIST))
+                            .child(super::neon_focus::chat_column(&p.tail, 3));
+                        let edited = super::neon_focus::touched(&p.tail);
+                        if !edited.is_empty() {
+                            body = body
+                                .child(label(format!("FILES TOUCHED · {}", edited.len()), MIST));
+                            for f in edited.iter().take(3) {
+                                body = body.child(code(f, MIST));
+                            }
+                        }
                     }
                 }
                 TaskSide::Sessions => {
@@ -813,7 +875,7 @@ impl Render for NightTasks {
             if let Some(a) = TaskAct::of(t.column) {
                 let id = t.id.clone();
                 tabs.push(
-                    menu_tab("nt-act", &format!("{} ›", a.label()), None, GREEN, false)
+                    menu_tab("nt-act", &format!("{} ›", a.label()), None, CYAN, false)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             task_act(&this.model, &id, a, Self::reload, cx);
                         }))
@@ -1028,14 +1090,15 @@ impl Render for NightRepos {
                 body = body.child(entry(format!("{} · {}", p.name, p.paths.join(", "))));
             }
             body = body.child(label(format!("LIVE SESSIONS · {}", sessions.len()), MIST));
-            for (k, s) in sessions.iter().take(5).enumerate() {
+            for (k, s) in sessions.iter().take(6).enumerate() {
                 let id = s.id.clone();
+                let now_line = format!("{} · {}", super::neon_focus::doing_line(s), s.provider);
                 body = body.child(
                     row(
                         format!("nr-s-{k}"),
                         &format!("{:02}", k + 1),
                         pane_color(s),
-                        (&s.title, &s.provider, ""),
+                        (&s.title, &now_line, super::neon_focus::state_of(s).0),
                         false,
                     )
                     .on_click(cx.listener(move |_, _, _, cx| {
@@ -1043,11 +1106,25 @@ impl Render for NightRepos {
                     })),
                 );
             }
+            if sessions.len() > 6 {
+                body = body.child(label(
+                    format!("+{} more live sessions", sessions.len() - 6),
+                    MIST,
+                ));
+            }
+            let spend: f64 = sessions.iter().map(|s| s.cost).sum();
+            let tokens: u64 = sessions.iter().map(|s| s.tokens).sum();
+            body = body.child(label("WORK HERE", MIST)).child(entry(format!(
+                "${spend:.2} · {} tok · {} worktrees · {}",
+                super::neon_focus::short_count(tokens),
+                c.worktrees,
+                c.languages.join(", ")
+            )));
             let open = sessions.first().map(|s| s.id.clone());
             right = right
                 .child(side_tabs(vec![
                     div().flex_1().into_any_element(),
-                    menu_tab("nr-open", "Open session ›", None, CYAN, false)
+                    menu_tab("nr-open", "Open first live session ›", None, CYAN, false)
                         .on_click(cx.listener(move |_, _, _, cx| {
                             if let Some(id) = &open {
                                 cx.emit(NightEvent::OpenSession(id.clone()));
@@ -1084,6 +1161,43 @@ enum Section {
     Looks,
     Autopilot,
     Providers,
+    Devices,
+    Notifications,
+}
+
+/// The notification events: key, name, when it fires.
+const EVENTS: [(&str, &str, &str); 5] = [
+    (
+        "needsAnswer",
+        "Needs your answer",
+        "A question, a permission or a plan waits for you.",
+    ),
+    ("error", "Error", "A session stops on an error."),
+    ("review", "Review", "A task reaches the review gate."),
+    ("conflict", "Conflict", "Two sessions edit the same code."),
+    (
+        "autopilot",
+        "Autopilot action",
+        "A session parks or a queued task starts.",
+    ),
+];
+
+/// The notification channels: key, name.
+const CHANNELS: [(&str, &str); 3] = [
+    ("desktop", "Desktop"),
+    ("phone", "Phone"),
+    ("email", "E-mail"),
+];
+
+/// The channels of one event.
+fn channels_of(n: &aivory_protocol::Notify, event: &str) -> aivory_protocol::Channels {
+    match event {
+        "needsAnswer" => n.needs_answer,
+        "error" => n.error,
+        "review" => n.review,
+        "conflict" => n.conflict,
+        _ => n.autopilot,
+    }
 }
 
 pub(super) struct NightSettings {
@@ -1091,6 +1205,10 @@ pub(super) struct NightSettings {
     section: Section,
     /// The look that the detail panel describes; the active look when `None`.
     picked: Option<aivory_protocol::Look>,
+    /// The settings of the daemon: providers, devices, notifications.
+    view: Option<aivory_protocol::SettingsView>,
+    provider: Option<String>,
+    event: usize,
     _obs: Subscription,
 }
 
@@ -1099,12 +1217,56 @@ impl EventEmitter<NightEvent> for NightSettings {}
 impl NightSettings {
     pub(super) fn new(model: Entity<Model>, cx: &mut Context<Self>) -> Self {
         let obs = cx.observe(&model, |_, _, cx| cx.notify());
-        Self {
+        let mut this = Self {
             model,
             section: Section::Looks,
             picked: None,
+            view: None,
+            provider: None,
+            event: 0,
             _obs: obs,
-        }
+        };
+        this.refresh(cx);
+        this
+    }
+
+    /// Read the settings of the daemon again.
+    fn refresh(&mut self, cx: &mut Context<Self>) {
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SettingsGet>(Default::default(), cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| {
+                if let Ok(view) = result {
+                    this.view = Some(view);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Switch one notification channel; the daemon returns the saved settings.
+    fn set_notify(&mut self, event: &str, channel: &str, on: bool, cx: &mut Context<Self>) {
+        let call = self.model.read(cx).call::<method::SettingsSet>(
+            aivory_protocol::rpc::SettingsSetParams {
+                key: format!("notify.{event}.{channel}"),
+                value: serde_json::Value::Bool(on),
+            },
+            cx,
+        );
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| {
+                if let (Ok(settings), Some(view)) = (result, this.view.as_mut()) {
+                    view.settings = settings;
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 }
 
@@ -1131,6 +1293,162 @@ fn look_text(look: aivory_protocol::Look) -> &'static str {
     }
 }
 
+/// One line about a look, for the list.
+fn look_short(look: aivory_protocol::Look) -> &'static str {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => "Light, quiet, a rail on the left",
+        Look::Bridge => "Starship console, orange frame",
+        Look::Operator => "Green rain and function keys",
+        Look::Neon => "3D night city, glow frames",
+        Look::Navigator => "Workstation desktop, grey windows",
+        Look::Holo => "See-through glass panels",
+        Look::Tactical => "Radar of live sessions",
+        Look::Command => "Command map with units",
+    }
+}
+
+/// The ground, the accent and the text color of a look, for the swatch and the preview.
+fn look_colors(look: aivory_protocol::Look) -> (u32, u32, u32) {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => (0xF6F7F9, 0x2E6BE6, 0x1B1F27),
+        Look::Bridge => (0x120A1E, 0xFF9C33, 0xF2E8FF),
+        Look::Operator => (0x020A06, 0x33FF77, 0xB8FFD0),
+        Look::Neon => (BG, YELLOW, PALE),
+        Look::Navigator => (0xC6C6C6, 0x7088AE, 0x111111),
+        Look::Holo => (0x040A16, 0x7FD8FF, 0xE6F6FF),
+        Look::Tactical => (0x262626, 0x8FD14F, 0xEDEDED),
+        Look::Command => (0x0B1118, 0x4FB8C4, 0xD6E4EC),
+    }
+}
+
+/// A small mock war room in the colors of a look: a header with tabs, a map with blocks,
+/// two HUD panels on the right and a board at the bottom. The Neon and the Holo show blocks
+/// of different heights; the other looks show round nodes.
+fn look_preview(look: aivory_protocol::Look) -> Div {
+    use aivory_protocol::Look;
+    let (bg, accent, ink) = look_colors(look);
+    let line = |w: f32, c: u32, a: u32| div().h(px(6.)).w(relative(w)).bg(rgba(c << 8 | a));
+    let panel = |title: f32, rows: [f32; 3]| {
+        div()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .p(px(10.))
+            .border_1()
+            .border_color(rgba(accent << 8 | 0x99))
+            .bg(rgba(accent << 8 | 0x10))
+            .child(line(title, accent, 0xFF))
+            .child(line(rows[0], ink, 0x99))
+            .child(line(rows[1], ink, 0x77))
+            .child(line(rows[2], ink, 0x55))
+    };
+    let blocky = matches!(
+        look,
+        Look::Neon | Look::Holo | Look::Command | Look::Tactical
+    );
+    let mut map = div().flex_1().relative().overflow_hidden();
+    for (k, (x, y, h)) in [
+        (0.12, 0.55, 40.),
+        (0.28, 0.35, 64.),
+        (0.44, 0.58, 30.),
+        (0.60, 0.30, 52.),
+        (0.74, 0.55, 72.),
+        (0.38, 0.12, 36.),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let c = if k == 3 { 0xFF2A6D } else { accent };
+        let node = if blocky {
+            div()
+                .absolute()
+                .left(relative(x))
+                .top(relative(y))
+                .w(px(26.))
+                .h(px(h))
+                .mt(px(-h + 30.))
+                .bg(rgba(c << 8 | 0x33))
+                .border_1()
+                .border_color(rgb(c))
+        } else {
+            div()
+                .absolute()
+                .left(relative(x))
+                .top(relative(y))
+                .w(px(18.))
+                .h(px(18.))
+                .rounded_full()
+                .bg(rgba(c << 8 | 0x55))
+                .border_1()
+                .border_color(rgb(c))
+        };
+        map = map.child(node);
+    }
+    div()
+        .w_full()
+        .flex_1()
+        .min_h(px(280.))
+        .flex()
+        .flex_col()
+        .bg(rgb(bg))
+        .border_1()
+        .border_color(rgba(accent << 8 | 0x99))
+        .child(
+            div()
+                .h(px(28.))
+                .flex_none()
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .bg(rgba(accent << 8 | 0x22))
+                .child(div().w(px(10.)).h(px(10.)).bg(rgb(accent)))
+                .child(div().w(px(46.)).h(px(14.)).bg(rgb(accent)))
+                .child(div().w(px(46.)).h(px(14.)).bg(rgba(ink << 8 | 0x33)))
+                .child(div().w(px(46.)).h(px(14.)).bg(rgba(ink << 8 | 0x33)))
+                .child(div().flex_1())
+                .child(div().w(px(60.)).h(px(8.)).bg(rgba(ink << 8 | 0x88))),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_h(px(0.))
+                .flex()
+                .gap(px(10.))
+                .p(px(10.))
+                .child(map)
+                .child(
+                    div()
+                        .w(px(150.))
+                        .flex_none()
+                        .flex()
+                        .flex_col()
+                        .gap(px(10.))
+                        .child(panel(0.6, [0.9, 0.7, 0.8]))
+                        .child(panel(0.8, [0.6, 0.9, 0.5])),
+                ),
+        )
+        .child(
+            div()
+                .h(px(36.))
+                .flex_none()
+                .mx(px(10.))
+                .mb(px(10.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .gap(px(14.))
+                .border_1()
+                .border_color(rgba(accent << 8 | 0x66))
+                .child(line(0.2, accent, 0xFF))
+                .child(line(0.25, ink, 0x88))
+                .child(line(0.2, ink, 0x66)),
+        )
+}
+
 /// An autopilot change as a button.
 fn patch_button(
     id: &'static str,
@@ -1144,6 +1462,16 @@ fn patch_button(
             act(&this.model, Action::Autopilot(patch.clone()), cx);
         }))
         .into_any_element()
+}
+
+/// The word and the color of a provider state.
+fn provider_state(status: aivory_protocol::ProviderStatus) -> (&'static str, u32) {
+    use aivory_protocol::ProviderStatus;
+    match status {
+        ProviderStatus::Connected => ("CONNECTED", CYAN),
+        ProviderStatus::Acp => ("ACP", MIST),
+        ProviderStatus::Off => ("OFF", DIM),
+    }
 }
 
 impl Render for NightSettings {
@@ -1167,6 +1495,8 @@ impl Render for NightSettings {
             (Section::Looks, "Looks"),
             (Section::Autopilot, "Autopilot"),
             (Section::Providers, "Providers"),
+            (Section::Devices, "Devices"),
+            (Section::Notifications, "Notifications"),
         ] {
             menu.push(
                 menu_tab(
@@ -1178,16 +1508,21 @@ impl Render for NightSettings {
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.section = s;
+                    if matches!(s, Section::Devices | Section::Providers) {
+                        this.refresh(cx);
+                    }
                     cx.notify();
                 }))
                 .into_any_element(),
             );
         }
-        let actions = vec![
-            button("ns-all", "All settings ›", CYAN, false)
+        // The rest (daemons, display, account) lives in the full settings screen.
+        menu.push(
+            menu_tab("ns-tab-Other", "Daemons and account ›", None, MIST, false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(NightEvent::AllSettings)))
                 .into_any_element(),
-        ];
+        );
+        let actions: Vec<AnyElement> = Vec::new();
 
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut right = frame(CYAN, "ns-detail", false)
@@ -1198,16 +1533,16 @@ impl Render for NightSettings {
         match self.section {
             Section::Looks => {
                 left_title = "Looks";
-                left_note = "click to switch".to_string();
+                left_note = "click to preview".to_string();
                 for (k, (l, name)) in crate::look::LOOKS.into_iter().enumerate() {
                     let on = l == look;
                     rows.push(
                         row(
                             format!("ns-look-{k}"),
                             &format!("{:02}", k + 1),
-                            if on { YELLOW } else { CYAN },
-                            (name, "", if on { "ON" } else { "" }),
-                            on,
+                            look_colors(l).1,
+                            (name, look_short(l), if on { "ACTIVE" } else { "" }),
+                            self.picked.unwrap_or(look) == l,
                         )
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.picked = Some(l);
@@ -1220,14 +1555,41 @@ impl Render for NightSettings {
                 let active = shown == look;
                 let shown_name = crate::look::name(shown);
                 let mut body = detail_body("ns-body")
+                    .child(look_preview(shown))
+                    .child(label("PALETTE · GROUND, ACCENT, TEXT", MIST))
+                    .child({
+                        let (g, a, t) = look_colors(shown);
+                        let mut sw = div().flex().gap(px(12.));
+                        for (c, name) in [(g, "Ground"), (a, "Accent"), (t, "Text")] {
+                            sw = sw.child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(8.))
+                                    .child(
+                                        div()
+                                            .w(px(48.))
+                                            .h(px(32.))
+                                            .bg(rgb(c))
+                                            .border_1()
+                                            .border_color(rgba(0x8C96BC66)),
+                                    )
+                                    .child(label(format!("{name} {c:06X}"), MIST)),
+                            );
+                        }
+                        sw
+                    })
                     .child(entry(look_text(shown)))
                     .child(label(
                         if active {
                             format!("{shown_name} is the active look.")
                         } else {
-                            format!("{shown_name} is not active. The active look is {}.", crate::look::name(look))
+                            format!(
+                                "{shown_name} is not active. The active look is {}.",
+                                crate::look::name(look)
+                            )
                         },
-                        if active { GREEN } else { MIST },
+                        if active { CYAN } else { MIST },
                     ))
                     .child(label(
                         "A look replaces the frame, the colors and the fonts of every screen. The choice is saved in the settings of the daemon.",
@@ -1255,7 +1617,7 @@ impl Render for NightSettings {
                     .child(section(
                         shown_name,
                         if active { YELLOW } else { CYAN },
-                        Some(if active { "ACTIVE" } else { "OFF" }.to_string()),
+                        Some(if active { "ACTIVE" } else { "PREVIEW" }.to_string()),
                     ))
                     .child(body);
             }
@@ -1272,20 +1634,20 @@ impl Render for NightSettings {
                         .child(patch_button(
                             "ns-auto",
                             if auto {
-                                "Autopilot on"
+                                "Autopilot: on, click to stop"
                             } else {
-                                "Autopilot off"
+                                "Autopilot: off, click to start"
                             },
                             AutopilotPatch {
                                 on: Some(!auto),
                                 ..AutopilotPatch::default()
                             },
-                            if auto { GREEN } else { CYAN },
+                            CYAN,
                             cx,
                         ))
                         .child(patch_button(
                             "ns-less",
-                            "Fewer",
+                            "Fewer sessions",
                             AutopilotPatch {
                                 max_running: Some(max.saturating_sub(1).max(1)),
                                 ..AutopilotPatch::default()
@@ -1295,7 +1657,7 @@ impl Render for NightSettings {
                         ))
                         .child(patch_button(
                             "ns-more",
-                            "More",
+                            "More sessions",
                             AutopilotPatch {
                                 max_running: Some((max + 1).min(64)),
                                 ..AutopilotPatch::default()
@@ -1309,47 +1671,235 @@ impl Render for NightSettings {
                     .child(section(
                         &format!("Up to {max} sessions run at once"),
                         CYAN,
-                        None,
+                        Some(if auto { "ON" } else { "OFF" }.to_string()),
                     ))
-                    .child(detail_body("ns-body").child(entry(format!(
-                        "Autopilot is {}. A session parks after {park} minutes without work.",
-                        if auto { "on" } else { "off" }
-                    ))));
+                    .child(
+                        detail_body("ns-body")
+                            .child(entry(format!(
+                                "Autopilot is {}. A session parks after {park} minutes without work.",
+                                if auto { "on" } else { "off" }
+                            )))
+                            .child(label(
+                                "Autopilot starts queued tasks when a slot is free, and parks sessions that wait for you.",
+                                MIST,
+                            ))
+                            .child(label(
+                                "Fewer sessions and More sessions change the number of slots.",
+                                MIST,
+                            )),
+                    );
             }
             Section::Providers => {
-                left_title = "Usage windows";
-                left_note = String::new();
-                if let Some(w) = &war {
-                    for (k, u) in w.usage.iter().enumerate() {
-                        let c = if u.pct >= 80 { RED } else { CYAN };
-                        rows.push(
-                            row(
-                                format!("ns-use-{k}"),
-                                &format!("{:02}", k + 1),
-                                c,
-                                (
-                                    &format!("{} {}", u.provider, u.label),
-                                    if u.estimate {
-                                        "estimate"
-                                    } else {
-                                        "from the provider"
-                                    },
-                                    &format!("{}%", u.pct),
-                                ),
-                                false,
-                            )
-                            .into_any_element(),
-                        );
-                    }
+                left_title = "Providers";
+                let list: Vec<aivory_protocol::ProviderInfo> = self
+                    .view
+                    .as_ref()
+                    .map(|v| v.providers.clone())
+                    .unwrap_or_default();
+                left_note = format!(
+                    "{} connected",
+                    list.iter()
+                        .filter(|p| p.status == aivory_protocol::ProviderStatus::Connected)
+                        .count()
+                );
+                let cur = self
+                    .provider
+                    .as_ref()
+                    .and_then(|id| list.iter().find(|p| &p.id == id))
+                    .or(list.first())
+                    .cloned();
+                for (k, p) in list.iter().enumerate() {
+                    let id = p.id.clone();
+                    let (word, c) = provider_state(p.status);
+                    rows.push(
+                        row(
+                            format!("ns-prov-{k}"),
+                            &format!("{:02}", k + 1),
+                            c,
+                            (&p.name, &p.auth, word),
+                            cur.as_ref().is_some_and(|x| x.id == p.id),
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.provider = Some(id.clone());
+                            cx.notify();
+                        }))
+                        .into_any_element(),
+                    );
                 }
                 if rows.is_empty() {
-                    rows.push(nothing("No usage window yet"));
+                    rows.push(nothing(if self.view.is_some() {
+                        "No provider"
+                    } else {
+                        "Loading the providers"
+                    }));
+                }
+                if let Some(p) = &cur {
+                    let (word, c) = provider_state(p.status);
+                    let mut body = detail_body("ns-body")
+                        .child(entry(p.auth.clone()))
+                        .child(label(format!("MODELS · {}", p.models.len()), MIST));
+                    for m in p.models.iter().take(10) {
+                        body = body.child(code(m, MIST));
+                    }
+                    if !p.usage.is_empty() {
+                        body = body.child(label("USAGE WINDOWS", MIST));
+                    }
+                    for u in &p.usage {
+                        body = body
+                            .child(label(
+                                format!(
+                                    "{} · {}%{}",
+                                    u.label,
+                                    u.pct,
+                                    if u.estimate { " · estimate" } else { "" }
+                                ),
+                                if u.pct >= 80 { RED } else { INK },
+                            ))
+                            .child(super::neon_focus::bar(
+                                f32::from(u.pct) / 100.,
+                                if u.pct >= 80 { RED } else { CYAN },
+                                4.,
+                            ));
+                    }
+                    body = body.child(label(
+                        "The model, effort and permission mode of a provider are set per session in the composer.",
+                        DIM,
+                    ));
+                    right = right
+                        .child(section(&p.name, c, Some(word.to_string())))
+                        .child(body);
+                } else {
+                    right = right
+                        .child(section("Providers", CYAN, None))
+                        .child(nothing("No provider to show."));
+                }
+            }
+            Section::Devices => {
+                left_title = "Paired devices";
+                let devices: Vec<aivory_protocol::Device> = self
+                    .view
+                    .as_ref()
+                    .map(|v| v.devices.clone())
+                    .unwrap_or_default();
+                left_note = format!("{} paired", devices.len());
+                for (k, d) in devices.iter().enumerate() {
+                    rows.push(
+                        row(
+                            format!("ns-dev-{k}"),
+                            &format!("{:02}", k + 1),
+                            if d.online { CYAN } else { DIM },
+                            (&d.name, &d.os, if d.online { "ONLINE" } else { "OFFLINE" }),
+                            false,
+                        )
+                        .into_any_element(),
+                    );
+                }
+                if rows.is_empty() {
+                    rows.push(nothing(if self.view.is_some() {
+                        "No device is paired"
+                    } else {
+                        "Loading the devices"
+                    }));
+                }
+                let mut body = detail_body("ns-body")
+                    .child(entry(
+                        "A paired phone shows the war room and answers asks away from the desk.",
+                    ))
+                    .child(
+                        div().flex().child(
+                            button("ns-pair", "Pair a phone", YELLOW, true).on_click(
+                                cx.listener(|_, _, _, cx| cx.emit(NightEvent::AllSettings)),
+                            ),
+                        ),
+                    );
+                if let Some(v) = &self.view {
+                    body = body
+                        .child(label("ACCOUNT", MIST))
+                        .child(entry(format!(
+                            "{} · {} seats · {}",
+                            v.account.team, v.account.seats, v.account.license
+                        )))
+                        .child(label(format!("Renews {}", v.account.renews), MIST));
                 }
                 right = right
-                    .child(section("Providers and models", CYAN, None))
-                    .child(detail_body("ns-body").child(entry(
-                    "Models, effort and permission mode per provider are set in the full settings.",
-                )));
+                    .child(section(
+                        "Devices",
+                        CYAN,
+                        Some(format!("{} PAIRED", devices.len())),
+                    ))
+                    .child(body);
+            }
+            Section::Notifications => {
+                left_title = "Notify me when";
+                left_note = String::new();
+                let settings = self.view.as_ref().map(|v| v.settings.notify.clone());
+                for (k, (key, name, _)) in EVENTS.iter().enumerate() {
+                    let on = settings.as_ref().map_or(0, |n| {
+                        let c = channels_of(n, key);
+                        usize::from(c.desktop) + usize::from(c.phone) + usize::from(c.email)
+                    });
+                    rows.push(
+                        row(
+                            format!("ns-ev-{k}"),
+                            &format!("{:02}", k + 1),
+                            if on > 0 { CYAN } else { DIM },
+                            (name, "", &format!("{on} of 3")),
+                            self.event == k,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.event = k;
+                            cx.notify();
+                        }))
+                        .into_any_element(),
+                    );
+                }
+                let (key, name, when) = EVENTS[self.event.min(EVENTS.len() - 1)];
+                let mut body = detail_body("ns-body").child(entry(when));
+                match &settings {
+                    Some(n) => {
+                        let c = channels_of(n, key);
+                        for (ch, ch_name) in CHANNELS {
+                            let on = match ch {
+                                "desktop" => c.desktop,
+                                "phone" => c.phone,
+                                _ => c.email,
+                            };
+                            body = body.child(
+                                div()
+                                    .flex_none()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .gap(px(16.))
+                                    .h(px(48.))
+                                    .border_b_1()
+                                    .border_color(gpui::rgba(0x8C96BC1A))
+                                    .child(entry(ch_name))
+                                    .child(
+                                        button(
+                                            format!("ns-n-{key}-{ch}"),
+                                            if on {
+                                                "On, click to turn off"
+                                            } else {
+                                                "Off, click to turn on"
+                                            },
+                                            if on { CYAN } else { MIST },
+                                            on,
+                                        )
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.set_notify(key, ch, !on, cx);
+                                            }),
+                                        ),
+                                    ),
+                            );
+                        }
+                    }
+                    None => {
+                        body = body.child(label("Loading the settings", MIST));
+                    }
+                }
+                right = right.child(section(name, CYAN, None)).child(body);
             }
         }
         let left = list_panel("ns-list", (left_title, YELLOW), left_note, rows);
@@ -1438,13 +1988,14 @@ impl Shell {
             }
             Screen::Settings => {
                 let menu = vec![
-                    menu_tab("nf-set-back", "Summary", None, YELLOW, false)
+                    menu_tab("nf-set-back", "‹ Settings", None, YELLOW, false)
                         .on_click(cx.listener(|this: &mut Self, _: &gpui::ClickEvent, _, cx| {
                             this.bridge_full_settings = false;
                             cx.notify();
                         }))
                         .into_any_element(),
-                    menu_tab("nf-set-all", "All settings", None, YELLOW, true).into_any_element(),
+                    menu_tab("nf-set-all", "Daemons and account", None, YELLOW, true)
+                        .into_any_element(),
                 ];
                 framed(
                     "Settings",
@@ -1463,7 +2014,7 @@ impl Shell {
                 } else {
                     let v = cx.new(|cx| NightFocus::new(model, id.clone(), window, cx));
                     let sub = cx.subscribe(&v, |t, _, e: &NightFocusEvent, cx| match e {
-                        NightFocusEvent::Back => t.go(Screen::WarRoom, cx),
+                        NightFocusEvent::Back => t.go_back(cx),
                         NightFocusEvent::Open(id) => t.open_session(id, cx),
                         NightFocusEvent::OpenFile { session, path } => {
                             t.open_session_file(session, path, cx)

@@ -16,6 +16,7 @@ const METHODS: &[&str] = &[
     "theme/inspect",
     "theme/add",
     "theme/list",
+    "theme/sync",
     "theme/get",
     "theme/asset",
     "theme/remove",
@@ -82,7 +83,13 @@ pub fn dispatch(
         }
         "theme/list" => {
             let _: Empty = parse_params(params)?;
+            d.theme_subscribe(out);
             value(&themes.list())
+        }
+        "theme/sync" => {
+            let _: Empty = parse_params(params)?;
+            d.theme_subscribe(out);
+            value(&themes.sync())
         }
         "theme/get" => {
             let p: ThemeGetParams = parse_params(params)?;
@@ -178,6 +185,8 @@ fn clear_current(d: &Daemon, removed: &str, id: &Value, out: &Outbox) -> Result<
         out,
     ) {
         r?;
+        d.themes()
+            .notify(aivory_protocol::theme::ThemeChangeReason::Select, None);
     }
     Ok(true)
 }

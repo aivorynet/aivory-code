@@ -19,12 +19,12 @@ pub enum Out {
 }
 
 #[derive(Debug, Clone)]
-pub struct Outbox(mpsc::SyncSender<Out>);
+pub struct Outbox(mpsc::SyncSender<Out>, std::sync::Arc<()>);
 
 impl Outbox {
     pub fn new(capacity: usize) -> (Self, mpsc::Receiver<Out>) {
         let (tx, rx) = mpsc::sync_channel(capacity);
-        (Self(tx), rx)
+        (Self(tx, std::sync::Arc::new(())), rx)
     }
 
     /// Queue a message. Blocks while the outbox is full. Fails when the connection is gone.
@@ -37,6 +37,11 @@ impl Outbox {
     /// Queue a message without a wait. `false`: the outbox is full or the connection is gone.
     pub fn try_send(&self, v: Value) -> bool {
         self.0.try_send(Out::Message(v)).is_ok()
+    }
+
+    /// True when both handles feed the same connection.
+    pub fn same_channel(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.1, &other.1)
     }
 
     pub fn close(&self) {

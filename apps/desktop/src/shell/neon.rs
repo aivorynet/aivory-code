@@ -6,7 +6,6 @@ use gpui::{AnyElement, Context, Div, FontWeight, SharedString, div, px, rgb};
 
 use super::neon_kit::*;
 use super::{Screen, Shell};
-use crate::theme::{T_CAPTION, T_SMALL};
 use crate::ui;
 
 /// The height of the header.
@@ -28,7 +27,7 @@ impl Shell {
             .flex_col()
             .bg(rgb(BG))
             .font_family("Chakra Petch")
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(T_LABEL))
             .text_color(rgb(INK))
             .child(head)
             .child(
@@ -57,20 +56,20 @@ impl Shell {
             ("Repos", Screen::Repos),
             ("Settings", Screen::Settings),
         ];
-        let mut nav = div().flex().items_center().gap(px(6.));
+        let mut nav = div().flex().items_center().gap(ui::sw(6.));
         for (label, screen) in tabs {
             let on = here == screen;
             let target = screen.clone();
             let mut tab = div()
                 .id(SharedString::from(format!("nc-tab-{label}")))
-                .h(px(34.))
-                .px(px(16.))
+                .h(ui::sw(34.))
+                .px(ui::sw(16.))
                 .flex()
                 .items_center()
-                .gap(px(6.))
+                .gap(ui::sw(6.))
                 .cursor_pointer()
                 .font_weight(FontWeight::BOLD)
-                .text_size(ui::ts(T_SMALL))
+                .text_size(ui::ts(T_LABEL))
                 .bg(rgb(if on { YELLOW } else { PANEL }))
                 .text_color(rgb(if on { DARK } else { INK }))
                 .hover(|h| h.bg(rgb(if on { YELLOW } else { 0x232C55 })))
@@ -89,65 +88,106 @@ impl Shell {
                 },
             )));
         }
-        for tab in crate::new_session::launch_buttons("neon", |id, label| {
-            div()
-                .id(id)
-                .h(px(34.))
-                .px(px(16.))
-                .flex()
-                .items_center()
-                .cursor_pointer()
-                .font_weight(FontWeight::BOLD)
-                .text_size(ui::ts(T_SMALL))
-                .bg(rgb(PANEL))
-                .text_color(rgb(INK))
-                .hover(|h| h.bg(rgb(0x232C55)))
-                .child(label.to_uppercase())
-        }) {
+        // The launchers open a tool and not a screen: an outlined cyan button with a plus.
+        for tab in crate::new_session::launch_buttons_open(
+            "neon",
+            self.launcher_open(cx),
+            |id, label, on| {
+                div()
+                    .id(id)
+                    .h(ui::sw(34.))
+                    .px(ui::sw(14.))
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .font_weight(FontWeight::BOLD)
+                    .text_size(ui::ts(T_LABEL))
+                    .border_1()
+                    .border_color(rgb(CYAN))
+                    .text_color(rgb(CYAN))
+                    .when(on, |d| d.bg(rgb(0x232C55)))
+                    .hover(|h| h.bg(rgb(0x232C55)))
+                    .child(format!("+ {}", label.to_uppercase()))
+            },
+        ) {
             nav = nav.child(tab);
         }
-        let part = |text: String, color: u32| div().text_color(rgb(color)).child(text);
+        // Each count opens the screen that shows it.
+        let part = |id: &'static str, text: String, color: u32, to: Screen| {
+            div()
+                .id(id)
+                .cursor_pointer()
+                .text_color(rgb(color))
+                .hover(|h| h.text_color(rgb(PALE)))
+                .child(text)
+                .on_click(
+                    cx.listener(move |this: &mut Self, _: &gpui::ClickEvent, _, cx| {
+                        this.look_menu = false;
+                        this.go(to.clone(), cx);
+                    }),
+                )
+        };
+        let sep = || div().text_color(rgb(MIST)).child("//");
         let mut line = div()
             .flex()
+            .flex_shrink(1.)
+            .min_w(px(0.))
+            .overflow_hidden()
+            .whitespace_nowrap()
             .items_center()
-            .gap(px(8.))
+            .gap(ui::sw(8.))
             .font_weight(FontWeight::BOLD)
-            .text_size(ui::ts(T_CAPTION));
+            .text_size(ui::ts(T_LABEL));
         if let Some(c) = counts {
             line = line
-                .child(part(format!("{} LIVE", c.live), MIST))
-                .child(part("//".into(), MIST))
                 .child(part(
+                    "nc-live",
+                    format!("{} LIVE", c.live),
+                    MIST,
+                    Screen::WarRoom,
+                ))
+                .child(sep())
+                .child(part(
+                    "nc-wait",
                     format!("{} WAIT FOR YOU", c.needs_you),
                     if c.needs_you > 0 { RED } else { MIST },
+                    Screen::Inbox,
                 ))
-                .child(part("//".into(), MIST))
+                .child(sep())
                 .child(part(
+                    "nc-fault",
                     format!("{} FAULT", c.error),
                     if c.error > 0 { YELLOW } else { MIST },
+                    Screen::Inbox,
                 ))
-                .child(part("//".into(), MIST))
-                .child(part(format!("{} IDLE", c.idle), MIST));
+                .child(sep())
+                .child(part(
+                    "nc-idle",
+                    format!("{} IDLE", c.idle),
+                    MIST,
+                    Screen::WarRoom,
+                ));
         }
         div()
             .flex_none()
-            .h(px(HEAD_H))
-            .px(px(24.))
+            .h(ui::sw(HEAD_H))
+            .px(ui::sw(24.))
             .flex()
             .items_center()
-            .gap(px(22.))
+            .gap(ui::sw(22.))
             .child(
                 div()
                     .flex()
+                    .flex_none()
                     .font_weight(FontWeight::BOLD)
-                    .text_size(ui::ts(26.))
+                    .text_size(ui::ts(T_SECTION))
                     .text_color(rgb(YELLOW))
                     .child("AIVORY")
                     .child(div().text_color(rgb(RED)).child("//"))
                     .child("CITY"),
             )
-            .child(nav)
-            .child(div().flex_1())
+            .child(nav.flex_none())
+            .child(div().flex_1().min_w(px(0.)))
             .child(line)
             .child(self.look_switch(cx))
     }

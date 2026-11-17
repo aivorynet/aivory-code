@@ -53,15 +53,16 @@ impl Shell {
     /// The navigation bar of the Tactical look.
     pub(super) fn tactical_bar(&self, cx: &mut Context<Self>) -> Div {
         let war = self.model.read(cx).war.as_ref();
-        let (live, waits, inbox, auto, now) = war.map_or((0, 0, 0, false, 0), |w| {
+        let (live, waits, inbox, auto) = war.map_or((0, 0, 0, false), |w| {
             let n = w.counts();
-            (
-                n.live,
-                n.needs_you + n.error,
-                w.inbox_open,
-                w.autopilot.on,
-                w.now,
-            )
+            (n.live, n.needs_you + n.error, w.inbox_open, w.autopilot.on)
+        });
+        let oldest: Option<String> = war.and_then(|w| {
+            w.sessions
+                .iter()
+                .filter(|s| s.ask.is_some())
+                .min_by_key(|s| s.since)
+                .map(|s| s.id.clone())
         });
         let here = self.screen.rail();
         let entry = |id: &'static str, name: String, screen: Screen, cx: &mut Context<Self>| {
@@ -70,16 +71,18 @@ impl Shell {
                 this.go(screen.clone(), cx);
             }))
         };
+        let rule = || div().flex_none().h(px(16.)).w(px(1.)).bg(c(tac::DIM, 1.));
         div()
             .flex_none()
             .min_h(px(BAR_H))
-            .mx(px(20.))
+            .mx(px(28.))
+            .py(px(2.))
             .flex()
             .flex_wrap()
             .items_center()
             .justify_between()
             .gap_x(px(22.))
-            .gap_y(px(4.))
+            .gap_y(px(2.))
             .border_b_1()
             .border_color(c(tac::DEEP, 1.))
             .font_family(tac::MONO)
@@ -87,28 +90,28 @@ impl Shell {
                 div()
                     .min_w(px(0.))
                     .flex()
-                    .flex_wrap()
                     .items_center()
-                    .gap_x(px(22.))
+                    .gap_x(px(14.))
                     .child(
                         div()
+                            .flex_none()
                             .font_family(tac::SANS)
                             .font_weight(FontWeight::BOLD)
-                            .text_size(ui::ts(15.))
+                            .text_size(ui::ts(tac::S_ENTRY))
                             .whitespace_nowrap()
                             .text_color(c(tac::INK, 1.))
-                            .child("AIVORY // TACTICAL"),
+                            .child("AIVORY"),
                     )
+                    .child(rule())
                     .child(
                         div()
                             .flex()
-                            .flex_wrap()
-                            .gap(px(4.))
-                            .child(entry("tac-war", "OPS".into(), Screen::WarRoom, cx))
+                            .gap(px(2.))
+                            .child(entry("tac-war", "WAR ROOM".into(), Screen::WarRoom, cx))
                             .child(entry(
                                 "tac-inbox",
                                 if inbox > 0 {
-                                    format!("INBOX ({inbox})")
+                                    format!("INBOX {inbox}")
                                 } else {
                                     "INBOX".into()
                                 },
@@ -117,39 +120,57 @@ impl Shell {
                             ))
                             .child(entry("tac-tasks", "TASKS".into(), Screen::Tasks, cx))
                             .child(entry("tac-repos", "REPOS".into(), Screen::Repos, cx))
-                            .child(entry("tac-set", "SETUP".into(), Screen::Settings, cx))
-                            .children(crate::new_session::launch_buttons(
-                                "tactical",
-                                |id, label| navb(id, &label.to_uppercase(), false),
-                            )),
-                    ),
+                            .child(entry("tac-set", "SETUP".into(), Screen::Settings, cx)),
+                    )
+                    .child(rule())
+                    .child(div().flex().gap(px(2.)).children(
+                        crate::new_session::launch_buttons_open(
+                            "tactical",
+                            self.launcher_open(cx),
+                            |id, label, on| navb(id, &label.to_uppercase(), on),
+                        ),
+                    )),
             )
             .child(
                 div()
-                    .min_w(px(0.))
+                    .flex_none()
                     .flex()
-                    .flex_wrap()
                     .items_center()
-                    .gap_x(px(22.))
-                    .child(tac::label(format!("{live} CONTACTS")))
-                    .child(
-                        tac::label(format!("{waits} AWAIT ORDERS"))
-                            .text_color(c(if waits > 0 { tac::WHITE } else { tac::LABEL }, 1.)),
-                    )
-                    .child(tac::label(format!(
-                        "AUTOPILOT: {}",
-                        if auto { "ON" } else { "OFF" }
-                    )))
+                    .gap_x(px(14.))
                     .child(
                         div()
-                            .text_size(ui::ts(14.))
-                            .text_color(c(tac::INK, 1.))
-                            .child(tac::utc(now)),
+                            .flex()
+                            .items_center()
+                            .gap(px(8.))
+                            .text_size(ui::ts(tac::S_LABEL))
+                            .text_color(c(tac::LABEL, 1.))
+                            .child(tac::dot(tac::CYAN))
+                            .child(format!("{live} LIVE")),
                     )
+                    .child(
+                        navb("tac-need", &format!("{waits} NEED YOU"), false)
+                            .when(waits > 0, |d| {
+                                d.text_color(c(tac::AMBER, 1.))
+                                    .border_color(c(tac::AMBER, 1.))
+                                    .border_b(px(2.))
+                            })
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                if let Some(id) = oldest.clone() {
+                                    this.open_session(&id, cx);
+                                }
+                            })),
+                    )
+                    .child(
+                        div()
+                            .text_size(ui::ts(tac::S_LABEL))
+                            .text_color(c(tac::LABEL, 1.))
+                            .child(if auto { "AUTO ON" } else { "AUTO OFF" }),
+                    )
+                    .child(rule())
                     .child(
                         navb(
                             "tac-look",
-                            &format!("LOOK: {} v", crate::look::name(tk().look).to_uppercase()),
+                            &format!("LOOK {} v", crate::look::name(tk().look).to_uppercase()),
                             false,
                         )
                         .on_click(cx.listener(|this, _, _, cx| {
@@ -253,17 +274,17 @@ impl Shell {
                     .as_ref()
                     .map_or(content, |(v, _)| v.clone().into_any_element())
             }
-            Screen::Inbox => self.tactical_full("INBOX", "ALL FUNCTIONS OF THE INBOX", content, cx),
-            Screen::Tasks => self.tactical_full("TASKS", "ALL FUNCTIONS OF THE TASKS", content, cx),
-            Screen::Repos => self.tactical_full("REPOS", "ALL FUNCTIONS OF THE REPOS", content, cx),
-            Screen::Settings => self.tactical_full("SETUP", "ALL SETTINGS", content, cx),
+            Screen::Inbox => self.tactical_full("INBOX", "FULL INBOX", content, cx),
+            Screen::Tasks => self.tactical_full("TASKS", "FULL TASKS", content, cx),
+            Screen::Repos => self.tactical_full("REPOS", "FULL REPOS", content, cx),
+            Screen::Settings => self.tactical_full("SETUP", "OTHER SETTINGS", content, cx),
             Screen::Session(id) => {
                 if let Some((v, _)) = &self.tactical_screens.focus {
                     v.update(cx, |v, cx| v.show(&id, cx));
                 } else {
                     let v = cx.new(|cx| TacticalFocus::new(model, id, window, cx));
                     let sub = cx.subscribe(&v, |t, _, e: &TacFocusEvent, cx| match e {
-                        TacFocusEvent::Back => t.go(Screen::WarRoom, cx),
+                        TacFocusEvent::Back => t.go_back(cx),
                         TacFocusEvent::Open(id) => t.open_session(id, cx),
                         TacFocusEvent::OpenFile { session, path } => {
                             t.open_session_file(session, path, cx)
@@ -333,7 +354,7 @@ impl Shell {
         content: AnyElement,
     ) -> AnyElement {
         frame(Frame {
-            title,
+            title: title.to_string(),
             kicker: kicker.to_string(),
             stats: Vec::new(),
             menu,

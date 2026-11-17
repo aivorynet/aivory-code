@@ -215,7 +215,7 @@ impl TacticalInbox {
     }
 }
 
-/// An item that needs the owner is white; the rest is green.
+/// An item that needs the owner is amber; the rest is quiet.
 fn needs_you(kind: InboxKind) -> bool {
     InboxFilter::Answers.matches(kind) || InboxFilter::Errors.matches(kind)
 }
@@ -280,7 +280,7 @@ impl Render for TacticalInbox {
             );
         }
         let open = cur.as_ref().map(|i| i.session.clone());
-        let open_btn = navb("ti-open", "OPEN SESSION >", false)
+        let open_btn = navb("ti-open", "OPEN SELECTED >", false)
             .border_1()
             .border_color(c(tac::INK, 1.))
             .text_color(c(tac::INK, 1.))
@@ -290,7 +290,7 @@ impl Render for TacticalInbox {
                 }
             }))
             .into_any_element();
-        let full = navb("ti-full", "ALL FUNCTIONS >", false)
+        let full = navb("ti-full", "FULL INBOX >", false)
             .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
             .into_any_element();
 
@@ -318,10 +318,14 @@ impl Render for TacticalInbox {
                 })),
             );
         }
-        let left = panel(format!("QUEUE · {} ITEMS", items.len())).child(list);
+        let left = panel(format!("SEC-01 / QUEUE · {} ITEMS", items.len()))
+            .child(list)
+            .child(foot(format!(
+                "{all} IN ALL · {waiting} WAIT FOR YOU · {done} DONE. SELECT A ROW FOR THE DECISION."
+            )));
 
         // The detail.
-        let mut right = panel("DECISION");
+        let mut right = panel("SEC-02 / DECISION");
         if let Some(it) = &cur {
             let hot = needs_you(it.kind) && it.result.is_none();
             right = right
@@ -355,16 +359,9 @@ impl Render for TacticalInbox {
             if let Some(result) = &it.result {
                 orders = orders.child(label(format!("DONE · {}", result.to_uppercase())));
             } else {
-                let n = it.options.len();
                 for (k, o) in it.options.iter().enumerate() {
                     let (id, opt) = (it.id.clone(), o.clone());
-                    let kind = if k == 0 {
-                        Btn::On
-                    } else if k + 1 == n && n > 1 {
-                        Btn::Dim
-                    } else {
-                        Btn::Plain
-                    };
+                    let kind = if k == 0 { Btn::On } else { Btn::Plain };
                     orders = orders.child(
                         tac::order(
                             format!("ti-opt-{k}"),
@@ -425,6 +422,19 @@ impl Render for TacticalInbox {
                                 .map(|(k, s)| entry(format!("{}. {s}", k + 1))),
                         );
                     }
+                    if !it.files.is_empty() {
+                        body = body.child(label(format!("FILES CHANGED · {}", it.files.len())));
+                        for f in it.files.iter().take(4) {
+                            body = body.child(code(f.clone()));
+                        }
+                    }
+                    let rows = chat_rows(&it.tail, 5);
+                    if !rows.is_empty() {
+                        body = body.child(label("LAST ROWS OF THE CHAT"));
+                        for r in rows {
+                            body = body.child(entry(r));
+                        }
+                    }
                 }
                 Side::Files => {
                     body = body.child(label(format!("FILES CHANGED · {}", it.files.len())));
@@ -447,7 +457,7 @@ impl Render for TacticalInbox {
         }
 
         frame(Frame {
-            title: "INBOX",
+            title: "INBOX".into(),
             kicker: "EVERY DECISION THAT WAITS FOR YOU, THE LONGEST WAIT FIRST".into(),
             stats,
             menu: menu_end(menu, Some(open_btn), full),
@@ -551,6 +561,28 @@ impl TacticalTasks {
     }
 }
 
+/// The state of a task as a word.
+fn col_word(c: TaskColumn) -> &'static str {
+    match c {
+        TaskColumn::Planned => "QUEUED",
+        TaskColumn::Working => "RUNNING",
+        TaskColumn::Waiting => "HOLD",
+        TaskColumn::Review => "REVIEW",
+        TaskColumn::Done => "DONE",
+    }
+}
+
+/// A line at the bottom of a list panel: counts, so that the panel is never empty.
+fn foot(text: String) -> Div {
+    div()
+        .mt_auto()
+        .flex_none()
+        .pt(px(10.))
+        .border_t_1()
+        .border_color(c(tac::DEEP, 1.))
+        .child(label(text))
+}
+
 fn step_word(s: StepState) -> &'static str {
     match s {
         StepState::Done => "DONE",
@@ -625,7 +657,7 @@ impl Render for TacticalTasks {
         let open = cur
             .as_ref()
             .and_then(|t| t.sessions.first().map(|s| s.session.clone()));
-        let open_btn = navb("tt-open", "OPEN SESSION >", false)
+        let open_btn = navb("tt-open", "OPEN SELECTED >", false)
             .border_1()
             .border_color(c(tac::INK, 1.))
             .text_color(c(tac::INK, 1.))
@@ -635,7 +667,7 @@ impl Render for TacticalTasks {
                 }
             }))
             .into_any_element();
-        let full = navb("tt-full", "ALL FUNCTIONS >", false)
+        let full = navb("tt-full", "FULL TASKS >", false)
             .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
             .into_any_element();
 
@@ -656,7 +688,7 @@ impl Render for TacticalTasks {
                         t.agents.first().cloned().unwrap_or_default().to_uppercase(),
                         t.codebase
                     ),
-                    &format!("STEP {}", (t.step + 1).min(5)),
+                    &format!("{} · STEP {}", col_word(t.column), (t.step + 1).min(5)),
                     if hot { tac::WHITE } else { tac::LABEL },
                     cur.as_ref().is_some_and(|x| x.id == t.id),
                 )
@@ -666,9 +698,16 @@ impl Render for TacticalTasks {
                 })),
             );
         }
-        let left = panel(format!("TASKS · {}", tasks.len())).child(list);
+        let left = panel(format!("SEC-01 / TASKS · {}", tasks.len()))
+            .child(list)
+            .child(foot(format!(
+                "{} QUEUED · {} RUNNING · {} IN REVIEW. SELECT A ROW FOR THE PLAN.",
+                n(TaskTab::Queued),
+                n(TaskTab::Running),
+                n(TaskTab::Review)
+            )));
 
-        let mut right = panel("TASK");
+        let mut right = panel("SEC-02 / TASK");
         if let Some(t) = &cur {
             right = right
                 .child(section(dots(&t.title, 44)))
@@ -743,12 +782,56 @@ impl Render for TacticalTasks {
                 }
             }
             right = right.child(body);
+            let war = self.model.read(cx).war.clone();
+            let pane = war
+                .as_ref()
+                .and_then(|w| t.sessions.iter().find_map(|s| w.session(&s.session)));
+            if let Some(pn) = pane {
+                use crate::console::display::{DKind, last};
+                let rows = last(&pn.tail, 40);
+                let says: Vec<String> = rows
+                    .iter()
+                    .filter(|d| d.first && d.kind == DKind::Agent)
+                    .map(|d| dots(&d.text, 150))
+                    .collect();
+                let tools: Vec<String> = rows
+                    .iter()
+                    .filter(|d| d.kind == DKind::Tool)
+                    .map(|d| {
+                        dots(
+                            &format!("{} {}", d.label.clone().unwrap_or_default(), d.text),
+                            90,
+                        )
+                    })
+                    .collect();
+                let mut more = div()
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .pt(px(10.))
+                    .border_t_1()
+                    .border_color(c(tac::DEEP, 1.))
+                    .child(label(format!(
+                        "LATEST FROM {} · ${:.2} · {} LINES",
+                        pn.provider.to_uppercase(),
+                        pn.cost,
+                        pn.lines_total
+                    )));
+                for s in says.iter().rev().take(2).rev() {
+                    more = more.child(entry(s.clone()));
+                }
+                for t2 in tools.iter().rev().take(3).rev() {
+                    more = more.child(code(t2.clone()));
+                }
+                right = right.child(more);
+            }
         } else {
             right = right.child(entry("Pick a task in the list."));
         }
 
         frame(Frame {
-            title: "TASKS",
+            title: "TASKS".into(),
             kicker: "THE WORK PLAN OF THE FLEET: QUEUED, RUNNING, IN REVIEW, DONE".into(),
             stats,
             menu: menu_end(menu, Some(open_btn), full),
@@ -762,8 +845,6 @@ impl Render for TacticalTasks {
 pub struct TacticalRepos {
     model: Entity<Model>,
     selected: Option<String>,
-    /// The first codebase of the list page on view.
-    start: usize,
     _obs: gpui::Subscription,
 }
 
@@ -775,20 +856,19 @@ impl TacticalRepos {
         Self {
             model,
             selected: None,
-            start: 0,
             _obs: obs,
         }
     }
 }
 
 impl Render for TacticalRepos {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let full = navb("tr-full", "ALL FUNCTIONS >", false)
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let full = navb("tr-full", "FULL REPOS >", false)
             .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
             .into_any_element();
         let Some(war) = self.model.read(cx).war.clone() else {
             return frame(Frame {
-                title: "REPOS",
+                title: "REPOS".into(),
                 kicker: "WAITING FOR THE DAEMON".into(),
                 stats: Vec::new(),
                 menu: menu_end(Vec::new(), None, full),
@@ -837,7 +917,7 @@ impl Render for TacticalRepos {
                 .find(|s| s.codebase == cb.id && s.state.is_live())
                 .map(|s| s.id.clone())
         });
-        let open_btn = navb("tr-open", "OPEN SESSION >", false)
+        let open_btn = navb("tr-open", "OPEN SELECTED >", false)
             .border_1()
             .border_color(c(tac::INK, 1.))
             .text_color(c(tac::INK, 1.))
@@ -848,22 +928,8 @@ impl Render for TacticalRepos {
             }))
             .into_any_element();
 
-        // Whole rows only: all of them when they fit, else a page and a "+N more" row.
-        let room = f32::from(window.viewport_size().height) - 44. - 340.;
-        let cap = ((room / 52.) as usize).max(3);
-        let total = war.codebases.len();
-        let (from, take) = if total <= cap {
-            (0, total)
-        } else {
-            (self.start.min(total - 1), cap - 1)
-        };
-        let mut list = div()
-            .flex_1()
-            .min_h(px(0.))
-            .flex()
-            .flex_col()
-            .overflow_hidden();
-        for (k, cb) in war.codebases.iter().enumerate().skip(from).take(take) {
+        let mut list = scroll("tr-list");
+        for (k, cb) in war.codebases.iter().enumerate() {
             let id = cb.id.clone();
             let w = waits(&cb.id);
             list = list.child(
@@ -882,29 +948,14 @@ impl Render for TacticalRepos {
                 })),
             );
         }
-        if total > cap {
-            let rest = total.saturating_sub(from + take);
-            let next = if rest > 0 { from + take } else { 0 };
-            list = list.child(
-                navb(
-                    "tr-more",
-                    &if rest > 0 {
-                        format!("+{rest} MORE >")
-                    } else {
-                        "< BACK TO THE FIRST".to_string()
-                    },
-                    false,
-                )
-                .h(px(40.))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.start = next;
-                    cx.notify();
-                })),
-            );
-        }
-        let left = panel(format!("CODEBASES · {}", war.codebases.len())).child(list);
+        let left = panel(format!("SEC-01 / CODEBASES · {}", war.codebases.len()))
+            .child(list)
+            .child(foot(format!(
+                "{} LIVE SESSIONS · {} WAIT FOR YOU. SELECT A ROW FOR THE PARTS.",
+                counts.live, counts.needs_you
+            )));
 
-        let mut right = panel("CODEBASE");
+        let mut right = panel("SEC-02 / CODEBASE");
         if let Some(cb) = &cur {
             right = right
                 .child(section(cb.id.to_uppercase()))
@@ -914,7 +965,11 @@ impl Render for TacticalRepos {
                     cb.worktrees,
                     cb.daemon.to_uppercase()
                 )))
-                .child(code(cb.path.clone()));
+                .child(code(cb.path.clone()))
+                .child(label(format!(
+                    "LANGUAGES · {}",
+                    cb.languages.join(", ").to_uppercase()
+                )));
             let mut body = scroll("tr-detail").gap(px(8.));
             body = body.child(label(format!("PARTS · {}", cb.parts.len())));
             for p in cb.parts.iter().take(8) {
@@ -934,7 +989,23 @@ impl Render for TacticalRepos {
                         format!("tr-s-{k}"),
                         if hot { tac::WHITE } else { tac::INK },
                         &dots(&s.title, 40),
-                        &s.provider.to_uppercase(),
+                        &s.tail
+                            .iter()
+                            .rev()
+                            .find(|l| l.kind == aivory_protocol::LineKind::Tool)
+                            .map_or_else(
+                                || s.provider.to_uppercase(),
+                                |l| {
+                                    dots(
+                                        &format!(
+                                            "{} {}",
+                                            l.label.clone().unwrap_or_default(),
+                                            l.text
+                                        ),
+                                        48,
+                                    )
+                                },
+                            ),
                         "OPEN >",
                         tac::LABEL,
                         false,
@@ -948,12 +1019,261 @@ impl Render for TacticalRepos {
         }
 
         frame(Frame {
-            title: "REPOS",
+            title: "REPOS".into(),
             kicker: "THE CODEBASES THE FLEET WORKS IN".into(),
             stats,
             menu: menu_end(Vec::new(), Some(open_btn), full),
             body: console(left, right),
         })
+    }
+}
+
+/// A small picture of a look: its page, bar, two cards and text lines in its own colors.
+fn look_thumb(look: aivory_protocol::Look) -> Div {
+    use aivory_protocol::Look;
+    let t = crate::look::tokens(look, aivory_protocol::Theme::Light, false);
+    let bar = |w: f32, rgb: u32| div().flex_none().h(px(6.)).w(px(w)).bg(c(rgb, 1.));
+    let lines = || {
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(7.))
+            .child(bar(90., t.ink))
+            .child(bar(130., t.ink_2))
+            .child(bar(70., t.muted))
+            .child(bar(110., t.ink_3))
+            .child(bar(100., t.ink_2))
+    };
+    let pane = |alpha: f32| {
+        div()
+            .flex_1()
+            .h_full()
+            .p(px(10.))
+            .bg(c(t.card, alpha))
+            .border_1()
+            .border_color(c(t.ink_3, 0.7))
+    };
+    let dotp = |x: f32, y: f32, d: f32, rgb: u32| {
+        div()
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .size(px(d))
+            .rounded_full()
+            .bg(c(rgb, 1.))
+    };
+    let ring = |d: f32| {
+        div()
+            .size(px(d))
+            .rounded_full()
+            .border_1()
+            .border_color(c(t.ink_3, 1.))
+            .flex()
+            .items_center()
+            .justify_center()
+    };
+    let titlebar = |rgb: u32| {
+        div()
+            .h(px(20.))
+            .flex_none()
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .px(px(8.))
+            .bg(c(rgb, 1.))
+            .child(div().size(px(8.)).bg(c(t.logo, 1.)))
+            .child(bar(60., t.ink_2))
+    };
+    let scene: Div = match look {
+        Look::Tactical => div()
+            .flex_1()
+            .flex()
+            .gap(px(10.))
+            .child(
+                pane(1.).flex().items_center().justify_center().child(
+                    ring(170.)
+                        .relative()
+                        .child(ring(110.).child(ring(50.)))
+                        .child(dotp(40., 32., 9., t.q))
+                        .child(dotp(118., 88., 9., t.ok))
+                        .child(dotp(66., 120., 9., t.work)),
+                ),
+            )
+            .child(pane(1.).child(lines()).child(
+                div().mt(px(14.)).flex().flex_col().gap(px(8.)).children(
+                    [t.q, t.work, t.ok, t.work].into_iter().map(|rgb| {
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.))
+                            .child(div().size(px(8.)).rounded_full().bg(c(rgb, 1.)))
+                            .child(bar(120., t.ink_3))
+                    }),
+                ),
+            )),
+        Look::Command => div()
+            .flex_1()
+            .flex()
+            .gap(px(10.))
+            .child(
+                pane(1.)
+                    .relative()
+                    .child(dotp(30., 30., 22., t.work))
+                    .child(dotp(110., 60., 22., t.ok))
+                    .child(dotp(70., 130., 22., t.q))
+                    .child(dotp(190., 110., 22., t.e)),
+            )
+            .child(
+                div()
+                    .w(px(120.))
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(pane(1.).child(lines()))
+                    .child(div().flex_none().h(px(40.)).bg(c(t.work, 1.))),
+            ),
+        Look::Operator => div().flex_1().flex().gap(px(8.)).children((0..6).map(|i| {
+            div()
+                .flex_1()
+                .h_full()
+                .bg(c(t.card, 1.))
+                .border_1()
+                .border_color(c(t.ink_3, 0.7))
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .p(px(6.))
+                .children((0..(4 + i % 3)).map(|k| {
+                    bar(
+                        6. + ((i * 7 + k * 5) % 5) as f32 * 6.,
+                        if k == 0 { t.ok } else { t.work },
+                    )
+                }))
+        })),
+        Look::Neon => div()
+            .flex_1()
+            .flex()
+            .items_end()
+            .gap(px(6.))
+            .bg(c(t.card, 1.))
+            .px(px(10.))
+            .children(
+                [70., 120., 90., 160., 110., 140., 80., 130., 100., 150.]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, h)| {
+                        div()
+                            .flex_1()
+                            .h(px(h))
+                            .bg(c(t.track, 1.))
+                            .border_1()
+                            .border_color(c(if i % 3 == 0 { t.work } else { t.q }, 1.))
+                    }),
+            ),
+        Look::Navigator => div()
+            .flex_1()
+            .flex()
+            .gap(px(8.))
+            .child(
+                div()
+                    .w(px(44.))
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .children((0..6).map(|_| {
+                        div()
+                            .size(px(36.))
+                            .bg(c(t.card, 1.))
+                            .border_1()
+                            .border_color(c(t.ink_3, 1.))
+                    })),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .bg(c(t.card, 1.))
+                    .border_1()
+                    .border_color(c(t.ink_3, 1.))
+                    .child(titlebar(t.work))
+                    .child(div().p(px(10.)).child(lines())),
+            ),
+        Look::Holo => div()
+            .flex_1()
+            .flex()
+            .gap(px(14.))
+            .p(px(10.))
+            .bg(c(t.work, 0.35))
+            .child(pane(0.45).rounded(px(12.)).child(lines()))
+            .child(pane(0.45).rounded(px(12.)).child(lines())),
+        Look::Bridge => div()
+            .flex_1()
+            .flex()
+            .gap(px(8.))
+            .child(
+                div()
+                    .w(px(70.))
+                    .h_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .child(div().flex_1().bg(c(t.work, 1.)).rounded_tl(px(24.)))
+                    .child(div().h(px(30.)).bg(c(t.q, 1.)))
+                    .child(div().h(px(30.)).bg(c(t.e, 1.)).rounded_bl(px(24.))),
+            )
+            .child(pane(1.).rounded(px(12.)).child(lines())),
+        _ => div()
+            .flex_1()
+            .flex()
+            .gap(px(10.))
+            .child(pane(1.).child(lines()))
+            .child(pane(1.).child(lines())),
+    };
+    div()
+        .flex_none()
+        .h(px(280.))
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .p(px(10.))
+        .bg(c(t.page, 1.))
+        .border_1()
+        .border_color(c(tac::DIM, 1.))
+        .child(titlebar(t.track))
+        .child(scene)
+        .child(
+            div().flex_none().flex().gap(px(6.)).children(
+                [t.page, t.card, t.ink, t.work, t.q, t.e, t.ok]
+                    .into_iter()
+                    .map(|rgb| {
+                        div()
+                            .flex_1()
+                            .h(px(16.))
+                            .bg(c(rgb, 1.))
+                            .border_1()
+                            .border_color(c(tac::DIM, 1.))
+                    }),
+            ),
+        )
+}
+
+/// One short line about a look.
+fn look_line(look: aivory_protocol::Look) -> &'static str {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => "calm default, white page",
+        Look::Bridge => "rounded frame, numbered tabs",
+        Look::Operator => "green rain, instrument screens",
+        Look::Neon => "dark city, glowing readouts",
+        Look::Navigator => "grey desktop, toolchest bar",
+        Look::Holo => "see-through glass panels",
+        Look::Tactical => "military terminal, calm radar",
+        Look::Command => "unit map and command card",
     }
 }
 
@@ -978,7 +1298,7 @@ fn look_text(look: aivory_protocol::Look) -> &'static str {
             "See-through glass panels on a deep blue field. Calm, with one strand per session."
         }
         Look::Tactical => {
-            "A phosphor radar: bearing is the codebase, range is the time since the last move."
+            "A military terminal: a calm radar of your sessions, amber when one needs you, cyan for live work. Bearing is the codebase, range is the time since the last move."
         }
         Look::Command => "A command console: a map of units per codebase and a command sidebar.",
     }
@@ -1053,19 +1373,19 @@ impl Render for TacticalSettings {
                     .into_any_element(),
             );
         }
-        let full = navb("ts-full", "ALL SETTINGS >", false)
-            .border_1()
-            .border_color(c(tac::INK, 1.))
-            .text_color(c(tac::INK, 1.))
-            .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
-            .into_any_element();
+        // "OTHER": the full settings screen (providers, devices, machines, notifications).
+        menu.push(
+            navb("ts-full", "FULL SETTINGS >", false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(TacEvent::Full)))
+                .into_any_element(),
+        );
 
         let mut left = panel(match self.section {
-            Section::Looks => "LOOKS · CLICK TO SWITCH",
-            Section::Autopilot => "AUTOPILOT",
-            Section::Providers => "USAGE WINDOWS",
+            Section::Looks => "SEC-01 / LOOKS · CLICK TO SWITCH",
+            Section::Autopilot => "SEC-01 / AUTOPILOT",
+            Section::Providers => "SEC-01 / USAGE WINDOWS",
         });
-        let mut right = panel("DETAIL");
+        let mut right = panel("SEC-02 / DETAIL");
         match self.section {
             Section::Looks => {
                 let mut list = scroll("ts-list");
@@ -1077,11 +1397,12 @@ impl Render for TacticalSettings {
                             format!("ts-look-{k}"),
                             tac::INK,
                             name,
-                            "",
+                            look_line(look),
                             if look == here { "IN USE" } else { "" },
                             tac::INK,
                             look == shown,
                         )
+                        .min_h(px(56.))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.look = Some(look);
                             cx.notify();
@@ -1093,17 +1414,32 @@ impl Render for TacticalSettings {
                 let on = shown == here;
                 right = right
                     .child(section(name.clone()))
-                    .child(label(if on { "STATUS: ON" } else { "STATUS: OFF" }).text_color(c(
-                        if on { tac::INK } else { tac::LABEL },
-                        1.,
-                    )))
+                    .child(look_thumb(shown))
                     .child(entry(look_text(shown)))
                     .child(entry(
                         "A look replaces the frame, the colors and the fonts of every screen. The choice is saved in the settings of the daemon.",
                     ));
-                if !on {
+                if let Some(w) = war.as_ref() {
+                    right = right.child(label(format!(
+                        "AUTOPILOT · {} · UP TO {} AT ONCE · PARK AFTER {} MIN",
+                        if w.autopilot.on { "ON" } else { "OFF" },
+                        w.autopilot.max_running,
+                        w.autopilot.park_after_min
+                    )));
+                    for u in w.usage.iter().take(3) {
+                        right = right.child(label(format!(
+                            "USAGE · {} {} · {}%",
+                            u.provider.to_uppercase(),
+                            u.label.to_uppercase(),
+                            u.pct
+                        )));
+                    }
+                }
+                if on {
+                    right = right.child(label("THIS LOOK IS IN USE"));
+                } else {
                     right = right.child(
-                        tac::order("ts-switch", &format!("SWITCH TO {name}"), Btn::On)
+                        tac::order("ts-switch", "APPLY", Btn::On)
                             .self_start()
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 act(&this.model, Action::SetLook(shown), cx);
@@ -1170,7 +1506,39 @@ impl Render for TacticalSettings {
                     .child(entry(format!(
                         "Autopilot is {}. A session parks after {park} minutes without work.",
                         if auto { "on" } else { "off" }
-                    )));
+                    )))
+                    .child(
+                        div()
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.))
+                            .child(label("PARK AFTER"))
+                            .child(tac::order("ts-park-less", "- 5 MIN", Btn::Plain).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    act(
+                                        &this.model,
+                                        Action::Autopilot(AutopilotPatch {
+                                            park_after_min: Some(park.saturating_sub(5).max(5)),
+                                            ..AutopilotPatch::default()
+                                        }),
+                                        cx,
+                                    );
+                                }),
+                            ))
+                            .child(tac::order("ts-park-more", "+ 5 MIN", Btn::Plain).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    act(
+                                        &this.model,
+                                        Action::Autopilot(AutopilotPatch {
+                                            park_after_min: Some((park + 5).min(240)),
+                                            ..AutopilotPatch::default()
+                                        }),
+                                        cx,
+                                    );
+                                }),
+                            )),
+                    );
             }
             Section::Providers => {
                 let mut list = scroll("ts-list");
@@ -1193,17 +1561,49 @@ impl Render for TacticalSettings {
                     }
                 }
                 left = left.child(list);
-                right = right.child(section("PROVIDERS AND MODELS")).child(entry(
-                    "Models, effort and permission mode per provider are set in all settings.",
+                right = right.child(section("PROVIDERS AND MODELS"));
+                let providers = self.model.read(cx).providers.clone();
+                if providers.is_empty() {
+                    right = right.child(entry("No provider is installed."));
+                }
+                let mut pl = scroll("ts-prov").gap(px(10.)).pb(px(24.));
+                for (pi, (id, models)) in providers.into_iter().enumerate() {
+                    let mut row = div().flex().flex_wrap().gap(px(8.));
+                    for (mi, m) in models.into_iter().enumerate() {
+                        let (provider, model) = (id.clone(), m.clone());
+                        row = row.child(
+                            tac::order(format!("ts-model-{pi}-{mi}"), &m, Btn::Plain).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    act(
+                                        &this.model,
+                                        Action::SetDefaultModel {
+                                            provider: provider.clone(),
+                                            model: model.clone(),
+                                        },
+                                        cx,
+                                    );
+                                }),
+                            ),
+                        );
+                    }
+                    pl = pl
+                        .child(label(format!(
+                            "{} · CLICK A MODEL FOR THE DEFAULT",
+                            id.to_uppercase()
+                        )))
+                        .child(row);
+                }
+                right = right.child(pl).child(label(
+                    "Change the effort and the permission mode in the full settings.",
                 ));
             }
         }
 
         frame(Frame {
-            title: "SETUP",
+            title: "SETUP".into(),
             kicker: "LOOK, AUTOPILOT AND PROVIDERS".into(),
             stats,
-            menu: menu_end(menu, None, full),
+            menu,
             body: console(left, right),
         })
     }

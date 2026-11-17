@@ -1,39 +1,50 @@
-//! The Tactical look kit (boards `TacticalRadar` and `TacticalSession`): the phosphor palette,
-//! the type scale, and the pieces every Tactical screen uses: a framed panel with corner
-//! brackets and a caption on its top border, order buttons, menu buttons, list rows, the screen
-//! frame (title, menu, body) and the scanlines.
+//! The Tactical look kit: the military-terminal palette (see DESIGN.md), the type scale, and the
+//! pieces every Tactical screen uses: a framed panel with a caption on its top border, order
+//! buttons, menu buttons, list rows and the screen frame (title row, key row, body).
 //!
 //! One type scale for the look: screen title > section title > entry text > label.
 //! Entry text is at most 0.8 x the section title.
 
 use gpui::prelude::*;
-use gpui::{
-    AnyElement, Bounds, Div, FontWeight, Hsla, SharedString, Stateful, canvas, div, fill, point,
-    px, size,
-};
+use gpui::{AnyElement, Div, FontWeight, Hsla, SharedString, Stateful, div, px};
 
 use crate::ui;
 
-pub const BG: u32 = 0x000400;
-/// Bright phosphor: the focus color.
-pub const INK: u32 = 0x39FF6A;
-pub const MID: u32 = 0x22C24E;
-pub const LABEL: u32 = 0x1FA845;
-pub const DIM: u32 = 0x128A35;
-pub const DEEP: u32 = 0x0B4A1E;
-/// White: "needs you", and nothing else.
-pub const WHITE: u32 = 0xE8FFE8;
-/// Text on a green fill.
-pub const DARK: u32 = 0x001A06;
+/// The base: a very dark olive slate, not black. Phosphor green on pure black made every
+/// element glow the same; on this base the text reads as paper and color is left for state.
+pub const BG: u32 = 0x0F120E;
+/// Bright text and the focus mark: warm bone white.
+pub const INK: u32 = 0xE9EBDA;
+/// Mid tone of lines and quiet marks.
+pub const MID: u32 = 0x7E8A6C;
+/// Labels and captions (olive grey, 6:1 on the base).
+pub const LABEL: u32 = 0x9AA586;
+/// Borders of panels and buttons.
+pub const DIM: u32 = 0x3F4A37;
+/// Hairlines and dim fills.
+pub const DEEP: u32 = 0x252D20;
+/// Amber: an agent needs you. The caution light of a cockpit, and nothing else.
+pub const AMBER: u32 = 0xE5A63A;
+/// Alias of `AMBER`: older code calls the attention color `WHITE`.
+pub const WHITE: u32 = AMBER;
+/// Desaturated cyan: information, live work, the selection (the radar scope).
+pub const CYAN: u32 = 0x7FBAC0;
+/// Muted olive green: nominal, done.
+pub const OK: u32 = 0x9DB86A;
+/// Red: a fault or an alarm, text and marks only.
+pub const ALARM: u32 = 0xE0604A;
+/// Text on a bright fill.
+pub const DARK: u32 = 0x10140D;
 /// Entry text.
-pub const TEXT: u32 = 0x8FFFAE;
+pub const TEXT: u32 = 0xCDD3BC;
 /// The glass of a panel.
-pub const PANEL: u32 = 0x021206;
+pub const PANEL: u32 = 0x171C14;
+/// The dim inset of code, diffs and tool calls.
+pub const INSET: u32 = 0x0B0E09;
 
 pub const SANS: &str = "B612";
-/// The proportional B612 also sets the mono roles: B612 Mono gives ":" and "." a full cell,
-/// so "14:40:02Z" and "0.8K" read with gaps.
-pub const MONO: &str = "B612";
+/// B612 Mono sets the labels, times and codes. B612 sets the titles and the entry text.
+pub const MONO: &str = "B612 Mono";
 
 /// Screen title.
 pub const S_TITLE: f32 = 32.;
@@ -43,8 +54,6 @@ pub const S_SECTION: f32 = 20.;
 pub const S_ENTRY: f32 = 15.;
 /// Labels, captions, buttons.
 pub const S_LABEL: f32 = 12.;
-/// Big readouts (numbers).
-pub const S_BIG: f32 = 28.;
 
 /// A color `0xRRGGBB` with an alpha of 0 to 1.
 pub fn c(rgb: u32, alpha: f32) -> Hsla {
@@ -67,29 +76,34 @@ pub fn clock_ms(ms: i64) -> String {
     format!("{}:{:02}", s / 60, s % 60)
 }
 
-/// `14:32:08Z` of a time in Unix milliseconds.
-pub fn utc(ms: i64) -> String {
-    let s = (ms / 1000).max(0);
-    format!("{:02}:{:02}:{:02}Z", s / 3600 % 24, s / 60 % 60, s % 60)
-}
-
-fn corner(top_left: bool) -> Div {
-    let d = div().absolute().size(px(12.)).border_color(c(INK, 1.));
-    if top_left {
-        d.left(px(-1.))
-            .top(px(-1.))
-            .border_t(px(2.))
-            .border_l(px(2.))
-    } else {
+/// A short tick at a corner of a panel (a thin L, no glow).
+fn tick(right: bool, bottom: bool) -> Div {
+    let d = div().absolute().size(px(9.)).border_color(c(MID, 1.));
+    let d = if right {
         d.right(px(-1.))
-            .bottom(px(-1.))
-            .border_b(px(2.))
-            .border_r(px(2.))
+    } else {
+        d.left(px(-1.))
+    };
+    let d = if bottom {
+        d.bottom(px(-1.))
+    } else {
+        d.top(px(-1.))
+    };
+    let d = if bottom {
+        d.border_b_1()
+    } else {
+        d.border_t_1()
+    };
+    if right {
+        d.border_r_1()
+    } else {
+        d.border_l_1()
     }
 }
 
-/// A framed panel: a thin border, glass, bright corners at the top left and bottom right, and a
-/// caption on the top border. The caller sets the size and the padding (24 px or more).
+/// A framed panel: a thin border, glass, corner ticks and a stencil plate on the top border
+/// that holds the panel code and name (`SEC-02 / SESSIONS`). No glow. The caller sets the size
+/// and the padding (24 px or more).
 pub fn tbox(caption: impl Into<SharedString>) -> Div {
     div()
         .relative()
@@ -97,20 +111,24 @@ pub fn tbox(caption: impl Into<SharedString>) -> Div {
         .flex_col()
         .border_1()
         .border_color(c(DIM, 1.))
-        .bg(c(PANEL, 0.82))
-        .child(corner(true))
-        .child(corner(false))
+        .bg(c(PANEL, 1.))
+        .child(tick(false, false))
+        .child(tick(true, false))
+        .child(tick(false, true))
+        .child(tick(true, true))
         .child(
             div()
                 .absolute()
                 .left(px(14.))
-                .top(px(-10.))
-                .px(px(10.))
+                .top(px(-11.))
+                .px(px(8.))
                 .py(px(1.))
-                .bg(c(BG, 1.))
+                .bg(c(DEEP, 1.))
+                .border_1()
+                .border_color(c(DIM, 1.))
                 .font_family(MONO)
                 .text_size(ui::ts(S_LABEL))
-                .text_color(c(INK, 1.))
+                .text_color(c(LABEL, 1.))
                 .child(caption.into()),
         )
 }
@@ -146,17 +164,18 @@ pub fn section(text: impl Into<SharedString>) -> Div {
         .child(text.into())
 }
 
-/// A path or a command: mono entry text in a dashed box.
+/// A path or a command: small mono text on a dim inset with a rule at the left. Code never
+/// looks like chat text.
 pub fn code(text: impl Into<SharedString>) -> Div {
     div()
         .px(px(12.))
         .py(px(8.))
-        .border_1()
-        .border_dashed()
+        .border_l(px(2.))
         .border_color(c(DIM, 1.))
+        .bg(c(INSET, 1.))
         .font_family(MONO)
-        .text_size(ui::ts(S_LABEL + 1.))
-        .line_height(ui::ts(S_LABEL + 1.) * 1.5)
+        .text_size(ui::ts(S_LABEL))
+        .line_height(ui::ts(S_LABEL) * 1.5)
         .text_color(c(TEXT, 1.))
         .child(text.into())
 }
@@ -164,24 +183,17 @@ pub fn code(text: impl Into<SharedString>) -> Div {
 /// The kind of an order button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Btn {
-    /// The first order: filled, with a glow.
+    /// The first order: filled cyan.
     On,
     /// A normal order: an outline.
     Plain,
-    /// The last order, the one that stops something: a dim outline.
-    Dim,
 }
 
 /// An order button `[1] ALLOW`.
 pub fn order(id: impl Into<SharedString>, text: &str, kind: Btn) -> Stateful<Div> {
-    let (line, fg, bg) = match kind {
-        Btn::On => (INK, DARK, Some(INK)),
-        Btn::Plain => (INK, INK, None),
-        Btn::Dim => (DIM, MID, None),
-    };
-    let mut d = div()
+    let d = div()
         .id(id.into())
-        .min_h(px(36.))
+        .min_h(px(34.))
         .px(px(16.))
         .flex()
         .flex_none()
@@ -189,20 +201,24 @@ pub fn order(id: impl Into<SharedString>, text: &str, kind: Btn) -> Stateful<Div
         .justify_center()
         .cursor_pointer()
         .border_1()
-        .border_color(c(line, 1.))
         .font_family(MONO)
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(S_LABEL + 1.))
-        .text_color(c(fg, 1.))
+        .text_size(ui::ts(S_LABEL))
         .child(text.to_string());
-    d = match bg {
-        Some(b) => d.bg(c(b, 1.)).hover(move |h| h.bg(c(b, 0.85))),
-        None => d.hover(move |h| h.bg(c(line, 0.18))),
-    };
-    d
+    match kind {
+        Btn::On => d
+            .border_color(c(CYAN, 1.))
+            .bg(c(CYAN, 1.))
+            .text_color(c(DARK, 1.))
+            .hover(|h| h.bg(c(CYAN, 0.85))),
+        Btn::Plain => d
+            .border_color(c(DIM, 1.))
+            .text_color(c(TEXT, 1.))
+            .hover(|h| h.border_color(c(CYAN, 1.)).text_color(c(INK, 1.))),
+    }
 }
 
-/// A menu button of a bar: flat; the one that is on is filled.
+/// A menu button of a bar: flat; the one that is on has a cyan rule below it.
 pub fn navb(id: impl Into<SharedString>, text: &str, on: bool) -> Stateful<Div> {
     div()
         .id(id.into())
@@ -213,18 +229,20 @@ pub fn navb(id: impl Into<SharedString>, text: &str, on: bool) -> Stateful<Div> 
         .flex_none()
         .items_center()
         .cursor_pointer()
+        .border_b(px(2.))
+        .border_color(c(CYAN, if on { 1. } else { 0. }))
         .font_family(MONO)
         .text_size(ui::ts(S_LABEL))
-        .when(on, |d| d.bg(c(INK, 1.)).text_color(c(DARK, 1.)))
+        .when(on, |d| d.bg(c(DEEP, 1.)).text_color(c(INK, 1.)))
         .when(!on, |d| {
             d.text_color(c(LABEL, 1.))
-                .hover(|h| h.text_color(c(INK, 1.)).bg(c(INK, 0.12)))
+                .hover(|h| h.text_color(c(INK, 1.)).bg(c(DEEP, 0.7)))
         })
         .child(text.to_string())
 }
 
-/// A list row of 52 px: a state mark, a title, a line below it, and a note at the right. The row
-/// is dim until it is hovered or selected.
+/// A list row: a state mark, a title, a line below it, and a note at the right. The picked
+/// row has a cyan rule at the left.
 pub fn trow(
     id: impl Into<SharedString>,
     mark: u32,
@@ -237,19 +255,18 @@ pub fn trow(
     div()
         .id(id.into())
         .flex_none()
-        .min_h(px(52.))
+        .min_h(px(62.))
         .px(px(14.))
-        .py(px(6.))
+        .py(px(8.))
         .flex()
         .items_center()
         .gap(px(14.))
         .cursor_pointer()
         .border_l(px(2.))
-        .border_color(c(INK, if on { 1. } else { 0. }))
-        .bg(c(INK, if on { 0.12 } else { 0. }))
-        .opacity(if on { 1. } else { 0.7 })
-        .hover(|h| h.bg(c(INK, 0.08)).opacity(1.))
-        .child(div().flex_none().size(px(8.)).bg(c(mark, 1.)))
+        .border_color(c(CYAN, if on { 1. } else { 0. }))
+        .bg(c(CYAN, if on { 0.08 } else { 0. }))
+        .hover(|h| h.bg(c(INK, 0.05)))
+        .child(dot(mark))
         .child(
             div()
                 .flex_1()
@@ -286,62 +303,44 @@ pub fn trow(
         )
 }
 
-/// A readout: a big number and a two-word label in a bordered box.
+/// A readout: a value and a short label, inline, with no box.
 pub fn readout(value: &str, text: &str, color: u32) -> Div {
     div()
         .flex()
         .flex_none()
-        .items_center()
-        .border_1()
-        .border_color(c(if color == WHITE { WHITE } else { DIM }, 1.))
+        .items_baseline()
+        .gap(px(8.))
         .child(
             div()
-                .px(px(14.))
-                .py(px(6.))
                 .font_family(SANS)
                 .font_weight(FontWeight::BOLD)
-                .text_size(ui::ts(S_BIG))
+                .text_size(ui::ts(S_SECTION))
                 .text_color(c(color, 1.))
                 .child(value.to_string()),
         )
         .child(
             div()
-                .px(px(12.))
-                .py(px(6.))
-                .border_l_1()
-                .border_color(c(DIM, 1.))
                 .font_family(MONO)
                 .text_size(ui::ts(S_LABEL))
-                .line_height(ui::ts(S_LABEL) * 1.5)
                 .text_color(c(LABEL, 1.))
                 .child(text.to_string()),
         )
 }
 
-/// Scanlines over everything below: a black line of 1 px every 3 px.
-pub fn scan() -> impl IntoElement {
-    canvas(
-        |_, _, _| (),
-        |b, _, window, _| {
-            let (x, w) = (f32::from(b.origin.x), f32::from(b.size.width));
-            let mut y = f32::from(b.origin.y);
-            let end = y + f32::from(b.size.height);
-            while y < end {
-                let line = Bounds::new(point(px(x), px(y)), size(px(w), px(1.)));
-                window.paint_quad(fill(line, c(0x000000, 0.2)));
-                y += 3.;
-            }
-        },
-    )
-    .absolute()
-    .inset_0()
+/// A state dot: round, 8 px.
+pub fn dot(color: u32) -> Div {
+    div()
+        .flex_none()
+        .size(px(8.))
+        .rounded_full()
+        .bg(c(color, 1.))
 }
 
 /// What a Tactical screen puts into the frame.
 pub struct Frame {
     /// The screen title.
-    pub title: &'static str,
-    /// The line below the title: what the screen is for.
+    pub title: String,
+    /// The line beside the title: what the screen is for.
     pub kicker: String,
     /// Readouts at the right of the title: value, label, color.
     pub stats: Vec<(String, String, u32)>,
@@ -351,13 +350,14 @@ pub struct Frame {
     pub body: AnyElement,
 }
 
-/// The layer of a Tactical screen: a title with readouts, a menu row, and the body. Scanlines
-/// lie over it.
+/// The layer of a Tactical screen: one title row (title, kicker, readouts), one key row, and
+/// the body. The same frame on every screen.
 pub fn frame(f: Frame) -> Div {
-    let mut stats = div().flex().flex_wrap().gap(px(16.));
+    let mut stats = div().flex().items_center().gap(px(24.));
     for (value, text, color) in f.stats {
         stats = stats.child(readout(&value, &text, color));
     }
+    let short = ui::short();
     div()
         .size_full()
         .relative()
@@ -369,34 +369,45 @@ pub fn frame(f: Frame) -> Div {
                 .size_full()
                 .flex()
                 .flex_col()
-                .px(px(32.))
-                .pt(px(if ui::short() { 12. } else { 28. }))
-                .pb(px(if ui::short() { 12. } else { 28. }))
-                .gap(px(if ui::short() { 10. } else { 20. }))
-                .when(!ui::short(), |d| {
+                .px(px(28.))
+                .pt(px(if short { 8. } else { 16. }))
+                .pb(px(if short { 12. } else { 24. }))
+                .gap(px(if short { 8. } else { 14. }))
+                .when(!short, |d| {
                     d.child(
                         div()
                             .flex_none()
+                            .min_h(px(40. * ui::factor()))
                             .flex()
-                            .flex_wrap()
-                            .gap(px(12.))
-                            .items_end()
+                            .items_center()
                             .justify_between()
+                            .gap(px(24.))
                             .child(
                                 div()
+                                    .min_w(px(0.))
                                     .flex()
-                                    .flex_col()
-                                    .gap(px(4.))
+                                    .items_baseline()
+                                    .gap(px(16.))
                                     .child(
                                         div()
+                                            .flex_none()
                                             .font_family(SANS)
                                             .font_weight(FontWeight::BOLD)
                                             .text_size(ui::ts(S_TITLE))
-                                            .line_height(ui::ts(S_TITLE) * 1.2)
+                                            .line_height(ui::ts(S_TITLE) * 1.15)
                                             .text_color(c(INK, 1.))
+                                            .whitespace_nowrap()
                                             .child(f.title.to_string()),
                                     )
-                                    .child(label(f.kicker)),
+                                    .child(
+                                        div()
+                                            .min_w(px(0.))
+                                            .truncate()
+                                            .font_family(MONO)
+                                            .text_size(ui::ts(S_LABEL))
+                                            .text_color(c(LABEL, 1.))
+                                            .child(f.kicker),
+                                    ),
                             )
                             .child(stats),
                     )
@@ -405,15 +416,13 @@ pub fn frame(f: Frame) -> Div {
                     div()
                         .flex_none()
                         .flex()
-                        .flex_wrap()
                         .items_center()
                         .gap(px(6.))
-                        .pb(px(12.))
+                        .pb(px(6.))
                         .border_b_1()
                         .border_color(c(DEEP, 1.))
                         .children(f.menu),
                 )
                 .child(div().flex_1().min_h(px(0.)).flex().flex_col().child(f.body)),
         )
-        .child(scan())
 }

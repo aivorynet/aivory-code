@@ -39,7 +39,7 @@ fn num(text: impl Into<SharedString>) -> Div {
         .justify_end()
         .whitespace_nowrap()
         .font_family(tk().mono)
-        .text_size(ui::ts(T_SMALL))
+        .text_size(ui::ts(T_CAPTION))
         .font_weight(FontWeight::MEDIUM)
         .text_color(rgb(tk().ink))
         .child(text.into())
@@ -65,7 +65,7 @@ fn big(value: String, size: f32, unit: &'static str) -> Div {
         )
         .child(
             div()
-                .text_size(ui::ts(T_SMALL))
+                .text_size(ui::ts(T_CAPTION))
                 .text_color(rgb(tk().ink_3))
                 .child(unit),
         )
@@ -127,7 +127,7 @@ impl WarRoomScreen {
     fn memory_view(&self) -> Div {
         let Some(m) = self.memory.as_ref().filter(|m| m.total_mb > 0) else {
             return div()
-                .text_size(ui::ts(T_SMALL))
+                .text_size(ui::ts(T_CAPTION))
                 .text_color(rgb(tk().ink_3))
                 .child("Reading the RAM…");
         };
@@ -141,10 +141,10 @@ impl WarRoomScreen {
                 .items_baseline()
                 .gap_x(px(10.))
                 .gap_y(px(2.))
-                .child(big(gb(m.used_mb), 24., "used"))
+                .child(big(gb(m.used_mb), T_DISPLAY, "used"))
                 .child(
                     div()
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(T_CAPTION))
                         .text_color(rgb(if low { tk().q_text } else { tk().ink_3 }))
                         .child(format!(
                             "{} free of {} · agents {}",
@@ -160,6 +160,7 @@ impl WarRoomScreen {
             .h(px(H))
             .flex()
             .items_end()
+            .justify_end()
             .gap(px(1.))
             .border_b_1()
             .border_color(ui::hsla(tk().line));
@@ -190,14 +191,14 @@ impl WarRoomScreen {
                 .child("30 min")
                 .child("now"),
         );
-        for a in &m.top {
+        for a in m.top.iter().take(5) {
             out = out.child(
                 div()
                     .h(px(22.))
                     .flex()
                     .items_center()
                     .gap(px(8.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .child(div().flex_1().child(format!("{} · pid {}", a.name, a.pid)))
                     .child(num(gb(a.mb))),
             );
@@ -223,7 +224,7 @@ impl WarRoomScreen {
                     .border_color(rgb(if on { tk().ink } else { tk().edge }))
                     .bg(rgb(if on { tk().ink } else { tk().card }))
                     .text_color(rgb(if on { tk().card } else { tk().ink }))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .cursor_pointer()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.organizer = mode;
@@ -243,7 +244,7 @@ impl WarRoomScreen {
             .gap(px(10.))
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(if running {
                         "An organizer runs. Its reports show in its session."
@@ -254,7 +255,7 @@ impl WarRoomScreen {
             .child(modes)
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(self.organizer.about()),
             )
@@ -299,14 +300,14 @@ impl WarRoomScreen {
             .pt(px(28.))
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(format!("Since {since} · {span}")),
             )
             .child(div().mt(px(8.)).child(if tokens > 0 {
-                big(fmt_tokens(tokens), 46., "tokens")
+                big(fmt_tokens(tokens), T_DISPLAY, "tokens")
             } else {
-                big(format!("${:.2}", self.shown.1), 46., "spent")
+                big(format!("${:.2}", self.shown.1), T_DISPLAY, "spent")
             }))
             .child(
                 div()
@@ -314,9 +315,9 @@ impl WarRoomScreen {
                     .flex()
                     .gap(px(24.))
                     .when(tokens > 0, |d| {
-                        d.child(big(format!("${:.2}", self.shown.1), 24., "spent"))
+                        d.child(big(format!("${:.2}", self.shown.1), T_DISPLAY, "spent"))
                     })
-                    .child(big(counts.agents.to_string(), 24., "agents live")),
+                    .child(big(counts.agents.to_string(), T_DISPLAY, "agents live")),
             )
             .child(self.spark(war))
             .child(
@@ -336,7 +337,7 @@ impl WarRoomScreen {
             .overflow_y_scroll()
             .track_scroll(&self.board.side_scroll)
             .px(px(24.))
-            .pb(px(32.))
+            .pb(px(56.))
             .flex()
             .flex_col()
             .child(top)
@@ -349,7 +350,7 @@ impl WarRoomScreen {
         if names.is_empty() {
             return out.child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child("No usage this week"),
             );
@@ -377,7 +378,7 @@ impl WarRoomScreen {
                     .flex()
                     .items_center()
                     .gap(px(8.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .child(ui::dot(rgb(color)))
                     .child(
                         div()

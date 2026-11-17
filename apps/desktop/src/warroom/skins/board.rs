@@ -867,7 +867,7 @@ pub(super) fn ab(
         .justify_center()
         .rounded_full()
         .whitespace_nowrap()
-        .text_size(ui::ts(12.))
+        .text_size(ui::ts(crate::theme::T_CAPTION))
         .font_weight(FontWeight::SEMIBOLD)
         .cursor_pointer()
         .when(primary, |d| {

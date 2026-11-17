@@ -448,7 +448,7 @@ impl SettingsScreen {
         if let Some(text) = &p.busy {
             block = block.child(
                 div()
-                    .text_size(crate::ui::ts(T_SMALL))
+                    .text_size(crate::ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(format!("{text}... {} s", p.ticks / 2)),
             );
@@ -466,7 +466,7 @@ impl SettingsScreen {
         if p.list.is_empty() {
             block = block.child(
                 div()
-                    .text_size(crate::ui::ts(T_SMALL))
+                    .text_size(crate::ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child("No theme is installed. The look cards above stay."),
             );
@@ -487,7 +487,7 @@ impl SettingsScreen {
             div()
                 .flex()
                 .gap(px(10.))
-                .text_size(crate::ui::ts(T_SMALL))
+                .text_size(crate::ui::ts(T_CAPTION))
                 .child(
                     div()
                         .w(px(64.))
@@ -503,6 +503,7 @@ impl SettingsScreen {
             .flex()
             .flex_col()
             .gap(px(8.))
+            .map(crate::overlay_style::skin)
             .child(
                 div()
                     .font_weight(FontWeight::BOLD)
@@ -604,7 +605,7 @@ impl SettingsScreen {
                                     .overflow_hidden()
                                     .text_ellipsis()
                                     .whitespace_nowrap()
-                                    .text_size(crate::ui::ts(T_SMALL))
+                                    .text_size(crate::ui::ts(T_CAPTION))
                                     .font_weight(FontWeight::MEDIUM)
                                     .text_color(rgb(if on { tk().ink } else { tk().ink_2 }))
                                     .child(t.name.clone()),

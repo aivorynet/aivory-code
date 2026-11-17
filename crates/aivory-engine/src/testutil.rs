@@ -32,6 +32,7 @@ pub fn pane(id: &str, codebase: &str, state: SessionState, since: UnixMs) -> Pan
             effort: Effort::High,
         },
         task: None,
+        machine: None,
     }
 }
 

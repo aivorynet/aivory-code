@@ -172,6 +172,7 @@ impl HoloInbox {
 fn kind_color(k: InboxKind) -> u32 {
     match k {
         InboxKind::Error => GD,
+        InboxKind::Review => SA,
         _ => RS,
     }
 }
@@ -324,7 +325,11 @@ impl Render for HoloInbox {
                     .mt(px(PAD))
                     .flex()
                     .flex_col()
-                    .child(sec("Next in line").mb(px(12.)));
+                    .child(sec("Next in line"))
+                    .child(
+                        th("Dot: orange waits for you · warm is an error · violet is a review")
+                            .mb(px(12.)),
+                    );
                 for (k, o) in rest.iter().enumerate() {
                     let id = o.id.clone();
                     list = list.child(
@@ -354,15 +359,20 @@ impl Render for HoloInbox {
             right_title = it.kind.heading().to_string();
             match self.side {
                 Side::Details => {
+                    if !it.preview.is_empty() && it.preview.trim() != it.text.trim() {
+                        right = right.child(sec("Why it asks")).child(prose(&it.preview));
+                    }
                     right = right
-                        .child(sec("Why it asks"))
-                        .child(prose(if it.preview.is_empty() {
-                            &it.text
-                        } else {
-                            &it.preview
-                        }))
                         .child(sec("Command or question"))
-                        .child(code(&it.text, RS));
+                        .child(code(&it.text, kind_color(it.kind)));
+                    let recent = chat_text(&it.tail, 2);
+                    if !recent.is_empty() {
+                        right = right.child(sec("Latest in the chat"));
+                        for r in recent {
+                            right =
+                                right.child(prose(&r).max_h(px(LH_BODY * 2.)).overflow_hidden());
+                        }
+                    }
                     if !it.steps.is_empty() {
                         right = right.child(sec("Plan")).children(
                             it.steps
@@ -371,6 +381,109 @@ impl Render for HoloInbox {
                                 .map(|(k, s)| prose(&format!("{}. {s}", k + 1))),
                         );
                     }
+                    // The lower half: the numbers of the item as glass tiles, then the files
+                    // and the last tool calls in mono on a dim inset (R3).
+                    let tile = |label: &str, value: String, accent: u32| {
+                        div()
+                            .flex_1()
+                            .min_w(px(0.))
+                            .h(px(70.))
+                            .flex()
+                            .flex_col()
+                            .justify_center()
+                            .gap(px(2.))
+                            .px(px(14.))
+                            .rounded(px(10.))
+                            .border_1()
+                            .border_color(ink(accent, 0.45))
+                            .bg(gpui::linear_gradient(
+                                160.,
+                                gpui::linear_color_stop(ink(0xBFEFFF, 0.14), 0.),
+                                gpui::linear_color_stop(ink(0x1A5E92, 0.10), 1.),
+                            ))
+                            .child(th(label.to_string()))
+                            .child(
+                                div()
+                                    .truncate()
+                                    .font_family(LABEL)
+                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .text_size(px(S_BIG))
+                                    .text_color(rgb(PA))
+                                    .child(value),
+                            )
+                    };
+                    right = right.child(
+                        div()
+                            .flex()
+                            .gap(px(10.))
+                            .child(tile("Waits", minutes(now, it.since), OR))
+                            .child(tile("Cost", format!("${:.2}", it.cost), PK))
+                            .child(tile("Context", format!("{}%", it.context_pct), PE))
+                            .child(tile("Files", it.files.len().to_string(), PK)),
+                    );
+                    let mut inset = div()
+                        .flex_1()
+                        .min_h(px(120.))
+                        .overflow_hidden()
+                        .flex()
+                        .flex_col()
+                        .gap(px(5.))
+                        .p(px(14.))
+                        .rounded(px(8.))
+                        .bg(ink(0x010A18, 0.6))
+                        .border_1()
+                        .border_color(ink(PK, 0.22))
+                        .border_l_2()
+                        .border_color(ink(PK, 0.5))
+                        .font_family(CODE)
+                        .text_size(px(S_CODE));
+                    let mut any = false;
+                    for f in it.files.iter().take(4) {
+                        any = true;
+                        inset = inset.child(
+                            div()
+                                .flex()
+                                .gap(px(10.))
+                                .child(div().flex_none().text_color(rgb(PE)).child("edit"))
+                                .child(div().truncate().text_color(rgb(PA)).child(f.clone())),
+                        );
+                    }
+                    for l in it
+                        .tail
+                        .iter()
+                        .filter(|l| l.kind == aivory_protocol::LineKind::Tool)
+                        .rev()
+                        .take(3)
+                    {
+                        any = true;
+                        inset = inset.child(
+                            div()
+                                .flex()
+                                .gap(px(10.))
+                                .child(
+                                    div().flex_none().text_color(rgb(PK)).child(
+                                        l.label
+                                            .clone()
+                                            .unwrap_or_else(|| "tool".into())
+                                            .to_lowercase(),
+                                    ),
+                                )
+                                .child(
+                                    div()
+                                        .truncate()
+                                        .text_color(ink(PA, 0.8))
+                                        .child(l.text.lines().next().unwrap_or("").to_string()),
+                                ),
+                        );
+                    }
+                    if !any {
+                        inset = inset.child(
+                            div()
+                                .text_color(rgb(MUTED))
+                                .child("$ no file edit or tool call yet"),
+                        );
+                    }
+                    right = right.child(sec("Files and last calls")).child(inset);
                 }
                 Side::Files => {
                     right = right.child(sec(format!("Files changed · {}", it.files.len())));
@@ -406,8 +519,8 @@ impl Render for HoloInbox {
             );
         }
         right_tabs.push(
-            tab("ri-open", "Open session ›", PK, false)
-                .h(px(40.))
+            link("ri-open", "Open session ›", PK)
+                .ml_auto()
                 .on_click(cx.listener(move |_, _, _, cx| {
                     if let Some(id) = &open {
                         cx.emit(HoloEvent::OpenSession(id.clone()));
@@ -629,15 +742,17 @@ impl Render for HoloTasks {
             div()
                 .mt(px(22.))
                 .flex()
-                .gap(px(8.))
+                .flex_wrap()
+                .items_center()
+                .gap(px(12.))
                 .child(
                     pill(
                         "lt-autopilot",
                         PK,
                         if autopilot {
-                            "Autopilot on"
+                            "Turn autopilot off"
                         } else {
-                            "Autopilot off"
+                            "Turn autopilot on"
                         },
                     )
                     .px(px(18.))
@@ -652,8 +767,33 @@ impl Render for HoloTasks {
                         );
                     })),
                 )
-                .child(th(format!("{queued_n} queued for autopilot")).mt(px(6.))),
+                .child(th(format!(
+                    "Autopilot is {} · {queued_n} queued",
+                    if autopilot { "on" } else { "off" }
+                ))),
         );
+        {
+            let all: Vec<Task> = [
+                TaskTab::Queued,
+                TaskTab::Running,
+                TaskTab::Review,
+                TaskTab::Done,
+            ]
+            .iter()
+            .flat_map(|t| self.of(*t))
+            .collect();
+            let spent: f64 = all.iter().map(|t| t.cost).sum();
+            let asking = all.iter().filter(|t| t.waiting_for.is_some()).count();
+            left = left.child(
+                div().mt(px(14.)).child(
+                    th(format!(
+                        "{} tasks · ${spent:.2} spent · {asking} wait for you",
+                        all.len()
+                    ))
+                    .text_color(rgb(PA)),
+                ),
+            );
+        }
 
         let mut right = div().flex().flex_col().gap(px(14.));
         let mut open: Option<String> = None;
@@ -669,46 +809,65 @@ impl Render for HoloTasks {
             match self.side {
                 TaskSide::Plan => {
                     right = right.child(sec(format!("Plan · {} steps", t.steps.len())).mt(px(16.)));
+                    let mut strip = div().flex_none().flex().gap(px(10.));
                     for (k, s) in t.steps.iter().enumerate() {
-                        right = right.child(
+                        let c = step_color(s.state);
+                        strip = strip.child(
                             div()
-                                .flex_none()
-                                .min_h(px(44.))
-                                .py(px(6.))
-                                .border_b_1()
-                                .border_color(ink(PK, 0.1))
+                                .flex_1()
+                                .min_w(px(0.))
                                 .flex()
-                                .items_center()
-                                .gap(px(14.))
+                                .flex_col()
+                                .gap(px(4.))
+                                .px(px(12.))
+                                .py(px(10.))
+                                .rounded(px(10.))
+                                .border_1()
+                                .border_color(ink(c, 0.5))
+                                .bg(gpui::linear_gradient(
+                                    160.,
+                                    gpui::linear_color_stop(ink(0xBFEFFF, 0.14), 0.),
+                                    gpui::linear_color_stop(ink(0x1A5E92, 0.10), 1.),
+                                ))
                                 .child(
                                     div()
-                                        .flex_none()
-                                        .w(px(26.))
-                                        .h(px(26.))
-                                        .rounded_full()
-                                        .border_1()
-                                        .border_color(rgb(step_color(s.state)))
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
                                         .font_family(LABEL)
                                         .text_size(px(S_SMALL))
-                                        .text_color(rgb(step_color(s.state)))
-                                        .child((k + 1).to_string()),
+                                        .text_color(rgb(c))
+                                        .child(format!(
+                                            "{} · {}",
+                                            k + 1,
+                                            step_word(s.state).to_uppercase()
+                                        )),
                                 )
-                                .child(div().flex_1().child(prose(&s.name)))
-                                .child(
-                                    div()
-                                        .font_family(LABEL)
-                                        .text_size(px(S_SMALL))
-                                        .text_color(rgb(if s.state == StepState::Waiting {
-                                            RS
-                                        } else {
-                                            MUTED
-                                        }))
-                                        .child(step_word(s.state).to_uppercase()),
-                                ),
+                                .child(prose(&s.name)),
                         );
+                    }
+                    right = right.child(strip);
+                    if !t.prompt.trim().is_empty() {
+                        right = right
+                            .child(sec("Now").mt(px(10.)))
+                            .child(prose(&t.prompt).max_h(px(LH_BODY * 2.)).overflow_hidden());
+                    }
+                    // The newest chat rows of the first session fill the rest of the panel.
+                    let rows = t
+                        .sessions
+                        .first()
+                        .and_then(|s| {
+                            self.model
+                                .read(cx)
+                                .war
+                                .as_ref()
+                                .and_then(|w| w.session(&s.session))
+                                .map(|p| chat_text(&p.tail, 4))
+                        })
+                        .unwrap_or_default();
+                    if !rows.is_empty() {
+                        right = right.child(sec("Latest output").mt(px(10.)));
+                        for r in rows {
+                            right =
+                                right.child(prose(&r).max_h(px(LH_BODY * 2.)).overflow_hidden());
+                        }
                     }
                 }
                 TaskSide::Sessions => {
@@ -749,14 +908,17 @@ impl Render for HoloTasks {
                     .into_any_element(),
             );
         }
+        let has_act = cur
+            .as_ref()
+            .is_some_and(|t| TaskAct::of(t.column).is_some());
         if let Some((t, a)) = cur
             .as_ref()
             .and_then(|t| TaskAct::of(t.column).map(|a| (t, a)))
         {
             let id = t.id.clone();
             right_tabs.push(
-                tab("rt-act", &format!("{} ›", a.label()), GD, false)
-                    .h(px(40.))
+                link("rt-act", &format!("{} ›", a.label()), GD)
+                    .ml_auto()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         task_act(&this.model, &id, a, Self::reload, cx);
                     }))
@@ -764,8 +926,8 @@ impl Render for HoloTasks {
             );
         }
         right_tabs.push(
-            tab("rt-open", "Open session ›", PK, false)
-                .h(px(40.))
+            link("rt-open", "Open session ›", PK)
+                .when(!has_act, |l| l.ml_auto())
                 .on_click(cx.listener(move |_, _, _, cx| {
                     if let Some(id) = &open {
                         cx.emit(HoloEvent::OpenSession(id.clone()));
@@ -794,6 +956,8 @@ impl Render for HoloTasks {
 pub struct HoloRepos {
     model: Entity<Model>,
     selected: Option<String>,
+    /// The "+N more" lines are opened: codebases, parts, sessions.
+    more: [bool; 3],
     _obs: gpui::Subscription,
 }
 
@@ -805,6 +969,7 @@ impl HoloRepos {
         Self {
             model,
             selected: None,
+            more: [false; 3],
             _obs: obs,
         }
     }
@@ -881,7 +1046,7 @@ impl Render for HoloRepos {
         let body = f32::from(window.viewport_size().height) - 278.;
         let n = war.codebases.len();
         let room = ((body - 40.) / 60.).floor().max(1.) as usize;
-        let shown = if n <= room {
+        let shown = if n <= room || self.more[0] {
             n
         } else {
             room.saturating_sub(1).max(1)
@@ -907,7 +1072,14 @@ impl Render for HoloRepos {
             );
         }
         if n > shown {
-            left = left.child(th(format!("+ {} more", n - shown)).mt(px(12.)));
+            left = left.child(
+                link("lr-more", &format!("+ {} more ›", n - shown), PK)
+                    .mt(px(12.))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.more[0] = true;
+                        cx.notify();
+                    })),
+            );
         }
         let mut right = div().flex().flex_col().gap(px(14.));
         let mut open: Option<String> = None;
@@ -925,12 +1097,26 @@ impl Render for HoloRepos {
                 )))
                 .child(code(&c.path, TXT))
                 .child(sec(format!("Parts · {}", c.parts.len())).mt(px(16.)));
-            let parts_shown = c.parts.len().min(3);
+            let parts_shown = if self.more[1] {
+                c.parts.len()
+            } else {
+                c.parts.len().min(3)
+            };
             for p in c.parts.iter().take(parts_shown) {
                 right = right.child(prose(&format!("{} · {}", p.name, p.paths.join(", "))));
             }
             if c.parts.len() > parts_shown {
-                right = right.child(th(format!("+ {} more parts", c.parts.len() - parts_shown)));
+                right = right.child(
+                    link(
+                        "lr-more-parts",
+                        &format!("+ {} more parts ›", c.parts.len() - parts_shown),
+                        PK,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.more[1] = true;
+                        cx.notify();
+                    })),
+                );
             }
             let sessions: Vec<&Pane> = war
                 .sessions
@@ -943,7 +1129,7 @@ impl Render for HoloRepos {
                 + parts_shown as f32 * 40.
                 + if c.parts.len() > parts_shown { 40. } else { 0. };
             let room = ((body - used) / 74.).floor().max(1.) as usize;
-            let shown = if sessions.len() <= room {
+            let shown = if sessions.len() <= room || self.more[2] {
                 sessions.len()
             } else {
                 room.saturating_sub(1).max(1)
@@ -967,12 +1153,22 @@ impl Render for HoloRepos {
                 );
             }
             if sessions.len() > shown {
-                right = right.child(th(format!("+ {} more sessions", sessions.len() - shown)));
+                right = right.child(
+                    link(
+                        "lr-more-sessions",
+                        &format!("+ {} more sessions ›", sessions.len() - shown),
+                        PK,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.more[2] = true;
+                        cx.notify();
+                    })),
+                );
             }
         }
         let right_tabs = vec![
-            tab("rr-open", "Open session ›", PK, false)
-                .h(px(40.))
+            link("rr-open", "Open session ›", PK)
+                .ml_auto()
                 .on_click(cx.listener(move |_, _, _, cx| {
                     if let Some(id) = &open {
                         cx.emit(HoloEvent::OpenSession(id.clone()));
@@ -1034,6 +1230,243 @@ fn look_text(look: aivory_protocol::Look) -> &'static str {
             "A command console: a map of units per codebase and a command sidebar. Amber marks a unit that waits for you."
         }
     }
+}
+
+/// The page color and the signal color of a look.
+fn look_colors(look: aivory_protocol::Look) -> (u32, u32) {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => (0xF4F4F2, 0x3B82F6),
+        Look::Bridge => (0x050505, 0xFFB000),
+        Look::Operator => (0x0A1020, 0x2F7CFF),
+        Look::Neon => (0x0B0620, 0xFF2BD6),
+        Look::Navigator => (0x1E2A33, 0x7FB0CF),
+        Look::Holo => (0x040A16, 0x7FD8FF),
+        Look::Tactical => (0x262626, 0x8FD14F),
+        Look::Command => (0x141A22, 0xFFB800),
+    }
+}
+
+/// A one-line description of a look for the list.
+fn look_line(look: aivory_protocol::Look) -> &'static str {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => "Clean light screens, one rail",
+        Look::Bridge => "LCARS panels, orange and violet",
+        Look::Operator => "Rain wall with blue instruments",
+        Look::Neon => "A neon city, a tower per session",
+        Look::Navigator => "3D files with a toolchest",
+        Look::Holo => "See-through glass over rings",
+        Look::Tactical => "A calm radar of sessions",
+        Look::Command => "A village map and a command card",
+    }
+}
+
+/// The five colors of a look: page, panel, text, signal, wait.
+fn look_palette(look: aivory_protocol::Look) -> [u32; 5] {
+    use aivory_protocol::Look;
+    match look {
+        Look::Minimal => [0xF4F4F2, 0xFFFFFF, 0x1A1C22, 0x3B82F6, 0xE08A1E],
+        Look::Bridge => [0x050505, 0x2A2130, 0xF3E3CF, 0xFF9C00, 0x9C7BFF],
+        Look::Operator => [0x0A1020, 0x07120D, 0x8FD3AE, 0x2F7CFF, 0x9BFFC0],
+        Look::Neon => [0x0B0620, 0x0E1016, 0xE6E8EE, 0xFF2BD6, 0xE8DA3A],
+        Look::Navigator => [0x1E2A33, 0xC6C6C6, 0x111111, 0x5A7299, 0xFFC21A],
+        Look::Holo => [0x040A16, 0x0A182E, 0xDDF8FF, 0x4FD8FF, 0xFF9A4D],
+        Look::Tactical => [0x262626, 0x021206, 0x8FFFAE, 0x39FF6A, 0xFFB000],
+        Look::Command => [0x141A22, 0x1E2124, 0xE6E8DA, 0x5EA634, 0xFFC21A],
+    }
+}
+
+/// A box of the sketch of a look at a place.
+fn blk(x: f32, y: f32, w: f32, h: f32, c: u32, a: f32) -> gpui::Div {
+    div()
+        .absolute()
+        .left(px(x))
+        .top(px(y))
+        .w(px(w))
+        .h(px(h))
+        .bg(ink(c, a))
+}
+
+/// A tiny sketch of the frame of a look: its colors and the shape of its war room.
+fn look_sketch(look: aivory_protocol::Look) -> gpui::Div {
+    use aivory_protocol::Look;
+    let [page, panel, text, signal, wait] = look_palette(look);
+    let mut d = div()
+        .relative()
+        .flex_none()
+        .h(px(170.))
+        .w(px(340.))
+        .overflow_hidden()
+        .border_1()
+        .border_color(ink(PK, 0.4))
+        .bg(rgb(page));
+    match look {
+        Look::Minimal => {
+            d = d
+                .child(blk(0., 0., 44., 170., 0xE6E6E2, 1.))
+                .child(blk(60., 14., 200., 60., panel, 1.).rounded(px(6.)))
+                .child(blk(60., 86., 200., 60., panel, 1.).rounded(px(6.)));
+        }
+        Look::Bridge => {
+            d = d
+                .child(blk(0., 0., 26., 170., signal, 1.).rounded_tr(px(14.)))
+                .child(blk(26., 0., 300., 14., wait, 1.))
+                .child(blk(44., 30., 90., 100., panel, 1.).rounded(px(8.)))
+                .child(blk(144., 30., 110., 100., panel, 1.).rounded(px(8.)));
+        }
+        Look::Operator => {
+            for k in 0..9 {
+                d = d.child(blk(
+                    10. + k as f32 * 22.,
+                    6.,
+                    2.,
+                    40. + (k % 4) as f32 * 14.,
+                    text,
+                    0.5,
+                ));
+            }
+            d = d
+                .child(
+                    blk(14., 90., 110., 60., 0x0F1D40, 1.)
+                        .border_1()
+                        .border_color(rgb(signal)),
+                )
+                .child(
+                    blk(140., 90., 110., 60., panel, 1.)
+                        .border_1()
+                        .border_color(rgb(wait)),
+                );
+        }
+        Look::Neon => {
+            for k in 0..8 {
+                let h = 30. + ((k * 37) % 70) as f32;
+                let c = if k % 3 == 0 { signal } else { 0x4FB8C4 };
+                d = d.child(blk(14. + k as f32 * 26., 150. - h, 16., h, c, 0.85));
+            }
+            d = d.child(
+                blk(200., 10., 70., 40., panel, 1.)
+                    .border_1()
+                    .border_color(rgb(signal)),
+            );
+        }
+        Look::Navigator => {
+            d = d
+                .child(blk(14., 14., 220., 130., panel, 1.))
+                .child(blk(14., 14., 220., 18., signal, 1.))
+                .child(blk(244., 40., 40., 40., wait, 1.));
+        }
+        Look::Holo => {
+            d = d
+                .child(
+                    blk(110., 20., 110., 110., signal, 0.0)
+                        .rounded_full()
+                        .border_1()
+                        .border_color(ink(signal, 0.7)),
+                )
+                .child(
+                    blk(136., 46., 58., 58., signal, 0.0)
+                        .rounded_full()
+                        .border_1()
+                        .border_color(ink(signal, 0.9)),
+                )
+                .child(
+                    blk(12., 16., 84., 66., signal, 0.12)
+                        .border_1()
+                        .border_color(ink(wait, 0.8)),
+                )
+                .child(
+                    blk(236., 16., 84., 120., signal, 0.12)
+                        .border_1()
+                        .border_color(ink(signal, 0.7)),
+                );
+        }
+        Look::Tactical => {
+            d = d
+                .child(
+                    blk(80., 14., 130., 130., signal, 0.0)
+                        .rounded_full()
+                        .border_1()
+                        .border_color(ink(signal, 0.8)),
+                )
+                .child(
+                    blk(110., 44., 70., 70., signal, 0.0)
+                        .rounded_full()
+                        .border_1()
+                        .border_color(ink(signal, 0.5)),
+                )
+                .child(blk(142., 76., 6., 6., wait, 1.))
+                .child(
+                    blk(8., 14., 54., 130., panel, 1.)
+                        .border_1()
+                        .border_color(ink(signal, 0.6)),
+                );
+        }
+        Look::Command => {
+            d = d
+                .child(blk(0., 0., 250., 170., 0x5C7A2E, 1.))
+                .child(blk(40., 40., 46., 34., 0x8A5A3A, 1.))
+                .child(blk(120., 90., 46., 34., 0x8A5A3A, 1.))
+                .child(
+                    blk(250., 0., 80., 170., panel, 1.)
+                        .border_l_2()
+                        .border_color(rgb(0x6A7076)),
+                )
+                .child(blk(266., 60., 48., 48., signal, 1.));
+        }
+    }
+    d
+}
+
+/// The palette of a look as five labeled swatches in a column.
+fn look_palette_list(look: aivory_protocol::Look) -> gpui::Div {
+    let mut col = div().flex_1().min_w(px(0.)).flex().flex_col().gap(px(8.));
+    for (name, c) in ["Page", "Panel", "Text", "Signal", "Wait"]
+        .into_iter()
+        .zip(look_palette(look))
+    {
+        col = col.child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(12.))
+                .child(
+                    div()
+                        .size(px(26.))
+                        .bg(rgb(c))
+                        .border_1()
+                        .border_color(ink(PA, 0.5)),
+                )
+                .child(th(name))
+                .child(
+                    div().flex_1().flex().justify_end().child(
+                        div()
+                            .font_family(CODE)
+                            .text_size(px(S_CODE))
+                            .text_color(rgb(MUTED))
+                            .child(format!("#{c:06X}")),
+                    ),
+                ),
+        );
+    }
+    col
+}
+
+/// A small preview of a look: its page color with its signal color, framed in cyan when the
+/// look is in use.
+fn swatch(look: aivory_protocol::Look, used: bool, size: f32) -> gpui::Div {
+    let (page, signal) = look_colors(look);
+    div()
+        .flex_none()
+        .w(px(size))
+        .h(px(size))
+        .border_1()
+        .border_color(ink(PK, if used { 1. } else { 0.3 }))
+        .bg(rgb(page))
+        .flex()
+        .items_end()
+        .justify_end()
+        .child(div().w(px(size * 0.5)).h(px(size * 0.35)).bg(rgb(signal)))
 }
 
 pub struct HoloSettings {
@@ -1098,6 +1531,12 @@ impl Render for HoloSettings {
                     .into_any_element(),
             );
         }
+        // "Other": the full settings screen (providers, devices, machines, notifications).
+        left_tabs.push(
+            tab("ls-tab-Other", "All settings ›", PK, false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(HoloEvent::AllSettings)))
+                .into_any_element(),
+        );
         let mut left = div().flex().flex_col();
         let mut right = div().flex().flex_col().gap(px(14.));
         match self.section {
@@ -1108,26 +1547,42 @@ impl Render for HoloSettings {
                 for (k, (look, name)) in crate::look::LOOKS.into_iter().enumerate() {
                     let used = look == now;
                     left = left.child(
-                        row(
-                            format!("ls-look-{k}"),
-                            &format!("{:02}", k + 1),
-                            if used { PK } else { GY },
-                            name,
-                            "",
-                            if used { "In use" } else { "" },
-                            PK,
-                            look == shown,
-                        )
-                        .min_h(px(40.))
-                        .py(px(4.))
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.picked = Some(look);
-                            cx.notify();
-                        })),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(10.))
+                            .child(swatch(look, used, 28.))
+                            .child(
+                                row(
+                                    format!("ls-look-{k}"),
+                                    &format!("{:02}", k + 1),
+                                    if used { PK } else { GY },
+                                    name,
+                                    look_line(look),
+                                    if used { "In use" } else { "" },
+                                    PK,
+                                    look == shown,
+                                )
+                                .min_h(px(52.))
+                                .py(px(4.))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.picked = Some(look);
+                                    cx.notify();
+                                }))
+                                .flex_1()
+                                .min_w(px(0.)),
+                            ),
                     );
                 }
                 let name = crate::look::name(shown);
                 right = right
+                    .child(
+                        div()
+                            .flex()
+                            .gap(px(24.))
+                            .child(look_sketch(shown))
+                            .child(look_palette_list(shown)),
+                    )
                     .child(big(name))
                     .child(th(if shown == now {
                         "In use now"
@@ -1162,9 +1617,9 @@ impl Render for HoloSettings {
                                 "ls-auto",
                                 if auto { PK } else { GY },
                                 if auto {
-                                    "Autopilot on"
+                                    "Turn autopilot off"
                                 } else {
-                                    "Autopilot off"
+                                    "Turn autopilot on"
                                 },
                             )
                             .px(px(18.))
@@ -1237,17 +1692,26 @@ impl Render for HoloSettings {
                         ));
                     }
                 }
-                right = right.child(big("Providers and models")).child(prose(
-                    "Models, effort and permission mode per provider are set in the full settings.",
-                ));
+                right = right.child(big("Providers and models"));
+                if let Some(w) = &war {
+                    for u in w.usage.iter() {
+                        right = right.child(prose(&format!(
+                            "{} {} · {}% used",
+                            u.provider, u.label, u.pct
+                        )));
+                    }
+                }
+                right = right
+                    .child(prose(
+                        "Models, effort and permission mode of each provider are in the full settings.",
+                    ))
+                    .child(
+                        button("ls-all", Tone::Plain, "Open all settings")
+                            .on_click(cx.listener(|_, _, _, cx| cx.emit(HoloEvent::AllSettings))),
+                    );
             }
         }
-        let right_tabs = vec![
-            tab("rs-all", "All settings ›", PK, false)
-                .h(px(40.))
-                .on_click(cx.listener(|_, _, _, cx| cx.emit(HoloEvent::AllSettings)))
-                .into_any_element(),
-        ];
+        let right_tabs: Vec<AnyElement> = Vec::new();
         island(
             art,
             Island {

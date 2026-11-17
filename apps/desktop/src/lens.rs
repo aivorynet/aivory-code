@@ -832,7 +832,7 @@ impl LensScreen {
             .child(
                 div()
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .whitespace_nowrap()
                     .child(crumb),
@@ -1014,7 +1014,7 @@ impl LensScreen {
             .pl(px(indent(node.depth)))
             .pr(px(12.))
             .font_family(tk().mono)
-            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
             .cursor_pointer()
             .when(on, |d| d.bg(rgb(SELECTED)))
             .when(!on, |d| d.hover(|s| s.bg(rgb(ROW_HOVER))))
@@ -1243,11 +1243,7 @@ pub(crate) fn gb_button(
         .border_1()
         .border_color(rgb(BUTTON_BORDER))
         .bg(rgb(tk().card))
-        .text_size(crate::ui::ts(if small {
-            crate::theme::T_CAPTION
-        } else {
-            crate::theme::T_SMALL
-        }))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .whitespace_nowrap()
         .cursor_pointer()
         .hover(|s| s.border_color(rgb(BUTTON_BORDER_HOVER)))
@@ -1282,7 +1278,7 @@ fn note_line(text: &'static str) -> AnyElement {
         .flex_none()
         .px(px(16.))
         .py(px(14.))
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .text_color(rgb(tk().muted))
         .child(text)
         .into_any_element()

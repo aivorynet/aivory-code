@@ -74,6 +74,7 @@ pub(super) fn glow(color: u32, alpha: u32, blur: f32) -> Vec<BoxShadow> {
 /// panel and must differ per panel on one screen.
 pub(super) fn frame(color: u32, group: &'static str, bright: bool) -> Div {
     let panel = div()
+        .child(brackets(color))
         .relative()
         .flex()
         .flex_col()
@@ -88,12 +89,49 @@ pub(super) fn frame(color: u32, group: &'static str, bright: bool) -> Div {
             .shadow(glow(color, 0x48, 22.))
     } else {
         panel
-            .border_color(rgba(color << 8 | 0x66))
-            .shadow(glow(color, 0x14, 14.))
+            .border_color(rgba(color << 8 | 0x99))
+            .shadow(glow(color, 0x2E, 20.))
             .group(group)
-            .opacity(0.68)
+            .opacity(0.88)
             .group_hover(group, |s| s.opacity(1.))
     }
+}
+
+/// The corner brackets of a panel and a short bright line on its top edge: the same frame as the
+/// panels of the war room.
+fn brackets(color: u32) -> impl IntoElement {
+    canvas(
+        |_, _, _| (),
+        move |b: Bounds<Pixels>, _, window, _| {
+            let k = ui::factor();
+            let (a, t) = (16. * k, 2.);
+            let (x, y) = (f32::from(b.origin.x), f32::from(b.origin.y));
+            let (w, h) = (f32::from(b.size.width), f32::from(b.size.height));
+            let c = rgba(color << 8 | 0xFF);
+            let mut quad = |x: f32, y: f32, w: f32, h: f32, c: gpui::Rgba| {
+                window.paint_quad(fill(
+                    Bounds::new(point(px(x), px(y)), size(px(w), px(h))),
+                    c,
+                ));
+            };
+            for (cx, cy, dx, dy) in [
+                (x, y, 1., 1.),
+                (x + w, y, -1., 1.),
+                (x + w, y + h, -1., -1.),
+                (x, y + h, 1., -1.),
+            ] {
+                let hx = if dx > 0. { cx } else { cx - a };
+                let hy = if dy > 0. { cy } else { cy - t };
+                quad(hx, hy, a, t, c);
+                let vx = if dx > 0. { cx } else { cx - t };
+                let vy = if dy > 0. { cy } else { cy - a };
+                quad(vx, vy, t, a, c);
+            }
+            quad(x + a + 6., y, 56. * k, t, rgba(color << 8 | 0x90));
+        },
+    )
+    .absolute()
+    .inset_0()
 }
 
 /// A section title: Orbitron capitals in neon, with a note on the right.
@@ -149,7 +187,7 @@ pub(super) fn code(text: &str, color: u32) -> Div {
         .border_l_2()
         .border_color(rgba(color << 8 | 0xAA))
         .font_family(tk().mono)
-        .text_size(ui::ts(T_ENTRY - 1.))
+        .text_size(ui::ts(T_ENTRY))
         .line_height(ui::ts(20.))
         .text_color(rgb(PALE))
         .child(text.to_string())
@@ -173,7 +211,7 @@ pub(super) fn button(
         .cursor_pointer()
         .font_family(CHAKRA)
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(T_LABEL + 1.))
+        .text_size(ui::ts(T_ENTRY))
         .border_1()
         .border_color(rgb(color))
         .when(solid, |d| d.bg(rgb(color)).text_color(rgb(DARK)))
@@ -202,7 +240,7 @@ pub(super) fn menu_tab(
         .cursor_pointer()
         .font_family(CHAKRA)
         .font_weight(FontWeight::BOLD)
-        .text_size(ui::ts(T_LABEL + 1.))
+        .text_size(ui::ts(T_ENTRY))
         .border_b_2()
         .border_color(rgba(if on { color << 8 | 0xFF } else { 0 }))
         .bg(rgba(if on { color << 8 | 0x1C } else { 0 }))
@@ -284,6 +322,7 @@ fn row_with(
                 .flex_none()
                 .font_weight(FontWeight::BOLD)
                 .text_size(ui::ts(T_LABEL))
+                .line_height(ui::ts(21.))
                 .text_color(rgb(color))
                 .child(code_text.to_string()),
         )
@@ -301,14 +340,14 @@ fn row_with(
                         .text_color(rgb(if on { 0xFFFFFF } else { PALE }))
                         .child(title.to_string()),
                 )
-                .child(
+                .children((!note.is_empty()).then(|| {
                     div()
                         .truncate()
                         .text_size(ui::ts(T_LABEL))
                         .line_height(ui::ts(18.))
                         .text_color(rgb(MIST))
-                        .child(note.to_string()),
-                ),
+                        .child(note.to_string())
+                })),
         )
         .child(
             div()
@@ -361,6 +400,8 @@ pub(super) fn screen(
                                     .font_weight(FontWeight::EXTRA_BOLD)
                                     .text_size(ui::ts(T_SCREEN))
                                     .line_height(ui::ts(40.))
+                                    .max_w(px(760.))
+                                    .truncate()
                                     .text_color(rgb(color))
                                     .child(title.to_uppercase()),
                             )

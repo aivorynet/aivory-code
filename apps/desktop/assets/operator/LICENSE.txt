@@ -1,0 +1,3 @@
+Original art of AIVory Code, made for the Operator war room. No third-party images.
+room.jpg: generated with FLUX-2-klein-9b (DeepInfra) from docs/design/looks/operator-board/tools/flux_desk_room.py,
+then blurred, darkened and made gray. License: the same as this repository.

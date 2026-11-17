@@ -268,7 +268,7 @@ impl WarRoomScreen {
                                     .overflow_hidden()
                                     .whitespace_nowrap()
                                     .text_ellipsis()
-                                    .text_size(ui::ts(T_SMALL))
+                                    .text_size(ui::ts(T_CAPTION))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(cb.clone()),
                             )
@@ -282,14 +282,14 @@ impl WarRoomScreen {
                                     .rounded_full()
                                     .bg(rgb(tk().dark))
                                     .text_color(rgb(tk().card))
-                                    .text_size(ui::ts(11.))
+                                    .text_size(ui::ts(crate::theme::T_CAPTION))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child("Filter ×")
                             } else {
                                 div()
                                     .flex_none()
                                     .font_family(tk().mono)
-                                    .text_size(ui::ts(11.))
+                                    .text_size(ui::ts(crate::theme::T_CAPTION))
                                     .text_color(rgb(tk().ink_3))
                                     .child(format!("{}/{}", live.len(), slots))
                             }),
@@ -695,6 +695,7 @@ impl WarRoomScreen {
         let mut detail: Vec<String> = text_lines
             .into_iter()
             .skip_while(|l| l.trim().is_empty())
+            .filter(|l| l.trim() != question.trim() && l.trim() != pane.title.trim())
             .collect();
         if let Some(a) = ask {
             for (i, step) in a.steps.iter().enumerate() {
@@ -756,7 +757,8 @@ impl WarRoomScreen {
             .min_h(px(0.))
             .overflow_y_scroll()
             .track_scroll(&ask_scroll)
-            .p(px(20.))
+            .p(px(16.))
+            .pb(px(40.))
             .flex()
             .flex_col()
             .gap(px(12.))
@@ -771,8 +773,6 @@ impl WarRoomScreen {
                             .id("ask-title")
                             .flex_1()
                             .min_w(px(0.))
-                            .max_h(px(44.))
-                            .overflow_hidden()
                             .line_height(relative(1.45))
                             .text_size(ui::ts(T_BODY))
                             .font_weight(FontWeight::SEMIBOLD)
@@ -830,20 +830,22 @@ impl WarRoomScreen {
             });
         let footer = div()
             .flex_none()
-            .p(px(20.))
+            .pt(px(12.))
             .flex()
             .flex_col()
-            .gap(px(12.))
+            .gap(px(8.))
             .border_t_1()
             .border_color(ui::hsla(tk().line))
-            .child(
-                div()
-                    .text_size(ui::ts(T_SMALL))
-                    .line_height(relative(1.45))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(tk().ink))
-                    .child(question),
-            )
+            .when(question.trim() != pane.title.trim(), |d| {
+                d.child(
+                    div()
+                        .text_size(ui::ts(T_CAPTION))
+                        .line_height(relative(1.45))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgb(tk().ink))
+                        .child(question.clone()),
+                )
+            })
             .child(buttons)
             .when_some(input, |d, input| {
                 d.child(
@@ -861,7 +863,7 @@ impl WarRoomScreen {
                                 .items_center()
                                 .rounded_full()
                                 .bg(rgb(tk().track))
-                                .text_size(ui::ts(T_SMALL))
+                                .text_size(ui::ts(T_CAPTION))
                                 .child(div().flex_1().min_w(px(0.)).child(input)),
                         )
                         .child(
@@ -873,6 +875,9 @@ impl WarRoomScreen {
                         ),
                 )
             });
+        // The question, the answers and the own answer scroll with the context: a short card
+        // never draws one over the other.
+        let context = context.child(footer);
         div()
             .flex_1()
             .min_h(px(0.))
@@ -898,7 +903,6 @@ impl WarRoomScreen {
                         3.,
                     )),
             )
-            .child(footer)
     }
 
     /// "Let it fix": the agent fixes its error and goes on.
@@ -952,7 +956,7 @@ impl WarRoomScreen {
                     .bg(rgb(tk().card))
                     .border_1()
                     .border_color(ui::hsla(tk().line_2))
-                    .text_size(ui::ts(11.))
+                    .text_size(ui::ts(crate::theme::T_CAPTION))
                     .font_weight(FontWeight::SEMIBOLD)
                     .cursor_pointer()
                     .hover(|s| s.bg(rgb(tk().track_2)))
@@ -1027,7 +1031,7 @@ impl WarRoomScreen {
                     .overflow_hidden()
                     .flex_grow(1.)
                     .flex_basis(px(0.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .font_weight(FontWeight::MEDIUM)
                     .child(pane.title.clone()),
             )

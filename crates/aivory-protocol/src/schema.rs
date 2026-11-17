@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::demo::{self, Demo};
-use crate::rpc::{self, DeltaNote, WARROOM_DELTA};
+use crate::rpc::{self, DeltaNote, THEME_CHANGED, WARROOM_DELTA};
 use crate::{HistoryPage, RepoList, TaskList};
 
 /// One JSON Schema (draft 2020-12) document: `methods` maps each method name to the schemas of
@@ -22,6 +22,7 @@ pub fn document() -> Value {
         );
     }
     let delta = generator.subschema_for::<DeltaNote>();
+    let theme_changed = generator.subschema_for::<crate::theme::ThemeChanged>();
     let defs = generator.take_definitions(true);
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -29,7 +30,7 @@ pub fn document() -> Value {
         "description": "JSON-RPC 2.0 surface of aivoryd. Generated from crates/aivory-protocol; do not edit.",
         "version": crate::PROTOCOL_VERSION,
         "methods": methods,
-        "notifications": { WARROOM_DELTA: { "params": delta } },
+        "notifications": { WARROOM_DELTA: { "params": delta }, THEME_CHANGED: { "params": theme_changed } },
         "$defs": defs,
     })
 }
@@ -67,6 +68,27 @@ pub fn fixtures(demo: &Demo) -> Vec<(&'static str, Value)> {
         ("demo-repo-aivory-code.json", value(&repo("aivory-code"))),
         ("demo-map-aivory-code.json", value(&map("aivory-code"))),
         ("demo-settings.json", value(&demo.settings)),
+        (
+            "demo-machines-list.json",
+            value(&crate::mesh::MachineList {
+                machines: vec![
+                    crate::mesh::Machine {
+                        id: "local".into(),
+                        name: "This PC".into(),
+                        look: "operator".into(),
+                        local: true,
+                        online: true,
+                    },
+                    crate::mesh::Machine {
+                        id: "5e81c0de".into(),
+                        name: "MacBook".into(),
+                        look: "holo".into(),
+                        local: false,
+                        online: true,
+                    },
+                ],
+            }),
+        ),
         (
             "demo-session-a01c-spans.json",
             value(&demo.traces.get("a01c")),

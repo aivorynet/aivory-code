@@ -25,6 +25,7 @@ use crate::notice::Draft;
 use crate::theme::*;
 use crate::ui;
 
+mod machines;
 mod themes;
 
 /// The row divider inside a card: rgba(13,13,14,.06).
@@ -73,6 +74,7 @@ mod keys {
 
     pub const QUIET_HOURS: &str = "quietHours.on";
     pub const COFFEE_REMINDER: &str = "coffeeReminder";
+    pub const START_WITH_SYSTEM: &str = "startWithSystem";
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,9 +117,9 @@ impl Section {
         match self {
             Section::Providers => view.providers.len().to_string(),
             Section::Autopilot => if view.settings.autopilot.on {
-                "on"
+                "enabled"
             } else {
-                "off"
+                "disabled"
             }
             .to_string(),
             Section::Devices => (view.daemons.len() + view.devices.len()).to_string(),
@@ -429,7 +431,7 @@ fn badge(label: &str, tone: Tone) -> Div {
         .flex_none()
         .px(px(9.))
         .py(px(2.))
-        .rounded_full()
+        .rounded(crate::look::r_pill())
         .bg(rgb(bg))
         .text_color(rgb(text))
         .text_size(crate::ui::ts(crate::theme::T_CAPTION))
@@ -450,7 +452,7 @@ fn card() -> Div {
         .rounded(tk().r_card)
         .shadow(ui::card_shadow())
         .when(ui::irix(), |d| {
-            d.rounded(px(0.)).shadow(Vec::new()).bg(rgb(0xBDBDBD))
+            d.rounded(px(0.)).shadow(Vec::new()).bg(rgb(tk().page))
         })
         .when(ui::irix(), |d| ui::bevel_edges(true, d))
 }
@@ -484,14 +486,14 @@ fn section_head(title: &str, lead: Option<&str>) -> Div {
         .gap(px(10.))
         .child(
             div()
-                .text_size(crate::ui::ts(crate::theme::T_HEADING))
+                .text_size(crate::ui::ts(crate::theme::T_DISPLAY))
                 .font_weight(FontWeight::SEMIBOLD)
                 .when(ui::irix(), |d| {
                     // An etched section title, as in the other Navigator screens.
                     d.font_weight(FontWeight::BOLD)
                         .pb(px(6.))
                         .border_b_1()
-                        .border_color(rgb(0x6A6A6A))
+                        .border_color(rgb(tk().edge))
                 })
                 .child(title.to_string()),
         )
@@ -523,7 +525,7 @@ fn switch(on: bool) -> Div {
         .relative()
         .w(px(36.))
         .h(px(20.))
-        .rounded_full()
+        .rounded(crate::look::r_pill())
         .bg(rgb(if on { tk().primary } else { tk().switch_off }))
         .when(ui::irix(), |d| {
             d.rounded(px(0.))
@@ -535,7 +537,7 @@ fn switch(on: bool) -> Div {
                 .top(px(2.))
                 .left(px(if on { 18. } else { 2. }))
                 .size(px(16.))
-                .rounded_full()
+                .rounded(crate::look::r_pill())
                 .bg(rgb(tk().card))
                 .shadow(knob_shadow())
                 .when(ui::irix(), |d| d.rounded(px(0.)).shadow(Vec::new()))
@@ -553,7 +555,7 @@ fn button(id: impl Into<SharedString>, label: &str, primary: bool) -> Stateful<D
         .flex()
         .flex_none()
         .items_center()
-        .rounded(px(6.))
+        .rounded(crate::look::r_ctrl())
         .border_1()
         .border_color(rgb(if primary { tk().primary } else { button_line() }))
         .bg(rgb(if primary { tk().primary } else { tk().card }))
@@ -567,11 +569,11 @@ fn button(id: impl Into<SharedString>, label: &str, primary: bool) -> Stateful<D
         .when(ui::irix(), |d| {
             d.rounded(px(0.))
                 .border_0()
-                .bg(rgb(0xC8C8C8))
-                .text_color(rgb(0x111111))
+                .bg(rgb(tk().card))
+                .text_color(rgb(tk().ink))
         })
         .when(ui::irix() && primary, |d| {
-            d.border_2().border_color(rgb(0x111111))
+            d.border_2().border_color(rgb(tk().ink))
         })
         .when(ui::irix(), |d| ui::bevel_edges(true, d))
         .child(label.to_string())
@@ -610,7 +612,7 @@ fn usage_bar(window: &UsageWindow) -> Div {
             div()
                 .flex()
                 .justify_between()
-                .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                 .text_color(rgb(tk().ink_2))
                 .child(window.label.clone())
                 .child(
@@ -655,7 +657,8 @@ fn qr_view(qr: Qr) -> impl IntoElement {
                             point(x0 + px(start as f32 * module), y0 + px(y as f32 * module)),
                             size(px(len as f32 * module), px(module)),
                         ),
-                        rgb(tk().ink),
+                        // Always black on white: phone scanners do not read an inverted code.
+                        rgb(0x000000),
                     ));
                 }
             }
@@ -682,6 +685,8 @@ pub struct SettingsScreen {
     pairing_error: Option<String>,
     /// The pairing link is shown (and copied).
     link_shown: bool,
+    /// The Machines card (machine mesh).
+    machines: machines::Machines,
     /// The Add an ACP agent form is open.
     acp_open: bool,
     acp: AcpForm,
@@ -703,6 +708,7 @@ impl SettingsScreen {
             section: match std::env::var("AIVORY_SETTINGS").as_deref() {
                 Ok("about") => Section::Account,
                 Ok("display") => Section::Display,
+                Ok("devices") => Section::Devices,
                 _ => Section::Providers,
             },
             view: None,
@@ -714,6 +720,7 @@ impl SettingsScreen {
             pairing_busy: false,
             pairing_error: None,
             link_shown: false,
+            machines: machines::Machines::default(),
             acp_open: false,
             acp: AcpForm::default(),
             import: None,
@@ -813,8 +820,12 @@ impl SettingsScreen {
 
     fn select(&mut self, section: Section, cx: &mut Context<Self>) {
         self.section = section;
-        if section == Section::Devices && self.pairing.is_none() && self.pairing_error.is_none() {
+        // Retry after an error too: the daemon can come back with pairing on.
+        if section == Section::Devices && self.pairing.is_none() {
             self.pair(cx);
+        }
+        if section == Section::Devices {
+            self.load_peers(cx);
         }
         cx.notify();
     }
@@ -1205,7 +1216,7 @@ impl SettingsScreen {
                     .child(
                         div()
                             .px(px(2.))
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .font_family(t.sans)
                             .text_color(rgb(if on { tk().ink } else { tk().ink_2 }))
                             .when(on, |d| d.font_weight(FontWeight::MEDIUM))
@@ -1237,7 +1248,7 @@ impl SettingsScreen {
             .bg(rgb(tk().track))
             .rounded(tk().r_button);
         if ui::irix() {
-            track = ui::bevel_edges(false, track.rounded(px(0.)).bg(rgb(0xBDBDBD)).p(px(4.)));
+            track = ui::bevel_edges(false, track.rounded(px(0.)).bg(rgb(tk().page)).p(px(4.)));
         }
         for (i, choice) in choices.into_iter().enumerate() {
             let (key, value, on) = (key.to_string(), choice.value, choice.on);
@@ -1248,8 +1259,8 @@ impl SettingsScreen {
                     .px(px(if dense { 8. } else { 11. }))
                     .flex()
                     .items_center()
-                    .rounded(px(6.))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .rounded(crate::look::r_ctrl())
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .when_some(choice.font, |d, f| d.font_family(f))
                     .text_color(rgb(if on { tk().ink } else { tk().ink_2 }))
                     .whitespace_nowrap()
@@ -1269,8 +1280,8 @@ impl SettingsScreen {
                     .when(ui::irix(), |d| {
                         d.rounded(px(0.))
                             .shadow(Vec::new())
-                            .text_color(rgb(0x111111))
-                            .bg(rgb(if on { 0xA6A6A6 } else { 0xC8C8C8 }))
+                            .text_color(rgb(tk().ink))
+                            .bg(rgb(if on { tk().track } else { tk().card }))
                     })
                     .when(ui::irix(), |d| ui::bevel_edges(!on, d))
                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -1301,9 +1312,15 @@ impl SettingsScreen {
             .rounded(tk().r_button)
             .border_1()
             .border_color(rgba(tk().line_2))
-            .text_size(crate::ui::ts(crate::theme::T_SMALL));
+            .text_size(crate::ui::ts(crate::theme::T_CAPTION));
         if ui::irix() {
-            stepper = ui::bevel_edges(false, stepper.rounded(px(0.)).border_0().bg(rgb(0xFFFFFF)));
+            stepper = ui::bevel_edges(
+                false,
+                stepper
+                    .rounded(px(0.))
+                    .border_0()
+                    .bg(rgb(crate::look::field())),
+            );
         }
         for (suffix, label, delta) in [("dec", "−", -step), ("inc", "+", step)] {
             let key = key.clone();
@@ -1344,7 +1361,7 @@ impl SettingsScreen {
     fn header(&self) -> Div {
         div()
             .flex_none()
-            .h(HEADER_H)
+            .min_h(HEADER_H)
             .flex()
             .items_center()
             .gap(px(16.))
@@ -1353,7 +1370,7 @@ impl SettingsScreen {
             .border_b_1()
             .border_color(rgba(tk().line))
             .when(ui::irix(), |d| {
-                d.bg(rgb(0xBDBDBD)).border_color(rgb(0x6A6A6A))
+                d.bg(rgb(tk().page)).border_color(rgb(tk().edge))
             })
             .child(
                 div()
@@ -1362,7 +1379,7 @@ impl SettingsScreen {
                     .font_weight(FontWeight::NORMAL)
                     .when(ui::irix(), |d| {
                         d.font_family(tk().sans)
-                            .text_size(px(28.))
+                            .text_size(crate::ui::ts(crate::theme::T_DISPLAY))
                             .font_weight(FontWeight::BOLD)
                     })
                     .child("Settings"),
@@ -1370,14 +1387,14 @@ impl SettingsScreen {
             .child(match &self.save_error {
                 Some(error) => div()
                     .min_w(px(0.))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().e_text))
                     .whitespace_nowrap()
                     .overflow_hidden()
                     .text_ellipsis()
                     .child(error.clone()),
                 None => div()
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child("changes save at once"),
             })
@@ -1393,7 +1410,8 @@ impl SettingsScreen {
                 .border_b_1()
         } else {
             nav.flex_none()
-                .w(px(NAV_W))
+                // The nav grows with the text size: labels and counts stay inside.
+                .w(px(NAV_W * crate::ui::factor().max(1.)))
                 .h_full()
                 .flex_col()
                 .pt(px(20.))
@@ -1404,7 +1422,7 @@ impl SettingsScreen {
         }
         .border_color(rgba(tk().line));
         if ui::irix() {
-            nav = ui::bevel_edges(false, nav.bg(rgb(0xFFFFFF)).gap(px(0.)));
+            nav = ui::bevel_edges(false, nav.bg(rgb(crate::look::field())).gap(px(0.)));
             if !compact {
                 nav = nav
                     .h_auto()
@@ -1459,14 +1477,22 @@ impl SettingsScreen {
                         d.rounded(px(0.))
                             .shadow(Vec::new())
                             .h(px(40.))
-                            .bg(rgb(if on { 0x2F4A7A } else { 0xFFFFFF }))
-                            .text_color(rgb(if on { 0xFFFFFF } else { 0x111111 }))
+                            .bg(rgb(if on { 0x3D5A8A } else { crate::look::field() }))
+                            .text_color(rgb(if on { 0xFFFFFF } else { tk().ink }))
                     })
                     .on_click(cx.listener(move |this, _, _, cx| this.select(section, cx)))
-                    .child(section.label())
+                    .child(
+                        div()
+                            .when(!compact, |d| d.flex_1())
+                            .min_w(px(0.))
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .child(section.label()),
+                    )
                     .when(!compact && !count.is_empty(), |d| {
-                        d.child(div().flex_1()).child(
+                        d.child(
                             div()
+                                .flex_none()
                                 .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                                 .text_color(rgb(tk().ink_3))
                                 .child(count),
@@ -1588,7 +1614,7 @@ impl SettingsScreen {
         let line = |text: String| {
             div()
                 .font_family(tk().mono)
-                .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                 .text_color(rgb(tk().ink_2))
                 .child(text)
         };
@@ -1599,7 +1625,7 @@ impl SettingsScreen {
             card = card.child(
                 div()
                     .pt(px(6.))
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child("Not imported"),
             );
@@ -1652,7 +1678,7 @@ impl SettingsScreen {
                     )
                     .child(
                         div()
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .text_color(rgb(tk().ink_3))
                             .whitespace_nowrap()
                             .overflow_hidden()
@@ -1736,7 +1762,7 @@ impl SettingsScreen {
                 .gap(px(6.))
                 .child(
                     div()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().ink_3))
                         .child(label.to_string()),
                 )
@@ -2047,7 +2073,7 @@ impl SettingsScreen {
                     )
                     .child(
                         div()
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .text_color(rgb(tk().ink_3))
                             .whitespace_nowrap()
                             .overflow_hidden()
@@ -2159,10 +2185,11 @@ impl SettingsScreen {
     fn pair_card(&self, cx: &mut Context<Self>) -> Div {
         let qr_box = div()
             .flex_none()
-            .size(px(120.))
-            .p(px(8.))
+            // The iroh link is long: a large code scans from the phone camera.
+            .size(px(240.))
+            .p(px(12.))
             .rounded(px(10.))
-            .bg(rgb(tk().card))
+            .bg(rgb(0xFFFFFF))
             .shadow(vec![BoxShadow {
                 color: ui::hsla(0x0D0D0E1A),
                 offset: point(px(0.), px(0.)),
@@ -2183,7 +2210,7 @@ impl SettingsScreen {
         let code_line: Option<String> = match &self.pairing {
             Some((p, _)) => Some(code_text(&p.code, &self.model.read(cx).clock(p.expires))),
             None => self.pairing_error.as_ref().map(|_| {
-                "This daemon cannot pair a phone yet. Pairing comes with the hub.".to_string()
+                "This daemon cannot pair a phone. Start it with `aivoryd serve --iroh`.".to_string()
             }),
         };
         let link = self
@@ -2191,7 +2218,8 @@ impl SettingsScreen {
             .then(|| self.pairing.as_ref().map(|(p, _)| p.url.clone()))
             .flatten();
         let mut texts = div()
-            .min_w(px(0.))
+            // Below this width the texts go under the code.
+            .min_w(px(240.))
             .flex()
             .flex_col()
             .gap(px(3.))
@@ -2215,7 +2243,7 @@ impl SettingsScreen {
             texts = texts.child(
                 div()
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(line),
             );
@@ -2224,8 +2252,11 @@ impl SettingsScreen {
             texts = texts.child(
                 div()
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_3))
+                    .whitespace_nowrap()
+                    .overflow_hidden()
+                    .text_ellipsis()
                     .child(format!("link copied · {url}")),
             );
         }
@@ -2246,6 +2277,7 @@ impl SettingsScreen {
         );
         card()
             .flex_row()
+            .flex_wrap()
             .items_center()
             .gap(px(20.))
             .px(px(20.))
@@ -2265,8 +2297,22 @@ impl SettingsScreen {
                 Some("Daemons run the agents. Phones and other desktops connect to them through the hub."),
             ))
             .child(self.daemon_card(&view.daemons, view.settings.autopilot.max_running, cx))
+            .child(card().child(self.row(
+                true,
+                row_label(
+                    "Start with the system",
+                    "Start aivoryd when you sign in, so phones and scheduled tasks reach it. Off: the app starts it when it finds none.",
+                ),
+                self.toggle(
+                    "dev-autostart",
+                    view.settings.start_with_system,
+                    keys::START_WITH_SYSTEM.to_string(),
+                    cx,
+                ),
+            )))
             .child(self.phone_card(&view.devices, now, cx))
             .child(self.pair_card(cx))
+            .child(self.machines_card(cx))
     }
 
     fn notifications_section(&self, view: &SettingsView, cx: &mut Context<Self>) -> Div {
@@ -2424,7 +2470,7 @@ impl Render for SettingsScreen {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().muted))
                         .child(text),
                 );
@@ -2449,7 +2495,12 @@ impl Render for SettingsScreen {
             (px(32.), px(28.))
         };
         // One scroll id per section: a new section starts at the top.
-        let body = div().w_full().max_w(px(CONTENT_MAX)).child(body);
+        let body = div()
+            .w_full()
+            .max_w(px(
+                CONTENT_MAX * (1. + (crate::ui::factor() - 1.).max(0.) * 2.5)
+            ))
+            .child(body);
         let content = if tk().look == aivory_protocol::Look::Navigator {
             // The Navigator look shows a visible scroll bar.
             div()
@@ -2460,7 +2511,7 @@ impl Render for SettingsScreen {
                     SharedString::from(format!("settings-body-{}", self.section.index())),
                     &self.scroll,
                     false,
-                    div().px(pad.0).pt(pad.1).pb(px(48.)).child(body),
+                    div().w_full().px(pad.0).pt(pad.1).pb(px(48.)).child(body),
                 ))
                 .into_any_element()
         } else {
@@ -2684,7 +2735,7 @@ mod tests {
     fn nav_counts_match_the_artboard() {
         let view = demo();
         let counts: Vec<String> = Section::ALL.iter().map(|s| s.count(&view)).collect();
-        assert_eq!(counts, ["5", "on", "", "5", "", ""]);
+        assert_eq!(counts, ["5", "enabled", "", "5", "", ""]);
         assert_eq!(Section::Account.label(), "About and license");
         assert_eq!(Section::Devices.index(), 3);
     }

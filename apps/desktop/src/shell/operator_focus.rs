@@ -16,7 +16,7 @@ use gpui::{
 };
 use gpui_base::input::{InputEvent, InputState};
 
-use super::operator_screens::{btn, head_line, page};
+use super::operator_screens::{btn, head_line, page, page_full};
 use crate::actions::{Action, act};
 use crate::compose::{self, Tools};
 use crate::compose_controls::{ControlStyle, Controls};
@@ -59,6 +59,10 @@ pub struct OperatorFocus {
     scroll: ScrollHandle,
     /// The session and line count that the chat was last scrolled to the end for.
     scrolled: String,
+    /// Follow the newest chat line unless the owner scrolled up.
+    follow: Follow,
+    /// The Stop button waits for a second click.
+    stop_ask: bool,
     /// The chips of the composer: attachments, and the mode, model and effort of the next
     /// message when the owner changed them.
     tools: Tools,
@@ -114,8 +118,7 @@ impl OperatorFocus {
         cx: &mut Context<Self>,
     ) -> Self {
         let observe = cx.observe(&model, |_, _, cx| cx.notify());
-        let input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("tell the agent what to do"));
+        let input = cx.new(|cx| InputState::new(window, cx).placeholder("Message the agent…"));
         let weak = cx.weak_entity();
         crate::complete::attach(
             &input,
@@ -157,6 +160,8 @@ impl OperatorFocus {
             file: None,
             scroll: ScrollHandle::new(),
             scrolled: String::new(),
+            follow: Follow::default(),
+            stop_ask: false,
             tools: Tools::default(),
             controls: Controls::default(),
             console,
@@ -172,6 +177,7 @@ impl OperatorFocus {
             self.diff = None;
             self.file = None;
             self.scrolled.clear();
+            self.stop_ask = false;
             self.tools = Tools::default();
             self.controls = Controls::default();
             self.console.update(cx, |c, cx| c.show(id, cx));
@@ -300,7 +306,7 @@ fn fact(k: &str, v: String) -> Div {
 fn title(text: &str, color: u32) -> Div {
     div()
         .flex_none()
-        .text_size(ui::ts(T_SECTION))
+        .text_size(ts(T_SECTION))
         .text_color(rgb(color))
         .child(text.to_uppercase())
 }
@@ -342,7 +348,6 @@ impl Render for OperatorFocus {
             vec![("state".into(), state_word.into())]
         } else {
             vec![
-                ("session".into(), name(&p)),
                 ("agent".into(), p.provider.clone()),
                 ("state".into(), state_word.into()),
             ]
@@ -361,9 +366,22 @@ impl Render for OperatorFocus {
                     move |this, _, _, cx| act(&this.model, Action::Pause(sid.clone()), cx)
                 })),
             )
-            .child(btn("mf-stop".into(), "Stop", false).on_click(
-                cx.listener(move |this, _, _, cx| act(&this.model, Action::Stop(sid.clone()), cx)),
-            ))
+            .child(
+                btn(
+                    "mf-stop".into(),
+                    if self.stop_ask { "Stop now?" } else { "Stop" },
+                    self.stop_ask,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if this.stop_ask {
+                        this.stop_ask = false;
+                        act(&this.model, Action::Stop(sid.clone()), cx);
+                    } else {
+                        this.stop_ask = true;
+                    }
+                    cx.notify();
+                })),
+            )
             .child(
                 btn("mf-back".into(), "‹ War room", false)
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(OperatorFocusEvent::Back))),
@@ -394,11 +412,12 @@ impl Render for OperatorFocus {
             .border_b_1()
             .border_color(rgb(0x0E3A1C));
         // Whole names only: the tabs that fit, the open session always, and a "+N" tab.
-        let mut budget = (vw - if narrow { 80. } else { right_w + 110. }).max(240.);
+        let glyph = f32::from(ts(T_ENTRY)) * 0.62;
+        let mut budget = (vw - if narrow { 80. } else { right_w + 110. } - 260.).max(240.);
         let mut shown = 0usize;
         for (k, (sid, nm, st)) in sessions.iter().enumerate() {
             let on = *sid == p.id;
-            let width = nm.chars().count() as f32 * 7.8 + 60.;
+            let width = nm.chars().count() as f32 * glyph + 64.;
             if !on && width > budget {
                 continue;
             }
@@ -421,7 +440,7 @@ impl Render for OperatorFocus {
                     .items_center()
                     .gap(px(8.))
                     .cursor_pointer()
-                    .text_size(ui::ts(T_ENTRY))
+                    .text_size(ts(T_ENTRY))
                     .when(on, |d| d.bg(hca(GREEN, 40)).text_color(rgb(GREEN_HI)))
                     .when(!on, |d| {
                         d.text_color(rgb(GREEN_MID))
@@ -437,11 +456,15 @@ impl Render for OperatorFocus {
         if shown < sessions.len() {
             strip = strip.child(
                 div()
+                    .id("mf-tab-more")
                     .flex_none()
                     .px(px(14.))
-                    .text_size(ui::ts(T_ENTRY))
+                    .cursor_pointer()
+                    .text_size(ts(T_ENTRY))
                     .text_color(rgb(FOOT))
-                    .child(format!("+{}", sessions.len() - shown)),
+                    .hover(|h| h.text_color(rgb(GREEN_HI)))
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(OperatorFocusEvent::Back)))
+                    .child(format!("+{} more", sessions.len() - shown)),
             );
         }
 
@@ -449,9 +472,12 @@ impl Render for OperatorFocus {
         let lines = display_lines(&p, 80);
         let key = format!("{}:{}", p.id, p.lines_total);
         if self.scrolled != key {
-            self.scroll.scroll_to_bottom();
+            if !self.scrolled.starts_with(&format!("{}:", p.id)) {
+                self.follow.reset();
+            }
             self.scrolled = key;
         }
+        self.follow.update(&self.scroll);
         // The media of the newest lines: a thumbnail or a card under the console text.
         let media_style = MediaStyle {
             card: gpui::rgba(0x04170AF0),
@@ -480,7 +506,7 @@ impl Render for OperatorFocus {
             .pb(px(10.))
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
-            .text_size(ui::ts(T_ENTRY))
+            .text_size(ts(MX_SMALL))
             .line_height(relative(1.5))
             .child(div().flex_none().child(tokenize(&lines).into_text()))
             .children(previews);
@@ -530,12 +556,12 @@ impl Render for OperatorFocus {
                 .flex_col()
                 .gap(px(10.))
                 .bg(hca(BLUE_DIM, 235))
-                .text_size(ui::ts(T_ENTRY))
+                .text_size(ts(T_ENTRY))
                 .line_height(relative(1.5))
                 .text_color(rgb(BLUE_HI))
                 .child(
                     div()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child("INCOMING · WAITS FOR YOU"),
                 )
@@ -552,19 +578,19 @@ impl Render for OperatorFocus {
             let (bg, fg) = if on {
                 (rgb(0x9BFFC0), rgb(0x020A04))
             } else {
-                (gpui::rgba(0x00000000), rgb(0x6DB596))
+                (gpui::rgba(0x00000000), rgb(GREEN_MID))
             };
             div()
                 .id(eid(id))
                 .flex_none()
-                .h(px(20.))
-                .px(px(6.))
+                .h(px(26.))
+                .px(px(8.))
                 .flex()
                 .items_center()
                 .cursor_pointer()
                 .bg(bg)
                 .text_color(fg)
-                .text_size(ui::ts(T_LABEL))
+                .text_size(ts(T_ENTRY))
                 .hover(|h| h.bg(rgb(0x0F2A1C)).text_color(rgb(0xB8FFCC)))
                 .child(text)
         };
@@ -574,7 +600,7 @@ impl Render for OperatorFocus {
             .flex_wrap()
             .items_center()
             .gap(px(2.))
-            .text_size(ui::ts(T_LABEL))
+            .text_size(ts(T_LABEL))
             .child(self.controls.row(
                 "mf-ctl",
                 &p,
@@ -622,42 +648,19 @@ impl Render for OperatorFocus {
                 )),
             );
         }
-        // The prompt: one console line under a thin rule, like the shell of the session. No
-        // field box; the input text is the bright green of the console.
-        let composer = div()
-            .flex_none()
-            .min_h(ui::sw(30.))
-            .pt(px(6.))
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .border_t_1()
-            .border_color(hca(GREEN_DIM, 160))
-            .text_size(ui::ts(T_ENTRY))
-            .text_color(rgb(GREEN_MID))
-            .child(
-                div()
-                    .flex_none()
-                    .child(format!("{}@{}:~$", p.provider, p.codebase)),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w(px(0.))
-                    .text_color(rgb(GREEN_HI))
-                    .child(self.input.clone()),
-            )
-            .child(
-                div()
-                    .flex_none()
-                    .text_size(ui::ts(T_LABEL))
-                    .text_color(rgb(GREEN_DIM))
-                    .child(if p.ask.is_some() && p.controlled {
-                        "↵ answer"
-                    } else {
-                        "↵"
-                    }),
-            );
+        // The prompt: a familiar text field on the console (owner 2026-11-14).
+        let typing = gpui::Focusable::focus_handle(&self.input, cx).is_focused(window);
+        let composer = chat_field(
+            format!("To {} · {}", p.provider, p.codebase),
+            self.input.clone().into_any_element(),
+            if p.ask.is_some() && p.controlled {
+                "↵ Answer"
+            } else {
+                "↵ Enter"
+            },
+            typing,
+        )
+        .flex_none();
         let column = div()
             .absolute()
             .inset_0()
@@ -733,7 +736,7 @@ impl Render for OperatorFocus {
             .flex_col()
             .gap(px(10.))
             .overflow_hidden()
-            .text_size(ui::ts(T_ENTRY))
+            .text_size(ts(T_ENTRY))
             .child(title("Facts", BLUE_HI))
             .child(fact("model", p.model.clone()))
             .child(fact("context", format!("{}%", p.context_pct)))
@@ -742,12 +745,12 @@ impl Render for OperatorFocus {
             .child(fact("in this state", format!("{mins} min")));
         let facts = bezel(BLUE_RING)
             .flex_none()
-            .h(ui::sw(250.))
+            .h(ui::sw(290.))
             .child(screen(true, facts_body))
             .child(foot(
                 "A",
                 FOOT,
-                vec![("facts".into(), FOOT)],
+                vec![("model · context · tokens · cost".into(), FOOT)],
                 f32::from(ui::sw(30.)),
             ));
 
@@ -772,7 +775,7 @@ impl Render for OperatorFocus {
             .flex()
             .flex_col()
             .overflow_y_scroll()
-            .text_size(ui::ts(T_ENTRY))
+            .text_size(ts(T_ENTRY))
             .child(title(&format!("Changes · {}", files.len()), BLUE_HI).pb(px(10.)));
         if self.diff.is_none() {
             changes = changes.child(
@@ -781,11 +784,53 @@ impl Render for OperatorFocus {
                     .child("reading the changes…"),
             );
         } else if files.is_empty() {
+            // No file changed yet: the pane shows the last tool calls of the session.
+            use crate::console::display::{DKind, lines as display_all};
+            let calls: Vec<_> = display_all(&p.tail)
+                .into_iter()
+                .filter(|d| d.kind == DKind::Tool)
+                .collect();
             changes = changes.child(
                 div()
+                    .flex_none()
+                    .pb(px(8.))
                     .text_color(rgb(BLUE_SOFT))
-                    .child("The agent has not changed a file yet."),
+                    .child("No file changed yet. The last tool calls:"),
             );
+            for (k, d) in calls.iter().rev().take(12).enumerate() {
+                changes = changes.child(
+                    div()
+                        .id(eid(format!("mf-call-{k}")))
+                        .flex_none()
+                        .min_h(px(24.))
+                        .flex()
+                        .items_center()
+                        .gap(px(10.))
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(px(64.))
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_color(rgb(BLUE_HI))
+                                .child(d.label.clone().unwrap_or_default()),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .text_color(rgb(BLUE))
+                                .child(d.text.clone()),
+                        ),
+                );
+            }
+            if calls.is_empty() {
+                changes = changes.child(div().text_color(rgb(BLUE_SOFT)).child("none yet"));
+            }
+            changes = changes.child(div().flex_none().h(px(PAD)));
         }
         for (k, f) in files.iter().take(8).enumerate() {
             let on = cur.as_ref().is_some_and(|c| c.path == f.path);
@@ -816,14 +861,14 @@ impl Render for OperatorFocus {
                     .child(
                         div()
                             .flex_none()
-                            .text_size(ui::ts(T_LABEL))
+                            .text_size(ts(T_LABEL))
                             .text_color(rgb(BLUE_HI))
                             .child(format!("+{}", f.added)),
                     )
                     .child(
                         div()
                             .flex_none()
-                            .text_size(ui::ts(T_LABEL))
+                            .text_size(ts(T_LABEL))
                             .text_color(rgb(BLUE_SOFT))
                             .child(format!("-{}", f.removed)),
                     ),
@@ -837,7 +882,7 @@ impl Render for OperatorFocus {
                         .flex_none()
                         .mt(px(12.))
                         .mb(px(6.))
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child(f.path.to_uppercase()),
                 )
@@ -861,7 +906,7 @@ impl Render for OperatorFocus {
                 changes = changes.child(
                     div()
                         .flex_none()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(color))
                         .child(format!("{mark}{}", l.text)),
                 );
@@ -876,7 +921,7 @@ impl Render for OperatorFocus {
                 .flex()
                 .items_center()
                 .cursor_pointer()
-                .text_size(ui::ts(T_SECTION))
+                .text_size(ts(T_SECTION))
                 .text_color(rgb(if on { BLUE_HI } else { BLUE_SOFT }))
                 .when(on, |d| d.bg(rgb(BLUE_DIM)))
                 .when(!on, |d| d.hover(|h| h.text_color(rgb(BLUE_HI))))
@@ -948,7 +993,7 @@ impl Render for OperatorFocus {
                 FOOT,
                 vec![(
                     if self.tab != Tab::Console {
-                        "diff of the session"
+                        "files changed · last tool calls"
                     } else {
                         "console output"
                     }
@@ -984,7 +1029,7 @@ impl Render for OperatorFocus {
                 .children(tabs_out)
                 .child(div().flex_1().min_h(px(0.)).flex().child(shown))
                 .into_any_element();
-            return page(head, vec![body]);
+            return page_full(head, vec![body]);
         }
         let body: AnyElement = div()
             .flex_1()
@@ -994,6 +1039,6 @@ impl Render for OperatorFocus {
             .child(strip)
             .child(div().flex_1().min_h(px(0.)).flex().child(center))
             .into_any_element();
-        page(head, vec![body, right])
+        page_full(head, vec![body, right])
     }
 }

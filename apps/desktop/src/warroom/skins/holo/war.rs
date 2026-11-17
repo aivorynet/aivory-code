@@ -237,9 +237,12 @@ impl Picture {
         let col = (width - 40.) / 2.;
         let x0 = ox + (g.cw - width) / 2.;
         let base = oy + g.ch - 6.;
-        for (n, (name, color)) in [("AGENTS AT WORK", SA), ("AGENTS THAT WAIT", OR)]
-            .iter()
-            .enumerate()
+        for (n, (name, color)) in [
+            ("AGENTS AT WORK · 60 MIN", SA),
+            ("AGENTS THAT WAIT · 60 MIN", OR),
+        ]
+        .iter()
+        .enumerate()
         {
             let x = x0 + n as f32 * (col + 40.);
             let series: Vec<f32> = self
@@ -298,7 +301,7 @@ impl Picture {
 fn mono(text: impl Into<SharedString>, color: u32) -> Div {
     div()
         .font_family(CODE)
-        .text_size(px(S_SMALL - 1.))
+        .text_size(px(S_SMALL))
         .line_height(px(S_SMALL + 6.))
         .text_color(rgb(color))
         .child(text.into())
@@ -583,12 +586,12 @@ impl WarRoomScreen {
                         div()
                             .font_family(FIGURE)
                             .font_weight(gpui::FontWeight::BOLD)
-                            .text_size(px(S_BIG - 3.))
+                            .text_size(px(S_SECTION))
                             .line_height(px(S_BIG - 3.))
                             .text_color(rgb(TXT))
                             .child(list.len().to_string()),
                     )
-                    .child(th("Live").text_size(px(S_SMALL - 2.))),
+                    .child(th("Live").text_size(px(S_SMALL))),
             );
         if list.is_empty() {
             center = center.child(
@@ -690,7 +693,7 @@ impl WarRoomScreen {
                         .cursor_pointer()
                         .font_family(LABEL)
                         .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_size(px(S_SMALL + 1.))
+                        .text_size(px(S_SMALL))
                         .text_color(ink(if waits { GD } else { PA }, 0.9))
                         .hover(|s| s.text_color(rgb(TXT)))
                         .child(
@@ -729,7 +732,7 @@ impl WarRoomScreen {
                 .border_1()
                 .border_color(ink(PK, 0.4))
                 .font_family(LABEL)
-                .text_size(px(S_SMALL + 1.))
+                .text_size(px(S_SMALL))
                 .text_color(ink(PA, 0.95))
                 .cursor_pointer()
                 .hover(|s| s.bg(ink(PK, 0.3)).border_color(ink(PK, 0.8)))
@@ -917,7 +920,7 @@ impl WarRoomScreen {
                         .mt(px(8.))
                         .font_family(LABEL)
                         .font_weight(gpui::FontWeight::BOLD)
-                        .text_size(px(S_BIG - 4.))
+                        .text_size(px(S_SECTION))
                         .line_height(px(S_BIG + 2.))
                         .text_color(rgb(PA))
                         .child("Nothing waits for you."),
@@ -970,7 +973,7 @@ impl WarRoomScreen {
                 div()
                     .font_family(LABEL)
                     .font_weight(gpui::FontWeight::BOLD)
-                    .text_size(px(S_BIG - 3.))
+                    .text_size(px(S_SECTION))
                     .line_height(px(S_BIG + 1.))
                     .text_color(rgb(WARM))
                     .child(headline),
@@ -978,7 +981,7 @@ impl WarRoomScreen {
         if let Some(text) = detail {
             body = body.child(
                 code(&clip(&text, 220), OR)
-                    .max_h(px(120.))
+                    .max_h(crate::ui::ts(120.))
                     .overflow_hidden(),
             );
         }
@@ -996,7 +999,17 @@ impl WarRoomScreen {
                     .filter(|t| !t.trim().is_empty())
             });
         // The lines that fit under the command: about 25 px each, whole sentences first.
-        let fit = ((dec_h - 380.) / 25.).floor().clamp(0., 4.) as usize;
+        let sc = (f32::from(crate::ui::ts(100.)) / 100.).max(1.);
+        let fit = ((dec_h - 380. * sc) / (25. * sc)).floor().clamp(0., 4.) as usize;
+        let why_shown = why.is_some() && fit > 0;
+        if !why_shown {
+            // No reason known: show the session, so the card has no empty gap.
+            body = body.child(th("Session")).child(
+                div()
+                    .text_color(ink(0xFFD9BD, 0.85))
+                    .child(clip(&pane.title, 60)),
+            );
+        }
         if let Some(why) = why
             && fit > 0
         {
@@ -1035,16 +1048,28 @@ impl WarRoomScreen {
             }
         }
         let (open_id, park_id) = (pane.id.clone(), pane.id.clone());
-        let mut links = div().flex().items_center().justify_between().child(
-            link("holo-open", "Open session ›", GD).on_click(cx.listener(
-                move |_this, _, _, cx| {
-                    cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
-                },
-            )),
+        let mut links = div()
+            .flex()
+            .flex_wrap()
+            .gap_x(px(12.))
+            .items_center()
+            .justify_between()
+            .child(
+                link("holo-open", "Open session ›", GD).on_click(cx.listener(
+                    move |_this, _, _, cx| {
+                        cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
+                    },
+                )),
+            );
+        let after_park = next.clone();
+        links = links.child(
+            link("holo-park", "Park for later", MUTED)
+                .tooltip(crate::ui::tip("Park this ask and show the next one"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.act(Action::Park(park_id.clone()), cx);
+                    this.holo.pick = after_park.clone();
+                })),
         );
-        links = links.child(link("holo-park", "Park", MUTED).on_click(
-            cx.listener(move |this, _, _, cx| this.act(Action::Park(park_id.clone()), cx)),
-        ));
         if total > 1 {
             links = links.child(link("holo-next", "Next ›", PA).on_click(cx.listener(
                 move |this, _, _, cx| {
@@ -1060,7 +1085,7 @@ impl WarRoomScreen {
             .child(body)
             .child(first)
             .child(rest)
-            .child(links)
+            .child(links.mt_auto())
     }
 
     /// Today: the busiest usage window as a ring, every window as a bar, and the cost.
@@ -1112,7 +1137,7 @@ impl WarRoomScreen {
                         .flex_col()
                         .gap(px(4.))
                         .child(th(u.provider.clone()))
-                        .child(th(u.label.clone()).text_color(rgb(PA)))
+                        .child(th(short_window(&u.label)).text_color(rgb(PA)))
                         .child(mono(resets(u), 0x5F95B8))
                         .child(mono(footer, 0x5F95B8)),
                 )
@@ -1149,12 +1174,16 @@ impl WarRoomScreen {
                             // A long window name gets an ellipsis; the reset time and the
                             // percent stay inside the card.
                             .child(
-                                th(format!("{} {}", u.provider, u.label))
+                                th(format!("{} {}", u.provider, short_window(&u.label)))
                                     .flex_1()
                                     .min_w(px(0.))
                                     .truncate(),
                             )
-                            .child(mono(resets(u), 0x5F95B8).flex_none().whitespace_nowrap())
+                            .child(
+                                mono(resets(u).replace("resets ", ""), 0x5F95B8)
+                                    .flex_none()
+                                    .whitespace_nowrap(),
+                            )
                             .child(mono(format!("{}%", u.pct), PA).flex_none()),
                     )
                     .child(meter(u.pct, color_of(u))),
@@ -1188,37 +1217,94 @@ impl WarRoomScreen {
         }
         meta.push_str(&format!("{} m · {} tok", minutes, kilo(pane.tokens)));
         let goal = pane.prompt.lines().next().unwrap_or("").trim();
-        let steps: Vec<(String, String)> = pane
+        let flat = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+        let last_of = |kind: aivory_protocol::LineKind| -> String {
+            pane.tail
+                .iter()
+                .rev()
+                .find(|l| l.kind == kind && !l.text.trim().is_empty())
+                .map(|l| flat(&l.text))
+                .unwrap_or_default()
+        };
+        let said = last_of(aivory_protocol::LineKind::Agent);
+        let asked = {
+            let u = last_of(aivory_protocol::LineKind::User);
+            if u.is_empty() { flat(goal) } else { u }
+        };
+        // What it does now: the latest tool call, one small mono line on a dim glass inset.
+        let now = pane
             .tail
             .iter()
-            .filter(|l| l.kind == aivory_protocol::LineKind::Tool)
             .rev()
-            .take(3)
+            .find(|l| l.kind == aivory_protocol::LineKind::Tool)
             .map(|l| {
                 (
                     l.label.clone().unwrap_or_else(|| "Tool".to_string()),
                     super::super::common::short_tool("", &l.text),
                 )
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-        let mut steps_box = div().flex().flex_col().gap(px(12.));
-        for (label, text) in steps {
-            steps_box = steps_box.child(
+            });
+        let chat_line = |who: &str, color: u32, text: String, size: f32, lines: f32| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(2.))
+                .child(
+                    div()
+                        .font_family(LABEL)
+                        .font_weight(gpui::FontWeight::BOLD)
+                        .text_size(px(S_SMALL))
+                        .text_color(rgb(color))
+                        .child(who.to_uppercase()),
+                )
+                .child(
+                    div()
+                        .max_h(px((size + 5.) * lines))
+                        .overflow_hidden()
+                        .font_family(LABEL)
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_size(px(size))
+                        .line_height(px(size + 5.))
+                        .text_color(rgb(if who == "You" { DIM } else { TXT }))
+                        .child(text),
+                )
+        };
+        let mut chat = div().flex().flex_col().gap(px(10.));
+        if !asked.is_empty() {
+            chat = chat.child(chat_line("You", PK, asked, S_LEAD, 2.));
+        }
+        chat = chat.child(chat_line(
+            &provider_name(&pane.provider),
+            OR,
+            if said.is_empty() {
+                "Has not written yet.".to_string()
+            } else {
+                said
+            },
+            S_BIG,
+            4.,
+        ));
+        if let Some((label, text)) = now {
+            chat = chat.child(
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(10.))
-                    .child(verb(&label))
+                    .gap(px(8.))
+                    .px(px(10.))
+                    .py(px(6.))
+                    .rounded(px(4.))
+                    .bg(ink(0x03172A, 0.55))
+                    .border_1()
+                    .border_color(ink(PK, 0.18))
+                    .child(div().w(px(6.)).h(px(6.)).rounded_full().bg(rgb(PK)))
                     .child(
                         div()
                             .flex_1()
                             .min_w(px(0.))
-                            .max_h(px(36.))
+                            .max_h(px(20.))
                             .overflow_hidden()
-                            .child(mono(text, 0xBFE6F7)),
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(mono(format!("{} {}", label.to_lowercase(), text), 0x9FD9F2)),
                     ),
             );
         }
@@ -1226,7 +1312,7 @@ impl WarRoomScreen {
         panel("Selected", false)
             .flex_1()
             .min_h(px(0.))
-            .gap(px(12.))
+            .gap(px(10.))
             .child(
                 div()
                     .flex_1()
@@ -1234,28 +1320,20 @@ impl WarRoomScreen {
                     .overflow_hidden()
                     .flex()
                     .flex_col()
-                    .gap(px(12.))
+                    .gap(px(10.))
                     .child(
                         div()
-                            .max_h(px((S_BIG + 1.) * 2.))
+                            .max_h(px((S_SECTION + 4.) * 2.))
                             .overflow_hidden()
                             .font_family(LABEL)
                             .font_weight(gpui::FontWeight::BOLD)
-                            .text_size(px(S_BIG - 3.))
+                            .text_size(px(S_SECTION))
                             .line_height(px(S_BIG + 1.))
                             .text_color(rgb(TXT))
                             .child(format!("{}/{}", pane.codebase, pane.title)),
                     )
                     .child(mono(meta, 0x5F95B8))
-                    .child(
-                        div()
-                            .max_h(px(LH_BODY * 3.))
-                            .overflow_hidden()
-                            .text_color(rgb(PA))
-                            .line_height(px(LH_BODY))
-                            .child(goal.to_string()),
-                    )
-                    .child(steps_box)
+                    .child(chat)
                     .child(
                         div()
                             .flex()
@@ -1266,14 +1344,26 @@ impl WarRoomScreen {
                             .child(mono(format!("{}%", pane.context_pct), PA)),
                     ),
             )
-            .child(div().flex().justify_between().child(
-                link("holo-sel-open", "Open session ›", PK).on_click(cx.listener(
-                    move |_this, _, _, cx| {
+            .child(
+                button("holo-sel-open", Tone::Plain, "Focus  ›")
+                    .bg(ink(PK, 0.24))
+                    .text_color(rgb(0xFFFFFF))
+                    .w_full()
+                    .min_h(px(40.))
+                    .on_click(cx.listener(move |_this, _, _, cx| {
                         cx.emit(crate::warroom::WarRoomEvent::OpenSession(open_id.clone()));
-                    },
-                )),
-            ))
+                    })),
+            )
     }
+}
+
+/// A short name of a usage window: "Gemini month", not "Gemini monthly".
+fn short_window(label: &str) -> String {
+    label
+        .replace("Monthly", "month")
+        .replace("monthly", "month")
+        .replace("Weekly", "week")
+        .replace("weekly", "week")
 }
 
 fn legend_row(name: &str, color: u32) -> Div {
@@ -1319,7 +1409,10 @@ fn events_panel(war: &WarRoom, height: f32) -> Div {
                     div()
                         .max_h(px((S_SMALL + 6.) * 2.))
                         .overflow_hidden()
-                        .child(mono(format!("{}/{} {}", s.codebase, s.title, text), color)),
+                        .child(mono(
+                            clip(&format!("{}/{} {}", s.codebase, s.title, text), 84),
+                            color,
+                        )),
                 ),
         );
     }

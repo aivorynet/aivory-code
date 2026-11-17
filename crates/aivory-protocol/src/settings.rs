@@ -219,6 +219,10 @@ pub struct Settings {
     /// One quiet coffee hint per app start. Old JSON has no value: on.
     #[serde(default = "Settings::default_coffee_reminder")]
     pub coffee_reminder: bool,
+    /// Start the daemon when the user signs in (a Task Scheduler task, a LaunchAgent or a
+    /// systemd user unit). Off: the app starts the daemon when it finds none. Old JSON: off.
+    #[serde(default)]
+    pub start_with_system: bool,
 }
 
 impl Settings {

@@ -40,13 +40,8 @@ impl Shell {
         let here = self.screen.rail();
         let nav = |id: &'static str, text: String, screen: Screen, cx: &mut Context<Self>| {
             let on = here == screen;
-            div()
+            keycap(on)
                 .id(id)
-                .flex_none()
-                .cursor_pointer()
-                .text_size(ui::ts(MX_BODY))
-                .text_color(rgb(if on { GREEN_HI } else { GREEN_MID }))
-                .hover(|h| h.text_color(rgb(GREEN_HI)))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.look_menu = false;
                     this.go(screen.clone(), cx);
@@ -56,17 +51,20 @@ impl Shell {
         let mut top = div()
             .flex_none()
             .min_h(ui::sw(TOP_H))
-            .px(px(30.))
-            .py(px(6.))
+            .px(px(24.))
+            .py(px(8.))
             .flex()
             .flex_wrap()
             .items_center()
-            .gap_x(px(26.))
-            .gap_y(px(4.))
+            .gap_x(px(10.))
+            .gap_y(px(6.))
+            .bg(rgb(0x0B0D0D))
+            .border_b_1()
+            .border_color(rgb(0x000000))
             .child(
                 div()
                     .flex_none()
-                    .text_size(ui::ts(MX_TITLE))
+                    .text_size(ts(MX_TITLE))
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(rgb(GREEN_HI))
                     .child("AIVORY//OPERATOR"),
@@ -81,62 +79,47 @@ impl Shell {
             .child(nav("mx-f3", "F3 tasks".into(), Screen::Tasks, cx))
             .child(nav("mx-f4", "F4 repos".into(), Screen::Repos, cx))
             .child(nav("mx-f5", "F5 settings".into(), Screen::Settings, cx))
-            .children(crate::new_session::launch_buttons(
+            .children(crate::new_session::launch_buttons_open(
                 "operator",
-                |id, label| {
-                    div()
-                        .id(id)
-                        .flex_none()
-                        .cursor_pointer()
-                        .text_size(ui::ts(MX_BODY))
-                        .text_color(rgb(GREEN_MID))
-                        .hover(|h| h.text_color(rgb(GREEN_HI)))
-                        .child(if label == "Organizer" {
-                            "F6 organizer"
-                        } else {
-                            "F7 new task"
-                        })
+                self.launcher_open(cx),
+                |id, label, on| {
+                    keycap(on).id(id).child(if label == "Organizer" {
+                        "Organizer"
+                    } else {
+                        "New session"
+                    })
                 },
             ));
-        if let Screen::Session(id) = &self.screen {
-            top = top.child(
-                div()
-                    .flex_none()
-                    .text_size(ui::ts(MX_BODY))
-                    .text_color(rgb(GREEN_HI))
-                    .child(format!(
-                        "session {}",
-                        id.chars().take(6).collect::<String>()
-                    )),
-            );
-        }
-        let crumb = match &self.screen {
-            Screen::Session(_) => Some("session"),
-            Screen::Lens => Some("lens"),
-            _ => None,
-        };
-        if let Some(crumb) = crumb {
-            top = top.child(
-                div()
-                    .text_size(ui::ts(MX_BODY))
-                    .text_color(rgb(GREEN_HI))
-                    .child(crumb),
-            );
-        }
         top = top
             .child(div().flex_1().min_w(px(0.)))
             .child(
                 div()
+                    .id("mx-stat-agents")
                     .flex_none()
-                    .text_size(ui::ts(MX_BODY))
+                    .cursor_pointer()
+                    .text_size(ts(MX_BODY))
                     .text_color(rgb(GREEN_MID))
+                    .hover(|h| h.text_color(rgb(GREEN_HI)))
+                    .tooltip(ui::tip("Open the war room"))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.look_menu = false;
+                        this.go(Screen::WarRoom, cx);
+                    }))
                     .child(format!("{live} agents · {idle} idle")),
             )
             .child(
                 div()
+                    .id("mx-stat-asks")
                     .flex_none()
-                    .text_size(ui::ts(MX_BODY))
+                    .cursor_pointer()
+                    .text_size(ts(MX_BODY))
                     .text_color(rgb(BLUE))
+                    .hover(|h| h.text_color(rgb(BLUE_HI)))
+                    .tooltip(ui::tip("Open the inbox"))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.look_menu = false;
+                        this.go(Screen::Inbox, cx);
+                    }))
                     .child(format!("{asks} decisions")),
             )
             .child(self.operator_look_switch(cx));
@@ -193,7 +176,7 @@ impl Shell {
             .flex_col()
             .bg(rgb(PAGE))
             .font_family(FONT)
-            .text_size(ui::ts(MX_BODY))
+            .text_size(ts(MX_BODY))
             .text_color(rgb(GREEN))
             .child(top)
             .child(div().relative().flex_1().min_h(px(0.)).child(content))
@@ -381,7 +364,7 @@ impl Shell {
                 .items_center()
                 .whitespace_nowrap()
                 .cursor_pointer()
-                .text_size(ui::ts(MX_BODY))
+                .text_size(ts(MX_BODY))
                 .text_color(rgb(if on { GREEN_HI } else { GREEN_MID }))
                 .hover(|h| h.text_color(rgb(GREEN_HI)))
                 .child(label)

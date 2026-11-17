@@ -621,7 +621,8 @@ impl ReposScreen {
     /// Paint a form above everything; a click outside closes it.
     fn overlay(&self, el: Div, cx: &mut Context<Self>) -> AnyElement {
         deferred(
-            el.occlude()
+            el.map(crate::overlay_style::skin)
+                .occlude()
                 .on_mouse_down_out(cx.listener(|this, _, _, cx| {
                     let open = std::mem::replace(&mut this.popup, Popup::None);
                     this.closed = Some((open, Instant::now()));
@@ -759,6 +760,7 @@ impl ReposScreen {
             },
             task: None,
             attachments: Vec::new(),
+            node: None,
         };
         let call = self.model.read(cx).call::<method::SessionNew>(params, cx);
         cx.spawn(async move |this, cx| {
@@ -832,7 +834,7 @@ impl ReposScreen {
             )
             .child(
                 div()
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(header_text(codebases)),
             )
@@ -994,7 +996,7 @@ impl ReposScreen {
                             .flex_col()
                             .child(
                                 div()
-                                    .text_size(crate::ui::ts(crate::theme::T_HEADING))
+                                    .text_size(crate::ui::ts(crate::theme::T_DISPLAY))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(cb.id.clone()),
                             )
@@ -1003,7 +1005,7 @@ impl ReposScreen {
                                 div()
                                     .flex()
                                     .gap(px(6.))
-                                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                                     .text_color(rgb(tk().ink_3))
                                     .child(div().font_family(tk().mono).child(cb.path.clone()))
                                     .child(format!("· {}", fact_line(cb))),
@@ -1124,7 +1126,12 @@ impl ReposScreen {
         if !flow.is_empty() {
             col = col.child(flow_card(cb, flow));
         }
-        col.child(split).into_any_element()
+        col = col.child(split);
+        // Minimal: a card of the live sessions fills the lower area of a tall window.
+        if tk().look == aivory_protocol::Look::Minimal && !live.is_empty() {
+            col = col.child(live_card(live, &cb.id));
+        }
+        col.into_any_element()
     }
 
     fn parts_table(&self, parts: &[PartStats], live: &[Live], now: UnixMs) -> Div {
@@ -1171,7 +1178,7 @@ impl ReposScreen {
             let mono = |text: String| {
                 div()
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .whitespace_nowrap()
                     .child(text)
@@ -1193,8 +1200,11 @@ impl ReposScreen {
                         cell(None).child(
                             div()
                                 .min_w(px(0.))
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
                                 .font_family(tk().mono)
-                                .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                                 .text_color(rgb(tk().ink_2))
                                 .child(p.paths.join("  ")),
                         ),
@@ -1289,7 +1299,7 @@ impl ReposScreen {
                             .w_full()
                             .flex()
                             .font_family(tk().mono)
-                            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                             .line_height(relative(1.7))
                             .child(
                                 div()
@@ -1327,7 +1337,7 @@ impl ReposScreen {
                     div()
                         .px(px(14.))
                         .py(px(8.))
-                        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().muted))
                         .child("Loads the map…"),
                 );
@@ -1351,7 +1361,7 @@ impl ReposScreen {
                     .border_b_1()
                     .border_color(rgba(tk().line))
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .child(".aivory/map.toml")
                     .child(div().flex_1())
                     .when_some(byline, |d, text| {
@@ -1419,7 +1429,7 @@ impl ReposScreen {
                     .border_b_1()
                     .border_color(rgba(tk().line))
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .child(cb.path.clone())
                     .child(div().flex_1())
                     .child(
@@ -1581,7 +1591,7 @@ fn ghost_button(id: impl Into<ElementId>, label: &'static str, primary: bool) ->
 
 fn note_text(text: SharedString) -> Div {
     div()
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .text_color(rgb(tk().ink_3))
         .child(text)
 }
@@ -1591,7 +1601,7 @@ fn muted_note(text: &'static str) -> AnyElement {
         .flex_none()
         .px(px(16.))
         .py(px(14.))
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .text_color(rgb(tk().muted))
         .child(text)
         .into_any_element()
@@ -1603,7 +1613,7 @@ fn centered_note(text: &'static str) -> AnyElement {
         .flex()
         .items_center()
         .justify_center()
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .text_color(rgb(tk().muted))
         .child(text)
         .into_any_element()
@@ -1704,7 +1714,7 @@ fn file_row(i: usize, node: &FileNode, claim: Option<(String, bool)>) -> Statefu
         .pl(px(indent(node.depth)))
         .pr(px(14.))
         .font_family(tk().mono)
-        .text_size(crate::ui::ts(crate::theme::T_SMALL))
+        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
         .hover(|s| s.bg(rgb(row_hover())))
         .child(
             div()
@@ -1735,7 +1745,7 @@ fn activity_row(row: &ActivityRow, time: String, line: bool, narrow: bool) -> Di
             .w(px(w))
             .flex_none()
             .font_family(tk().mono)
-            .text_size(crate::ui::ts(crate::theme::T_SMALL))
+            .text_size(crate::ui::ts(crate::theme::T_CAPTION))
             .text_color(rgb(tk().ink_3))
             .whitespace_nowrap()
             .child(text)
@@ -1791,7 +1801,7 @@ fn activity_row(row: &ActivityRow, time: String, line: bool, narrow: bool) -> Di
                     .flex()
                     .gap(px(5.))
                     .font_family(tk().mono)
-                    .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                    .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                     .whitespace_nowrap()
                     .child(
                         div()
@@ -1830,7 +1840,7 @@ fn flow_card(cb: &Codebase, items: &[FlowItem]) -> Div {
                 .flex()
                 .items_baseline()
                 .gap(px(10.))
-                .text_size(crate::ui::ts(crate::theme::T_SMALL))
+                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                 .child(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
@@ -1894,17 +1904,20 @@ fn flow_box(sankey: Sankey) -> Div {
             .text_size(crate::ui::ts(crate::theme::T_CAPTION))
             .line_height(px(11.))
             .whitespace_nowrap()
+            .px(px(3.))
+            .rounded(px(3.))
+            .bg(ui::hsla(tk().card << 8 | 0xCC))
             .text_color(rgb(tk().ink));
         l = match label.column {
-            FlowColumn::Provider => l.right(relative(1. - frac + 0.008)),
+            FlowColumn::Provider => l.right(relative(1. - frac + 0.016)),
             FlowColumn::Part => l
-                .left(relative(frac + 0.008))
+                .left(relative(frac + 0.016))
                 .max_w(relative(0.3))
                 .overflow_hidden()
                 .text_ellipsis()
                 .font_weight(FontWeight::SEMIBOLD),
             FlowColumn::State => {
-                let l = l.left(relative(frac + 0.01));
+                let l = l.left(relative(frac + 0.018));
                 match label.state {
                     Some(SessionState::NeedsYou) => l
                         .text_color(rgb(tk().q_text))
@@ -2118,6 +2131,62 @@ fn short_ids(ids: &[String]) -> String {
         text.push_str(&format!(" +{}", ids.len() - 3));
     }
     text
+}
+
+/// The live sessions of one codebase as rows: a dot, the short id and the state.
+fn live_card(live: &[Live], codebase: &str) -> Div {
+    let rows: Vec<&Live> = live.iter().filter(|l| l.codebase == codebase).collect();
+    let mut card = div()
+        .flex_none()
+        .w_full()
+        .px(px(18.))
+        .py(px(14.))
+        .flex()
+        .flex_col()
+        .bg(rgb(tk().card))
+        .rounded(tk().r_card)
+        .shadow(ui::card_shadow())
+        .child(
+            div()
+                .pb(px(8.))
+                .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                .font_weight(FontWeight::BOLD)
+                .text_color(rgb(tk().ink_3))
+                .child(format!("LIVE SESSIONS · {}", rows.len())),
+        );
+    for (i, l) in rows.iter().enumerate() {
+        let label = match l.state {
+            SessionState::NeedsYou => "waits for you",
+            SessionState::Error => "error",
+            SessionState::Working => "working",
+            SessionState::Idle => "idle",
+            SessionState::Parked => "parked",
+            _ => "done",
+        };
+        card = card.child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .py(px(9.))
+                .when(i > 0, |d| d.border_t_1().border_color(rgba(ROW_LINE)))
+                .child(ui::state_dot(l.state, 8.))
+                .child(
+                    div()
+                        .font_family(tk().mono)
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                        .child(short_ids(std::slice::from_ref(&l.id))),
+                )
+                .child(div().flex_1())
+                .child(
+                    div()
+                        .text_size(crate::ui::ts(crate::theme::T_CAPTION))
+                        .text_color(rgb(tk().ink_2))
+                        .child(label),
+                ),
+        );
+    }
+    card
 }
 
 #[cfg(test)]

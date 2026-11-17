@@ -80,6 +80,9 @@ pub struct IrixFocus {
     tokens: Series,
     diff_scroll: ScrollHandle,
     files_scroll: ScrollHandle,
+    chat_scroll: ScrollHandle,
+    /// The list of the sessions that do not fit in the key row is open.
+    more_open: bool,
     _subs: Vec<Subscription>,
     _tick: GpuiTask<()>,
 }
@@ -146,6 +149,8 @@ impl IrixFocus {
             tokens: Series::default(),
             diff_scroll: ScrollHandle::new(),
             files_scroll: ScrollHandle::new(),
+            chat_scroll: ScrollHandle::new(),
+            more_open: false,
             _subs: vec![observe, events, console_events],
             _tick: tick,
         }
@@ -323,6 +328,45 @@ fn chat_line(d: &DLine) -> Option<Div> {
     )
 }
 
+/// The last tool calls of a session: the content of the Changes pane while no file changed.
+fn recent_tools(p: &Pane) -> Div {
+    let calls: Vec<DLine> = last(&p.tail, 120)
+        .into_iter()
+        .filter(|d| d.kind == DKind::Tool)
+        .collect();
+    let skip = calls.len().saturating_sub(10);
+    let mut col = div()
+        .flex_none()
+        .flex()
+        .flex_col()
+        .gap(px(4.))
+        .child(note("No file changed yet. The last tool calls:"));
+    if calls.is_empty() {
+        return col
+            .child(note("The agent has not called a tool yet."))
+            .child(note(
+                "A changed file shows here as a diff. The Console key shows the output of the agent.",
+            ));
+    }
+    for d in calls.into_iter().skip(skip) {
+        let line = match &d.label {
+            Some(l) => format!("{l} {}", d.text),
+            None => d.text.clone(),
+        };
+        col = col.child(
+            div()
+                .flex_none()
+                .truncate()
+                .font_family(tk().mono)
+                .text_size(ui::ts(S_LABEL))
+                .line_height(relative(1.6))
+                .text_color(rgb(TEXT))
+                .child(line),
+        );
+    }
+    col
+}
+
 impl Render for IrixFocus {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(p) = self.pane(cx) else {
@@ -333,7 +377,7 @@ impl Render for IrixFocus {
                 ))
                 .child(
                     menu_bar().child(
-                        push("if-gone", "War room", true)
+                        push("if-gone", "Back", true)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(IrixFocusEvent::Back))),
                     ),
                 );
@@ -383,11 +427,13 @@ impl Render for IrixFocus {
                     .flex()
                     .items_center()
                     .gap(px(10.))
+                    // The ask bar below says that the agent waits: show the state once.
+                    .when(waits, |d| d.hidden())
                     .child(crate::warroom::skins::navigator::panels::led(led_for(&p)))
                     .child(kv(
-                        state_word,
+                        if waits { "Waiting" } else { state_word },
                         if waits {
-                            format!("waits {}", wait_text(mins))
+                            wait_text(mins)
                         } else {
                             format!("in state {}", wait_text(mins))
                         },
@@ -436,20 +482,27 @@ impl Render for IrixFocus {
                 cx.listener(move |_, _, _, cx| cx.emit(IrixFocusEvent::Open(sid.clone()))),
             ));
         }
-        if let Some((sid, _, _)) = sessions
+        let hidden: Vec<(String, String)> = sessions
             .iter()
             .enumerate()
-            .find(|(k, _)| !shown.contains(k))
-            .map(|(_, v)| v)
-        {
-            let sid = sid.clone();
-            let more = sessions.len() - shown.len();
-            keys = keys.child(seg("if-s-more", &format!("+{more}"), false).on_click(
-                cx.listener(move |_, _, _, cx| cx.emit(IrixFocusEvent::Open(sid.clone()))),
-            ));
+            .filter(|(k, _)| !shown.contains(k))
+            .map(|(_, (sid, name, _))| (sid.clone(), name.clone()))
+            .collect();
+        if !hidden.is_empty() {
+            keys = keys.child(
+                seg(
+                    "if-s-more",
+                    &format!("{} more sessions", hidden.len()),
+                    self.more_open,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.more_open = !this.more_open;
+                    cx.notify();
+                })),
+            );
         }
         keys = keys.child(div().flex_1()).child(
-            push("if-back", "War room", false)
+            push("if-back", "Back", false)
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(IrixFocusEvent::Back))),
         );
 
@@ -488,10 +541,15 @@ impl Render for IrixFocus {
         if shown.is_empty() {
             lines = lines.child(note("No rows yet."));
         }
-        // Top-aligned, from the start of a message; what does not fit is cut at the bottom.
-        let chat = sunken(div().size_full().overflow_hidden().child(lines))
-            .flex_1()
-            .min_h(px(96.));
+        // The newest rows show; the area scrolls and stays at the bottom.
+        let chat = sunken(div().size_full().child(scroll_area(
+            "if-chat",
+            &self.chat_scroll,
+            true,
+            lines.pb(px(32.)),
+        )))
+        .flex_1()
+        .min_h(px(96.));
 
         let ask_card = p.ask.as_ref().map(|ask| {
             let mut buttons = div().flex().flex_wrap().gap(px(10.));
@@ -656,12 +714,18 @@ impl Render for IrixFocus {
         if narrow {
             tab_list.push(("if-t-chat", "Chat", Side::Chat));
         }
-        tab_list.extend([
-            ("if-t-diff", "Diff", Side::Diff),
-            ("if-t-files", "Files", Side::Files),
-            ("if-t-console", "Console", Side::Console),
-            ("if-t-tests", "Tests", Side::Tests),
-        ]);
+        // A tab without content does not show: Files needs a change, Tests needs a test run.
+        tab_list.push(("if-t-diff", "Diff", Side::Diff));
+        if !files.is_empty() {
+            tab_list.push(("if-t-files", "Files", Side::Files));
+        }
+        tab_list.push(("if-t-console", "Console", Side::Console));
+        if tests_of(&p.tail).is_some() {
+            tab_list.push(("if-t-tests", "Tests", Side::Tests));
+        }
+        if !tab_list.iter().any(|t| t.2 == self.side) {
+            self.side = Side::Diff;
+        }
         let mut chat_tabs = menu_bar().flex_wrap();
         for (id, label, side) in tab_list {
             let key = |bar: Div, id: String| {
@@ -676,18 +740,18 @@ impl Render for IrixFocus {
             chat_tabs = key(chat_tabs, format!("{id}-c"));
         }
         let (sid, open_path) = (p.id.clone(), current.map(|f| f.path.clone()));
-        tabs = tabs
-            .child(div().flex_1())
-            .child(push("if-lens", "Open in Lens", false).on_click(cx.listener(
+        tabs = tabs.child(div().flex_1());
+        // Without a changed file, the key has nothing to open and does not show.
+        if let Some(path) = open_path {
+            tabs = tabs.child(push("if-lens", "Open in Lens", false).on_click(cx.listener(
                 move |_, _, _, cx| {
-                    if let Some(path) = &open_path {
-                        cx.emit(IrixFocusEvent::OpenFile {
-                            session: sid.clone(),
-                            path: path.clone(),
-                        });
-                    }
+                    cx.emit(IrixFocusEvent::OpenFile {
+                        session: sid.clone(),
+                        path: path.clone(),
+                    });
                 },
             )));
+        }
 
         let content: AnyElement = match self.side {
             Side::Chat => div().into_any_element(),
@@ -749,7 +813,7 @@ impl Render for IrixFocus {
                             .min_h_0(),
                         );
                     }
-                    None => col = col.child(note("No change yet.")),
+                    None => col = col.child(recent_tools(&p)),
                 }
                 col.into_any_element()
             }
@@ -780,12 +844,7 @@ impl Render for IrixFocus {
                     );
                 }
                 if rows.is_empty() {
-                    rows.push(
-                        div()
-                            .p(px(16.))
-                            .child(note("No change yet."))
-                            .into_any_element(),
-                    );
+                    rows.push(div().p(px(16.)).child(recent_tools(&p)).into_any_element());
                 }
                 div()
                     .size_full()
@@ -854,38 +913,69 @@ impl Render for IrixFocus {
             }
         };
 
-        let right = div()
-            .when(narrow, |d| d.flex_1().min_w_0())
-            .when(!narrow, |d| {
-                d.w(px(
-                    (vw * 0.4).clamp(ui::sw(SIDE_W * 0.7).into(), ui::sw(760.).into())
-                ))
-                .flex_none()
-            })
-            .h_full()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .child(section(&format!("Changes · {} files", files.len())))
-            .child(tabs)
-            .child(div().flex_1().min_h_0().flex().flex_col().child(content))
-            .child(section("Activity"))
-            .child(
-                div()
+        let right =
+            div()
+                .when(narrow, |d| d.flex_1().min_w_0())
+                .when(!narrow, |d| {
+                    d.w(px(
+                        (vw * 0.4).clamp(ui::sw(SIDE_W * 0.7).into(), ui::sw(760.).into())
+                    ))
                     .flex_none()
-                    .flex()
-                    .gap(px(32.))
-                    .child(kv("Context", format!("{}%", p.context_pct), TEXT))
-                    .child(kv("Tokens", p.tokens.to_string(), TEXT))
-                    .child(kv("Spend", format!("${:.2}", p.cost), TEXT)),
-            )
-            .child(strip_chart(
-                &self.tokens.list(),
-                0x3CE05A,
-                64.,
-                1.,
-                "tokens per s",
-            ));
+                })
+                .h_full()
+                .flex()
+                .flex_col()
+                .gap(px(16.))
+                .child(section(&format!("Changes · {} files", files.len())))
+                .child(tabs)
+                .child(div().flex_none().flex().flex_col().child(content))
+                .child(section("Activity"))
+                .child(
+                    div()
+                        .flex_none()
+                        .flex()
+                        .gap(px(32.))
+                        .child(kv("Context", format!("{}%", p.context_pct), TEXT))
+                        .child(kv("Tokens", p.tokens.to_string(), TEXT))
+                        .child(kv("Spend", format!("${:.2}", p.cost), TEXT)),
+                )
+                .children(
+                    self.tokens.list().iter().any(|v| *v > 0.).then(|| {
+                        strip_chart(&self.tokens.list(), 0x3CE05A, 64., 1., "tokens per s")
+                    }),
+                )
+                .child(section("The task"))
+                .child(
+                    div()
+                        .flex_none()
+                        .font_family(tk().mono)
+                        .text_size(ui::ts(S_LABEL))
+                        .line_height(relative(1.6))
+                        .text_color(rgb(MUTED))
+                        .child(p.prompt.chars().take(400).collect::<String>()),
+                )
+                .when(!p.subagents.is_empty(), |d| {
+                    let mut list = div().flex_none().flex().flex_col().gap(px(6.));
+                    for sa in &p.subagents {
+                        list = list.child(
+                            div()
+                                .flex()
+                                .gap(px(14.))
+                                .text_size(ui::ts(S_LABEL))
+                                .child(div().w(ui::sw(130.)).flex_none().child(sa.name.clone()))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .truncate()
+                                        .text_color(rgb(MUTED))
+                                        .child(sa.task.clone()),
+                                ),
+                        );
+                    }
+                    d.child(section(&format!("Subagents · {}", p.subagents.len())))
+                        .child(list)
+                });
 
         let body = div().flex_1().min_h_0().flex().gap(px(32.));
         let body = if !narrow {
@@ -896,6 +986,22 @@ impl Render for IrixFocus {
         } else {
             body.child(right)
         };
-        page().child(head).child(keys).child(body)
+        let mut more_list = div().flex_none().flex().flex_wrap().gap(px(10.));
+        if self.more_open {
+            for (k, (sid, name)) in hidden.iter().enumerate() {
+                let sid = sid.clone();
+                more_list = more_list.child(seg(format!("if-m-{k}"), name, false).on_click(
+                    cx.listener(move |this, _, _, cx| {
+                        this.more_open = false;
+                        cx.emit(IrixFocusEvent::Open(sid.clone()));
+                    }),
+                ));
+            }
+        }
+        page()
+            .child(head)
+            .child(keys)
+            .when(self.more_open && !hidden.is_empty(), |d| d.child(more_list))
+            .child(body)
     }
 }

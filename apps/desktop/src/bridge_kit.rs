@@ -10,7 +10,7 @@ use aivory_protocol::{Pane, SessionState, WarRoom};
 
 use crate::console::display::{DKind, DLine};
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Div, SharedString, Stateful, Window, div, px, rgb};
+use gpui::{AnyElement, App, Div, SharedString, Stateful, Window, div, rgb};
 
 /// Navigation and actions.
 pub const OR: u32 = 0xFF9C00;
@@ -43,25 +43,25 @@ pub const DIM: u32 = 0xBDB6AD;
 /// Antonio 600 for labels, Antonio 700 for figures (see `assets.rs`).
 pub const LABEL: &str = "Antonio SB";
 /// Chat and questions.
-pub const BODY: &str = "Barlow Semi Condensed";
+pub const BODY: &str = "Antonio SB";
 /// Code, commands, paths.
 pub const CODE: &str = "IBM Plex Mono";
 
 /// The type scale of the look: screen title > section title > entry text > label.
 /// Entry text stays under 0.8 x the section title.
-pub const S_TITLE: f32 = 44.;
+pub const S_TITLE: f32 = 28.;
 /// A figure or an island title.
-pub const S_BIG: f32 = 30.;
+pub const S_BIG: f32 = 28.;
 /// A section title above a list or a block (Antonio capitals).
-pub const S_SECTION: f32 = 22.;
+pub const S_SECTION: f32 = 18.;
 /// The lead entry: the question of a decision.
-pub const S_LEAD: f32 = 17.;
+pub const S_LEAD: f32 = 18.;
 /// Entry text: rows, chat lines, list items.
-pub const S_BODY: f32 = 16.;
+pub const S_BODY: f32 = 18.;
 /// Code, paths and commands in an entry.
 pub const S_CODE: f32 = 14.;
 /// A label or a button text.
-pub const S_SMALL: f32 = 16.;
+pub const S_SMALL: f32 = 14.;
 /// The line height of entry text (1.5).
 pub const LH_BODY: f32 = 24.;
 /// The inner padding of an island, and the gap between two islands or two blocks.
@@ -87,6 +87,24 @@ pub fn kf() -> f32 {
     f32::from(crate::ui::sw(1.))
 }
 
+/// The scale of the Bridge art board: 1 up to a 1440x900 window, then the text fit (up to
+/// 1.4). Every length of the frame goes through [`px`], so bars, elbows and gaps grow like
+/// the text, and a large window reads like the art.
+pub fn art_k() -> f32 {
+    let (w, h) = crate::ui::window_size();
+    let room = if w > 0. {
+        (w / ART_W).min(h / ART_H)
+    } else {
+        f32::MAX
+    };
+    kf().max(1.).min(room.max(1.))
+}
+
+/// An art length (a bar, a gap, a corner) in window px.
+pub fn px(v: f32) -> gpui::Pixels {
+    gpui::px(v * art_k())
+}
+
 /// The window against the 1440x900 art. A left edge stays; a right edge moves with `dx`, a
 /// bottom edge with `dy`.
 #[derive(Debug, Clone, Copy)]
@@ -97,6 +115,13 @@ pub struct Art {
 
 impl Art {
     pub fn of(window: &Window) -> Self {
+        let s = window.viewport_size();
+        let k = art_k();
+        Self::sized(f32::from(s.width) / k, f32::from(s.height) / k)
+    }
+
+    /// The art of the window in real px (the war room map draws in window px).
+    pub fn raw(window: &Window) -> Self {
         let s = window.viewport_size();
         Self::sized(f32::from(s.width), f32::from(s.height))
     }
@@ -268,7 +293,7 @@ pub const NAV_DETAIL: usize = 5;
 /// adds the Detail entry (a session is selected).
 pub fn nav(
     active: Option<usize>,
-    sub: Option<usize>,
+    _sub: Option<usize>,
     inbox: u32,
     detail: bool,
     go: &NavFn,
@@ -289,11 +314,7 @@ pub fn nav(
                 (16., y, 150., h),
                 c,
                 S_SMALL,
-                &if sub == Some(i) {
-                    format!("{:02}·1", i + 1)
-                } else {
-                    format!("{:02}", i + 1)
-                },
+                &format!("{:02}", i + 1),
                 &name,
             )
             .on_click(move |_, w, cx| go(i, w, cx))
@@ -324,8 +345,8 @@ pub fn bar_text(el: Div, text: &str) -> Div {
         .justify_end()
         .pr(px(16.))
         .font_family(LABEL)
-        .text_size(px(14.))
-        .line_height(px(14.))
+        .text_size(px(S_CODE))
+        .line_height(px(S_CODE))
         .text_color(rgb(BLACK))
         .whitespace_nowrap()
         .overflow_hidden()
@@ -392,9 +413,28 @@ fn display_lines(d: &DLine, chars: usize) -> usize {
     }
 }
 
+/// The line height of a display line: tight (1.35) for code, so a block reads as one unit.
+fn line_h(d: &DLine) -> f32 {
+    match d.kind {
+        DKind::Code | DKind::Table | DKind::Tool | DKind::Output | DKind::Error | DKind::Meta => {
+            19.
+        }
+        _ => LH_BODY,
+    }
+}
+
+/// The gap above a message. Code lines of a tool call, with no speaker name, sit tight.
+fn gap(d: &DLine) -> bool {
+    let tight = matches!(
+        d.kind,
+        DKind::Tool | DKind::Output | DKind::Error | DKind::Meta
+    ) && d.speaker().is_none();
+    d.first && !tight
+}
+
 /// The height of a display line, with the gap above a message.
 pub fn display_h(d: &DLine, chars: usize) -> f32 {
-    display_lines(d, chars) as f32 * LH_BODY * kf() + if d.first { MSG_GAP } else { 0. }
+    display_lines(d, chars) as f32 * line_h(d) * kf() + if gap(d) { MSG_GAP } else { 0. }
 }
 
 /// The lines that fit in `avail` px, newest at the end. The list starts at a message when one
@@ -444,17 +484,18 @@ fn speaker_color(d: &DLine) -> u32 {
 /// colored block, else as colored text.
 pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usize) -> Div {
     let n = display_lines(d, chars);
+    let lh = line_h(d);
     let c = speaker_color(d);
     let label = match (d.first, speaker_name(d, agent)) {
         (true, Some(name)) => Some(name),
         _ => None,
     };
-    let mut cell = div().flex_none().w(px(label_w)).h(tsz(LH_BODY));
+    let mut cell = div().flex_none().w(px(label_w)).h(tsz(lh));
     if let Some(name) = label {
         cell = if pill {
             cell.child(
                 div()
-                    .h(tsz(LH_BODY))
+                    .h(tsz(lh))
                     .px(px(10.))
                     .rounded_l(px(12.))
                     .bg(rgb(c))
@@ -481,9 +522,9 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
     let text = div()
         .flex_1()
         .min_w(px(0.))
-        .max_h(tsz(n as f32 * LH_BODY))
+        .max_h(tsz(n as f32 * lh))
         .overflow_hidden()
-        .line_height(tsz(LH_BODY));
+        .line_height(tsz(lh));
     let text = match d.kind {
         DKind::You => text
             .font_family(BODY)
@@ -496,7 +537,7 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
         DKind::Heading => text
             .truncate()
             .font_family(LABEL)
-            .text_size(tsz(S_SECTION - 4.))
+            .text_size(tsz(S_SECTION))
             .text_color(rgb(PK)),
         DKind::Code => text
             .truncate()
@@ -540,7 +581,7 @@ pub fn display_row(d: &DLine, agent: &str, label_w: f32, pill: bool, chars: usiz
         .flex()
         .items_start()
         .gap(px(16.))
-        .when(d.first, |r| r.mt(px(MSG_GAP)))
+        .when(gap(d), |r| r.mt(px(MSG_GAP)))
         .child(cell)
         .child(text.child(shown))
 }

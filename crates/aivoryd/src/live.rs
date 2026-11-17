@@ -315,6 +315,55 @@ impl LiveBackend {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// The sessions of one mesh peer (ADR 0026) join the war room: each id becomes
+    /// `@<node8>/<id>` and `machine` names the peer, so `session/*` calls go to it. `None`: the
+    /// peer is offline and its sessions leave. The peer's own copies of other machines'
+    /// sessions are skipped, so two machines never mirror each other in a loop.
+    pub fn merge_peer(&self, node8: &str, name: &str, panes: Option<Vec<Pane>>) {
+        let prefix = format!("@{node8}/");
+        let incoming: Vec<Pane> = panes
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| p.machine.is_none() && !p.id.starts_with('@'))
+            .map(|mut p| {
+                p.id = format!("{prefix}{}", p.id);
+                p.machine = Some(name.to_string());
+                p
+            })
+            .collect();
+        let mut st = self.lock();
+        let mut deltas = Vec::new();
+        for pane in &incoming {
+            if st.view.session(&pane.id) != Some(pane) {
+                deltas.push(Delta::Session {
+                    session: Box::new(pane.clone()),
+                });
+            }
+        }
+        for old in &st.view.sessions {
+            if old.id.starts_with(&prefix) && !incoming.iter().any(|p| p.id == old.id) {
+                deltas.push(Delta::SessionRemoved { id: old.id.clone() });
+            }
+        }
+        if !deltas.is_empty() {
+            st.publish(deltas);
+        }
+    }
+
+    /// The peers (by `@<node8>/` prefix) that have sessions in the war room now.
+    pub fn peer_prefixes(&self) -> Vec<String> {
+        let st = self.lock();
+        let mut out: Vec<String> = st
+            .view
+            .sessions
+            .iter()
+            .filter_map(|p| crate::mesh_host::split_remote(&p.id).map(|(node, _)| node.to_string()))
+            .collect();
+        out.sort();
+        out.dedup();
+        out
+    }
+
     /// The binary that the detection found for Codex or Gemini, so that a CLI outside PATH
     /// (npm, bun, scoop folders) still starts. `None` before the detection ends: the run then
     /// looks the name up on PATH. Claude keeps its own lookup.
@@ -1123,6 +1172,7 @@ impl LiveBackend {
             composer: composer.clone(),
             task: Some(task.id.clone()),
             attachments: Vec::new(),
+            node: None,
         })?;
         let mut st = self.lock();
         let native = st.runs.get(&created.id).and_then(|e| e.session_id.clone());
@@ -1243,11 +1293,7 @@ impl LiveBackend {
         };
         let os = crate::schedule::OsScheduler::detect();
         let entry = match s.next_fire {
-            Some(at) => {
-                let exe =
-                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("aivoryd"));
-                os.install(&exe, &s.id, at)
-            }
+            Some(at) => os.install(&crate::autostart::daemon_exe(), &s.id, at),
             None => {
                 os.remove(&s.id);
                 aivory_protocol::schedules::OsEntry {
@@ -1550,6 +1596,7 @@ impl LiveBackend {
             return Ok(Dispatched {
                 session: None,
                 task: Some(task.id),
+                node: None,
             });
         }
         let composer = ComposerPrefs {
@@ -1573,10 +1620,12 @@ impl LiveBackend {
             composer,
             task: None,
             attachments: Vec::new(),
+            node: None,
         })?;
         Ok(Dispatched {
             session: Some(created.id),
             task: None,
+            node: None,
         })
     }
 
@@ -1670,6 +1719,7 @@ impl LiveBackend {
             lines_total: 0,
             composer: p.composer.clone(),
             task: p.task.clone(),
+            machine: None,
         };
         st.runs.insert(
             id.clone(),
@@ -2443,9 +2493,19 @@ impl State {
     }
 
     fn set_setting(&mut self, p: SettingsSetParams) -> Result<Settings, RpcError> {
+        let before = self.settings.start_with_system;
         self.settings
             .set_key(&p.key, p.value)
             .map_err(|e| RpcError::new(code::INVALID_PARAMS, e))?;
+        if p.key == "startWithSystem"
+            && let Err(e) = crate::autostart::apply(self.settings.start_with_system)
+        {
+            self.settings.start_with_system = before;
+            return Err(RpcError::new(
+                code::SERVER_ERROR,
+                format!("cannot change the start with the system: {e}"),
+            ));
+        }
         self.save_settings();
         if p.key.starts_with("autopilot.") {
             let autopilot = self.settings.autopilot.clone();
@@ -3020,7 +3080,10 @@ impl Scanner {
             }
         }
         for old in &st.view.sessions {
-            if !panes.iter().any(|p| p.id == old.id) && !st.runs.contains_key(&old.id) {
+            if !panes.iter().any(|p| p.id == old.id)
+                && !st.runs.contains_key(&old.id)
+                && old.machine.is_none()
+            {
                 deltas.push(Delta::SessionRemoved { id: old.id.clone() });
             }
         }
@@ -3220,6 +3283,7 @@ impl Scanner {
                 model,
             },
             task: None,
+            machine: None,
         })
     }
 
@@ -3480,6 +3544,18 @@ pub fn saved_relay(store: Option<&Path>) -> Option<String> {
         .ok()??;
     let relay = value.get("relay")?.as_str()?.trim();
     (!relay.is_empty()).then(|| relay.to_string())
+}
+
+/// The saved `startWithSystem` setting (off when the store has none).
+pub fn saved_start_with_system(store: Option<&Path>) -> bool {
+    let Some(path) = store.filter(|p| p.is_file()) else {
+        return false;
+    };
+    aivory_engine::Store::open_read_only(path)
+        .ok()
+        .and_then(|s| s.setting("startWithSystem").ok().flatten())
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 /// Keep every run, turn and agent span, and the other spans of the last `turns` turns only:

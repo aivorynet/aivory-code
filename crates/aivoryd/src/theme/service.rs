@@ -12,9 +12,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use aivory_protocol::theme::{
-    Inspected, InstalledTheme, JobRef, JobState, JobStatus, OFFICIAL_REGISTRY,
-    OFFICIAL_REGISTRY_URL, Registry, RegistryEntry, RegistryList, RemoveResult, ThemeDiff,
-    ThemeList, UpdateAvailable, UpdateList, UpdateResult,
+    DisplayClass, Inspected, InstalledTheme, JobRef, JobState, JobStatus, OFFICIAL_REGISTRY,
+    OFFICIAL_REGISTRY_URL, Registry, RegistryEntry, RegistryList, RemoveResult, ThemeChangeReason,
+    ThemeChanged, ThemeDiff, ThemeList, ThemeSha, ThemeSync, UpdateAvailable, UpdateList,
+    UpdateResult,
 };
 use aivory_theme::archive::{extract, sha256_hex};
 use aivory_theme::package::{self, Semver};
@@ -66,6 +67,19 @@ pub struct ThemeService {
     /// One writer at a time on the themes folder.
     apply: Mutex<()>,
     registries: Mutex<()>,
+    /// Called after a theme changes (see [`ThemeService::set_notifier`]).
+    notifier: Mutex<NotifierSlot>,
+}
+
+/// A callback that gets the `theme/changed` parameters.
+pub type Notifier = Arc<dyn Fn(ThemeChanged) + Send + Sync>;
+
+struct NotifierSlot(Option<Notifier>);
+
+impl std::fmt::Debug for NotifierSlot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("NotifierSlot")
+    }
 }
 
 fn random_hex(bytes: usize) -> String {
@@ -99,6 +113,64 @@ impl ThemeService {
             state: Mutex::new(State::default()),
             apply: Mutex::new(()),
             registries: Mutex::new(()),
+            notifier: Mutex::new(NotifierSlot(None)),
+        }
+    }
+
+    /// Set the callback for `theme/changed`. A later call replaces the earlier one.
+    pub fn set_notifier(&self, f: Notifier) {
+        guard(&self.notifier).0 = Some(f);
+    }
+
+    /// The SHA of every installed theme and the revision of the list.
+    pub fn sync(&self) -> ThemeSync {
+        let mut themes: Vec<ThemeSha> = self
+            .store
+            .ids()
+            .iter()
+            .map(
+                |id| match super::bundle::get(&self.store, id, DisplayClass::Phone) {
+                    Ok(b) => ThemeSha {
+                        id: id.clone(),
+                        sha256: b.sha256,
+                        error: None,
+                    },
+                    Err(e) => ThemeSha {
+                        id: id.clone(),
+                        sha256: String::new(),
+                        error: Some(e),
+                    },
+                },
+            )
+            .collect();
+        themes.sort_by(|a, b| a.id.cmp(&b.id));
+        let lines: String = themes
+            .iter()
+            .map(|t| {
+                format!(
+                    "{}@{}
+",
+                    t.id, t.sha256
+                )
+            })
+            .collect();
+        ThemeSync {
+            revision: sha256_hex(lines.as_bytes()),
+            themes,
+        }
+    }
+
+    /// Tell the notifier that the themes changed.
+    pub fn notify(&self, reason: ThemeChangeReason, id: Option<String>) {
+        let f = guard(&self.notifier).0.clone();
+        if let Some(f) = f {
+            let ThemeSync { revision, themes } = self.sync();
+            f(ThemeChanged {
+                reason,
+                id,
+                revision,
+                themes,
+            });
         }
     }
 
@@ -247,6 +319,8 @@ impl ThemeService {
             let _ = fs::remove_dir_all(&staged.dir);
         }
         result?;
+        drop(_g);
+        self.notify(ThemeChangeReason::Add, Some(id.clone()));
         self.installed(&id)
     }
 
@@ -369,6 +443,8 @@ impl ThemeService {
     pub fn remove(&self, id: &str) -> Result<RemoveResult, String> {
         let _g = guard(&self.apply);
         self.store.remove(id)?;
+        drop(_g);
+        self.notify(ThemeChangeReason::Remove, Some(id.to_string()));
         Ok(RemoveResult {
             ok: true,
             cleared_current: false,
@@ -772,7 +848,11 @@ impl ThemeService {
     }
 
     pub fn job_update(self: &Arc<Self>, id: String) -> Result<JobRef, String> {
-        self.start_job(move |s| to_value(&s.update(&id)?))
+        self.start_job(move |s| {
+            let r = to_value(&s.update(&id)?)?;
+            s.notify(ThemeChangeReason::Update, Some(id));
+            Ok(r)
+        })
     }
 
     pub fn job_diff(self: &Arc<Self>, id: String) -> Result<JobRef, String> {

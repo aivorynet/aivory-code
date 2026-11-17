@@ -229,3 +229,23 @@ fn war_room_needs_demo_mode_for_now() {
     call(&endpoint, "daemon/shutdown", Value::Null);
     server.join().unwrap().unwrap();
 }
+
+/// `machines/list` without a mesh: one local machine with the look of the settings.
+#[test]
+fn machines_list_of_a_single_machine() {
+    let daemon = Daemon::with_demo(config());
+    let (out, _rx) = aivoryd::outbox::Outbox::new(8);
+    let ask = |method: &str, params: Value| {
+        let line = json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params });
+        daemon.handle_line(&line.to_string(), &out).unwrap()
+    };
+    let look = ask("settings/get", json!({}))["result"]["settings"]["display"]["look"].clone();
+    let r = ask("machines/list", json!({}));
+    let machines = r["result"]["machines"].as_array().unwrap();
+    assert_eq!(machines.len(), 1, "{r}");
+    assert_eq!(machines[0]["id"], "local");
+    assert_eq!(machines[0]["look"], look);
+    assert_eq!(machines[0]["local"], true);
+    assert_eq!(machines[0]["online"], true);
+    assert!(!machines[0]["name"].as_str().unwrap().is_empty());
+}

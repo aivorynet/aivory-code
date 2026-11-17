@@ -11,6 +11,7 @@ publish.workspace = true
 # MIT. `bundled` compiles SQLite (public domain); same version as `aivory-engine`, so one SQLite links.
 rusqlite = { version = "0.41", features = ["bundled"] }
 thiserror.workspace = true
+serde.workspace = true
 # MIT or Apache-2.0. Holds the temporary index file of a snapshot.
 tempfile = "3"
 

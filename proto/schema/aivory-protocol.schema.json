@@ -2075,6 +2075,13 @@
             "null"
           ]
         },
+        "node": {
+          "description": "Where the session runs (machine mesh, ADR 0026): `auto` (the best free machine), a node\nid or a unique prefix of a peer, or `local`. Missing: this machine.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "part": {
           "type": [
             "string",
@@ -2093,6 +2100,13 @@
     "Dispatched": {
       "description": "The result of `session/dispatch`: `session` when it started, `task` when it queued.",
       "properties": {
+        "node": {
+          "description": "The peer that runs the session or holds the task. Missing: this machine.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "session": {
           "type": [
             "string",
@@ -3337,6 +3351,53 @@
         }
       ]
     },
+    "Machine": {
+      "description": "One machine of the mesh for a phone (`machines/list`).",
+      "properties": {
+        "id": {
+          "description": "The node id (`local` when the daemon has no node id).",
+          "type": "string"
+        },
+        "local": {
+          "description": "This daemon.",
+          "type": "boolean"
+        },
+        "look": {
+          "description": "The `display.look` of the machine. Empty: not known yet.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name that `Pane.machine` uses for the sessions of this machine.",
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "look",
+        "local",
+        "online"
+      ],
+      "type": "object"
+    },
+    "MachineList": {
+      "description": "Result of `machines/list`: this machine first, then one entry per mesh peer.",
+      "properties": {
+        "machines": {
+          "items": {
+            "$ref": "#/$defs/Machine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "machines"
+      ],
+      "type": "object"
+    },
     "MailItem": {
       "description": "One item of the mailbox of a session.",
       "properties": {
@@ -3543,6 +3604,43 @@
         }
       ]
     },
+    "MediaPutParams": {
+      "description": "`media/put`: a phone sends an image for the next turn. The daemon stores it in its upload\nfolder and gives the path for [`crate::rpc::SendParams::attachments`].",
+      "properties": {
+        "data": {
+          "description": "The bytes as base64.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The file name with its extension (png, jpg, jpeg, gif, webp).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "data"
+      ],
+      "type": "object"
+    },
+    "MediaStored": {
+      "description": "The stored upload.",
+      "properties": {
+        "path": {
+          "description": "The absolute path on the daemon machine.",
+          "type": "string"
+        },
+        "size": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size"
+      ],
+      "type": "object"
+    },
     "MemSample": {
       "properties": {
         "agentsMb": {
@@ -3610,6 +3708,40 @@
       ],
       "type": "object"
     },
+    "MirrorInfo": {
+      "description": "One read-only mirror of a folder of a peer.",
+      "properties": {
+        "files": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "description": "The local folder of the mirror.",
+          "type": "string"
+        },
+        "peer": {
+          "type": "string"
+        },
+        "updated": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "peer",
+        "name",
+        "path",
+        "files"
+      ],
+      "type": "object"
+    },
     "Mode": {
       "description": "Permission mode of the composer.",
       "enum": [
@@ -3650,6 +3782,13 @@
         "composer": {
           "$ref": "#/$defs/ComposerPrefs"
         },
+        "node": {
+          "description": "Where the session runs (machine mesh, ADR 0026): `auto` (the best free machine), a node\nid or a unique prefix of a peer, or `local`. Missing: this machine.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "part": {
           "type": [
             "string",
@@ -3676,6 +3815,78 @@
         "codebase",
         "prompt",
         "composer"
+      ],
+      "type": "object"
+    },
+    "NodeCodebase": {
+      "description": "One codebase of a machine.",
+      "properties": {
+        "identity": {
+          "description": "The repository identity (the same repo on two machines has the same identity), for\nexample `git:<root commit>`. Empty: not a repository, or unknown.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "remote": {
+          "description": "The remote URL of the repository, when it has one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "NodeState": {
+      "description": "The work state of one machine, sent with each `mesh/ping` (step M2).",
+      "properties": {
+        "codebases": {
+          "default": [],
+          "description": "The codebases of the machine.",
+          "items": {
+            "$ref": "#/$defs/NodeCodebase"
+          },
+          "type": "array"
+        },
+        "look": {
+          "description": "The look (`display.look`) of the machine, as `settings/get` gives it. Empty: an older\npeer that does not send it.",
+          "type": "string"
+        },
+        "maxRunning": {
+          "description": "The autopilot limit of running sessions.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "providers": {
+          "default": [],
+          "description": "The agent CLIs installed on the machine (`claude`, `codex`, `gemini`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "queued": {
+          "description": "Queued tasks.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "running": {
+          "description": "Sessions that work or wait for the user now.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "running",
+        "maxRunning",
+        "queued"
       ],
       "type": "object"
     },
@@ -3908,6 +4119,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "machine": {
+          "description": "The machine that runs the session, for a session of another machine of the mesh (ADR\n0026): the peer name. Its id is then `@<node8>/<id>`, and `session/*` calls with that id\ngo to the peer. `None`: this machine.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "model": {
           "type": "string"
         },
@@ -4042,6 +4260,210 @@
         "sessions",
         "claims",
         "lines"
+      ],
+      "type": "object"
+    },
+    "Peer": {
+      "description": "One paired machine.",
+      "properties": {
+        "direct": {
+          "default": [],
+          "description": "The direct addresses that the peer gave on its last connect (`ip:port`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "The iroh node id of the peer daemon (64 hex characters).",
+          "type": "string"
+        },
+        "lastError": {
+          "description": "Why the last connect or ping failed.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastSeen": {
+          "description": "The last answer of the peer.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "The machine name that the peer gave.",
+          "type": "string"
+        },
+        "online": {
+          "default": false,
+          "description": "`true` while this daemon has an open connection to the peer.",
+          "type": "boolean"
+        },
+        "os": {
+          "default": "",
+          "type": "string"
+        },
+        "pairedAt": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "path": {
+          "$ref": "#/$defs/PeerPathKind",
+          "default": "none"
+        },
+        "pathAddr": {
+          "description": "The remote address of the path: `ip:port` or the relay URL. Empty: no path.",
+          "type": "string"
+        },
+        "relay": {
+          "description": "The home relay of the peer.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rttMs": {
+          "description": "The round-trip time of the last ping.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the peer reported on its last ping: slots, providers, codebases."
+        },
+        "version": {
+          "default": "",
+          "description": "The version of the peer daemon.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "pairedAt"
+      ],
+      "type": "object"
+    },
+    "PeerCallParams": {
+      "description": "Params of `peers/call`: run one method of the JSON-RPC surface on a peer.",
+      "properties": {
+        "id": {
+          "description": "The node id of the peer, or a unique prefix.",
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "method"
+      ],
+      "type": "object"
+    },
+    "PeerInvite": {
+      "description": "Result of `peers/invite`.",
+      "properties": {
+        "code": {
+          "description": "The one-time code in the link (`AIV-xxxxxx`).",
+          "type": "string"
+        },
+        "expires": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "url": {
+          "description": "`aivory://peer?node=&relay=&direct=&code=&name=`. Give it to the other machine.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "url",
+        "expires"
+      ],
+      "type": "object"
+    },
+    "PeerJoinParams": {
+      "description": "Params of `peers/join`.",
+      "properties": {
+        "link": {
+          "description": "The link of `peers/invite` of the other machine.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "link"
+      ],
+      "type": "object"
+    },
+    "PeerList": {
+      "description": "Result of `peers/list`.",
+      "properties": {
+        "node": {
+          "description": "The node id of this daemon. Empty: the daemon runs without iroh.",
+          "type": "string"
+        },
+        "peers": {
+          "items": {
+            "$ref": "#/$defs/Peer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "node",
+        "peers"
+      ],
+      "type": "object"
+    },
+    "PeerPathKind": {
+      "description": "The kind of the network path to a peer.",
+      "oneOf": [
+        {
+          "const": "direct",
+          "description": "A direct IP path (same network, or hole punched).",
+          "type": "string"
+        },
+        {
+          "const": "relay",
+          "description": "Through the relay.",
+          "type": "string"
+        },
+        {
+          "const": "none",
+          "description": "No connection.",
+          "type": "string"
+        }
+      ]
+    },
+    "PeerRef": {
+      "description": "Params of `peers/check` and `peers/remove`.",
+      "properties": {
+        "id": {
+          "description": "The node id of the peer (64 hex characters). A unique prefix is enough.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
       "type": "object"
     },
@@ -5355,6 +5777,11 @@
             "pushUrl": "",
             "relay": ""
           }
+        },
+        "startWithSystem": {
+          "default": false,
+          "description": "Start the daemon when the user signs in (a Task Scheduler task, a LaunchAgent or a\nsystemd user unit). Off: the app starts the daemon when it finds none. Old JSON: off.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -5418,6 +5845,128 @@
         "devices",
         "account",
         "budget"
+      ],
+      "type": "object"
+    },
+    "ShareInfo": {
+      "description": "One folder that this machine shares.",
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "description": "Files in the share (ignored files left out).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lastError": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastScan": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lastWip": {
+          "description": "The last WIP commit of the share in its VCS.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "to": {
+          "default": [],
+          "description": "The peers. Empty: all paired machines.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "files",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "ShareParams": {
+      "description": "Params of `peers/share`: push a folder live to peers (step M5). The machine that shares is\nthe only writer; the peers keep a read-only mirror.",
+      "properties": {
+        "name": {
+          "description": "The name of the mirror on the peers. Default: the folder name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "The folder to share (absolute).",
+          "type": "string"
+        },
+        "to": {
+          "description": "The peers (node ids or prefixes). Empty: all paired machines.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "ShareRef": {
+      "description": "Params of `peers/unshare`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "SharesView": {
+      "description": "Result of `peers/shares`.",
+      "properties": {
+        "mirrors": {
+          "items": {
+            "$ref": "#/$defs/MirrorInfo"
+          },
+          "type": "array"
+        },
+        "shares": {
+          "items": {
+            "$ref": "#/$defs/ShareInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "shares",
+        "mirrors"
       ],
       "type": "object"
     },
@@ -6370,6 +6919,54 @@
       ],
       "type": "object"
     },
+    "ThemeChangeReason": {
+      "description": "Why `theme/changed` was sent.",
+      "oneOf": [
+        {
+          "enum": [
+            "add",
+            "update",
+            "remove"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "select",
+          "description": "`display.look` or `display.customTheme` changed.",
+          "type": "string"
+        }
+      ]
+    },
+    "ThemeChanged": {
+      "description": "Parameters of the `theme/changed` notification. A connection gets it after it called\n`theme/sync` or `theme/list`.",
+      "properties": {
+        "id": {
+          "description": "The theme that changed (a `select` of a built-in look has none).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/ThemeChangeReason"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "themes": {
+          "items": {
+            "$ref": "#/$defs/ThemeSha"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "reason",
+        "revision",
+        "themes"
+      ],
+      "type": "object"
+    },
     "ThemeFont": {
       "description": "A font file of a theme and the family name inside it.",
       "properties": {
@@ -6428,6 +7025,30 @@
       ],
       "type": "object"
     },
+    "ThemeSha": {
+      "description": "The SHA-256 of one installed theme (the key of a phone cache).",
+      "properties": {
+        "error": {
+          "description": "The theme is invalid; a client must not cache it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "description": "The `sha256` of the `ThemeBundle`. Empty when the theme is invalid.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "type": "object"
+    },
     "ThemeSourceParams": {
       "description": "`theme/inspect`: a source such as `github:owner/repo@v1.0.0` or a GitHub release URL.",
       "properties": {
@@ -6437,6 +7058,26 @@
       },
       "required": [
         "source"
+      ],
+      "type": "object"
+    },
+    "ThemeSync": {
+      "description": "Result of `theme/sync`: every installed theme with its SHA, and one revision of the list.",
+      "properties": {
+        "revision": {
+          "description": "SHA-256 over the sorted `id@sha256` lines. It changes when any theme changes.",
+          "type": "string"
+        },
+        "themes": {
+          "items": {
+            "$ref": "#/$defs/ThemeSha"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "revision",
+        "themes"
       ],
       "type": "object"
     },
@@ -6693,6 +7334,68 @@
         "provider",
         "label",
         "pct"
+      ],
+      "type": "object"
+    },
+    "VcsSyncRow": {
+      "description": "The auto-sync state of one codebase (step M4).",
+      "properties": {
+        "changed": {
+          "default": false,
+          "description": "The last update brought new commits.",
+          "type": "boolean"
+        },
+        "codebase": {
+          "type": "string"
+        },
+        "kind": {
+          "description": "`git`, `hg`, `jj`, `svn`, `p4`. Empty: no VCS found.",
+          "type": "string"
+        },
+        "last": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "note": {
+          "description": "Why the last update did not run or failed (dirty checkout, a session works, conflict).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "codebase",
+        "path",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "VcsSyncView": {
+      "description": "Result of `peers/vcs`.",
+      "properties": {
+        "intervalSecs": {
+          "description": "Seconds between two updates. 0: auto-sync is off.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/VcsSyncRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "intervalSecs",
+        "rows"
       ],
       "type": "object"
     },
@@ -7015,6 +7718,14 @@
         "$ref": "#/$defs/TurnList"
       }
     },
+    "machines/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/MachineList"
+      }
+    },
     "mail/list": {
       "params": {
         "$ref": "#/$defs/MailListParams"
@@ -7047,12 +7758,98 @@
         "$ref": "#/$defs/MediaData"
       }
     },
+    "media/put": {
+      "params": {
+        "$ref": "#/$defs/MediaPutParams"
+      },
+      "result": {
+        "$ref": "#/$defs/MediaStored"
+      }
+    },
     "organizer/start": {
       "params": {
         "$ref": "#/$defs/OrganizerStartParams"
       },
       "result": {
         "$ref": "#/$defs/Created"
+      }
+    },
+    "peers/call": {
+      "params": {
+        "$ref": "#/$defs/PeerCallParams"
+      },
+      "result": true
+    },
+    "peers/check": {
+      "params": {
+        "$ref": "#/$defs/PeerRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Peer"
+      }
+    },
+    "peers/invite": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/PeerInvite"
+      }
+    },
+    "peers/join": {
+      "params": {
+        "$ref": "#/$defs/PeerJoinParams"
+      },
+      "result": {
+        "$ref": "#/$defs/Peer"
+      }
+    },
+    "peers/list": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/PeerList"
+      }
+    },
+    "peers/remove": {
+      "params": {
+        "$ref": "#/$defs/PeerRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "peers/share": {
+      "params": {
+        "$ref": "#/$defs/ShareParams"
+      },
+      "result": {
+        "$ref": "#/$defs/ShareInfo"
+      }
+    },
+    "peers/shares": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/SharesView"
+      }
+    },
+    "peers/unshare": {
+      "params": {
+        "$ref": "#/$defs/ShareRef"
+      },
+      "result": {
+        "$ref": "#/$defs/Ack"
+      }
+    },
+    "peers/vcs": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/VcsSyncView"
       }
     },
     "project/new": {
@@ -7463,6 +8260,14 @@
         "$ref": "#/$defs/RemoveResult"
       }
     },
+    "theme/sync": {
+      "params": {
+        "$ref": "#/$defs/Empty"
+      },
+      "result": {
+        "$ref": "#/$defs/ThemeSync"
+      }
+    },
     "theme/update": {
       "params": {
         "$ref": "#/$defs/ThemeRef"
@@ -7489,6 +8294,11 @@
     }
   },
   "notifications": {
+    "theme/changed": {
+      "params": {
+        "$ref": "#/$defs/ThemeChanged"
+      }
+    },
     "warroom/delta": {
       "params": {
         "$ref": "#/$defs/DeltaNote"

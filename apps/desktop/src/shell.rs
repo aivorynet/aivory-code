@@ -293,7 +293,7 @@ impl Shell {
         }
         let view = cx.new(|cx| FocusScreen::new(self.model.clone(), id.clone(), window, cx));
         let subscription = cx.subscribe(&view, |this, _, event: &FocusEvent, cx| match event {
-            FocusEvent::Back => this.go(Screen::WarRoom, cx),
+            FocusEvent::Back => this.go_back(cx),
             FocusEvent::Open(id) => this.open_session(id, cx),
             FocusEvent::OpenFile { session, path } => this.open_session_file(session, path, cx),
         });
@@ -411,6 +411,15 @@ impl Shell {
         cx.notify();
     }
 
+    /// Back key of a session screen: return to the screen the owner came from (`back`).
+    fn go_back(&mut self, cx: &mut Context<Self>) {
+        let to = match std::mem::replace(&mut self.back, Screen::WarRoom) {
+            Screen::Session(_) | Screen::Lens => Screen::WarRoom,
+            s => s,
+        };
+        self.go(to, cx);
+    }
+
     /// Show a screen. The war room and Settings read the settings again, so a change on one
     /// shows on the other.
     fn go(&mut self, screen: Screen, cx: &mut Context<Self>) {
@@ -435,7 +444,7 @@ impl Shell {
         let inbox = self.model.read(cx).war.as_ref().map_or(0, |w| w.inbox_open);
         div()
             .flex_none()
-            .w(if compact { RAIL_W_COMPACT } else { RAIL_W })
+            .w((if compact { RAIL_W_COMPACT } else { RAIL_W }) * ui::factor().max(1.))
             .h_full()
             .flex()
             .flex_col()
@@ -470,25 +479,29 @@ impl Shell {
             .children(crate::new_session::launch_buttons(
                 "minimal",
                 move |id, label| {
-                    let text = match (compact, label) {
-                        (true, "Organizer") => "Org",
-                        (true, _) => "New",
-                        (false, l) => l,
+                    let icon = if label == "Organizer" {
+                        "icons/panel.svg"
+                    } else {
+                        "icons/play.svg"
                     };
                     div()
                         .id(id)
-                        .w(px(if compact { 38. } else { 60. }))
-                        .h(px(28.))
+                        .w(ui::sw(if compact { 38. } else { 60. }).max(px(38.)))
+                        .h(ui::sw(if compact { 38. } else { 54. }).max(px(38.)))
                         .flex()
+                        .flex_col()
                         .items_center()
                         .justify_center()
-                        .whitespace_nowrap()
+                        .gap(px(4.))
                         .rounded(tk().r_rail_item)
                         .text_size(crate::ui::ts(crate::theme::T_CAPTION))
                         .text_color(rgb(tk().ink_3))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(tk().track)).text_color(rgb(tk().ink)))
-                        .child(text)
+                        .child(svg().path(icon).size(px(18.)).text_color(rgb(tk().ink_3)))
+                        .when(!compact, |d| {
+                            d.child(div().text_center().line_height(px(12.)).child(label))
+                        })
                 },
             ))
             .child(div().flex_1())
@@ -511,8 +524,8 @@ impl Shell {
             .id(group.clone())
             .group(group.clone())
             .relative()
-            .w(px(if compact { 38. } else { 60. }))
-            .h(px(if compact { 38. } else { 54. }))
+            .w(ui::sw(if compact { 38. } else { 60. }))
+            .h(ui::sw(if compact { 38. } else { 54. }))
             .whitespace_nowrap()
             .flex()
             .flex_col()
@@ -572,7 +585,7 @@ impl Shell {
             .absolute()
             .left_0()
             .right_0()
-            .bottom(STATUS_H + px(14.))
+            .bottom(STATUS_H * ui::factor().max(1.) + px(14.))
             .flex()
             .flex_col()
             .items_center()
@@ -600,6 +613,24 @@ impl Shell {
                 .shadow(ui::popover_shadow())
                 .text_size(crate::ui::ts(crate::theme::T_BODY))
                 .text_color(rgb(tk().ink))
+                .when(!crate::overlay_style::plain(), |d| {
+                    let st = crate::overlay_style::style();
+                    let (sans, _, _) = crate::overlay_style::fonts();
+                    d.bg(crate::overlay_style::color(st.panel))
+                        .border_color(crate::overlay_style::color(
+                            st.frame
+                                .or(st.edge)
+                                .or(st.field_edge)
+                                .unwrap_or(st.sel_edge),
+                        ))
+                        .rounded(px(if tk().look == aivory_protocol::Look::Bridge {
+                            14.
+                        } else {
+                            st.radius.min(8.)
+                        }))
+                        .font_family(sans)
+                        .text_color(crate::overlay_style::color(st.text))
+                })
                 .child(ui::dot(rgb(color)))
                 .child(div().min_w(px(0.)).child(n.text.clone()));
             if let Some(help) = n.help.clone() {
@@ -654,7 +685,7 @@ impl Shell {
         };
         let mut bar = div()
             .flex_none()
-            .h(STATUS_H)
+            .h(STATUS_H * ui::factor().max(1.))
             .flex()
             .items_center()
             .gap(px(20.))
@@ -690,7 +721,7 @@ impl Shell {
     /// The look switch of the app frame (ADR 0022): the current look; a click shows all looks.
     fn look_switch(&self, cx: &mut Context<Self>) -> AnyElement {
         let current = tk().look;
-        let chip = |id: SharedString, label: &'static str, on: bool| {
+        let chip = |id: SharedString, label: SharedString, on: bool| {
             div()
                 .id(id)
                 .h(px(20.))
@@ -704,12 +735,17 @@ impl Shell {
                 .child(label)
         };
         if !self.look_menu {
-            return chip("look-switch".into(), crate::look::name(current), false)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.look_menu = true;
-                    cx.notify();
-                }))
-                .into_any_element();
+            return chip(
+                "look-switch".into(),
+                format!("Look: {} ▾", crate::look::name(current)).into(),
+                false,
+            )
+            .tooltip(ui::tip("Change the look"))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.look_menu = true;
+                cx.notify();
+            }))
+            .into_any_element();
         }
         let mut list = div()
             .id("look-list")
@@ -727,23 +763,26 @@ impl Shell {
             }));
         for (look, name) in crate::look::LOOKS {
             list = list.child(
-                chip(format!("look-{name}").into(), name, look == current).on_click(cx.listener(
-                    move |this, _, _, cx| {
+                chip(format!("look-{name}").into(), name.into(), look == current).on_click(
+                    cx.listener(move |this, _, _, cx| {
                         this.look_menu = false;
                         crate::actions::act(&this.model, crate::actions::Action::SetLook(look), cx);
-                    },
-                )),
+                    }),
+                ),
             );
         }
         div()
             .relative()
             .child(
-                chip("look-switch".into(), crate::look::name(current), true).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.look_menu = false;
-                        cx.notify();
-                    },
-                )),
+                chip(
+                    "look-switch".into(),
+                    format!("Look: {} ▴", crate::look::name(current)).into(),
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.look_menu = false;
+                    cx.notify();
+                })),
             )
             .child(
                 deferred(
@@ -835,6 +874,11 @@ impl Shell {
         self.new_dialog = None;
         self.new_pending = Some(purpose);
         cx.notify();
+    }
+
+    /// The launcher that is on screen, for the pressed state of the launcher buttons.
+    pub(super) fn launcher_open(&self, cx: &gpui::App) -> Option<crate::new_session::Purpose> {
+        self.new_dialog.as_ref().map(|(d, _)| d.read(cx).purpose())
     }
 
     /// N (no text field has the focus) or Ctrl+N opens the New session dialog.
@@ -1037,7 +1081,7 @@ impl Shell {
                 .relative()
                 .bg(rgb(tk().page))
                 .font_family(tk().sans)
-                .text_size(TEXT)
+                .text_size(px(crate::look::snap(13.)))
                 .text_color(rgb(tk().ink))
                 .child(el)
                 .children(toasts);
@@ -1053,11 +1097,13 @@ impl Shell {
         }
         let content = match self.screen {
             Screen::WarRoom => self.war_room.clone().into_any_element(),
+            Screen::Inbox if navigator => self.irix_inbox_view(cx),
             Screen::Inbox => self.inbox.clone().into_any_element(),
             Screen::Tasks if navigator => self.irix_tasks_view(cx),
             Screen::Repos if navigator => self.irix_repos_view(cx),
             Screen::Tasks => self.tasks.clone().into_any_element(),
             Screen::Repos => self.repos.clone().into_any_element(),
+            Screen::Settings if navigator => self.irix_settings_view(cx),
             Screen::Settings => self.settings.clone().into_any_element(),
             // The looks with their own session screen draw it in their content step below.
             Screen::Session(_) if tk().look == aivory_protocol::Look::Tactical => {
@@ -1135,7 +1181,7 @@ impl Shell {
                 .flex_col()
                 .bg(rgb(tk().page))
                 .font_family(tk().sans)
-                .text_size(TEXT)
+                .text_size(px(crate::look::snap(13.)))
                 .text_color(rgb(tk().ink))
                 .child(bar)
                 .child(
@@ -1173,7 +1219,7 @@ impl Shell {
                 .flex_col()
                 .bg(rgb(irix::DESKTOP))
                 .font_family(tk().sans)
-                .text_size(TEXT)
+                .text_size(px(crate::look::snap(13.)))
                 .text_color(rgb(tk().ink))
                 .child(chest)
                 .child(
@@ -1198,7 +1244,7 @@ impl Shell {
             .flex_col()
             .bg(rgb(tk().page))
             .font_family(tk().sans)
-            .text_size(TEXT)
+            .text_size(px(crate::look::snap(13.)))
             .text_color(rgb(tk().ink))
             .child(
                 div().flex_1().min_h(px(0.)).flex().child(rail).child(

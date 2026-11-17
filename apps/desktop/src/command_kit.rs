@@ -84,6 +84,16 @@ pub fn label(text: impl Into<SharedString>) -> Div {
     data(text, S_LABEL).text_color(c(LABEL, 1.))
 }
 
+/// A key hint in a small frame, apart from the label of its control.
+pub fn key(text: impl Into<SharedString>) -> Div {
+    data(text, S_LABEL)
+        .flex_none()
+        .px(px(6.))
+        .border_1()
+        .border_color(c(RULE_2, 1.))
+        .text_color(c(HINT, 1.))
+}
+
 /// Upper case for the all-caps face; code and paths keep their case.
 pub fn up(text: &str) -> String {
     text.to_uppercase()
@@ -218,7 +228,7 @@ pub fn plate(
             .size_full(),
         )
         .child(
-            data(text, 23.)
+            data(text, S_SECTION)
                 .absolute()
                 .left_0()
                 .top_0()
@@ -276,7 +286,7 @@ pub fn button(
                 .h(px(2.))
                 .bg(c(hi, 1.)),
         )
-        .child(data(text, 22.).text_color(c(ink, 1.)))
+        .child(data(text, S_ENTRY).text_color(c(ink, 1.)))
         .hover(|s| s.opacity(0.88))
 }
 

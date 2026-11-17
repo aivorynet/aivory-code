@@ -34,6 +34,13 @@ const FIT_RANGE: (f32, f32) = (0.85, 1.4);
 
 /// The fit for a window of `w` x `h` logical px.
 pub fn fit_for(w: f32, h: f32) -> f32 {
+    // `AIVORY_FIT=1.4`: force the fit (screenshot runs; a 4K window at 100 % scale has 1.4).
+    if let Some(f) = std::env::var("AIVORY_FIT")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    {
+        return f.clamp(FIT_RANGE.0, FIT_RANGE.1);
+    }
     (w / FIT_BASE.0)
         .min(h / FIT_BASE.1)
         .clamp(FIT_RANGE.0, FIT_RANGE.1)
@@ -50,15 +57,27 @@ pub fn short() -> bool {
     SHORT.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+static WIN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// The window size of the last frame, in logical px (0, 0 before the first frame).
+pub fn window_size() -> (f32, f32) {
+    let v = WIN.load(std::sync::atomic::Ordering::Relaxed);
+    ((v >> 16) as f32, (v & 0xFFFF) as f32)
+}
+
 /// Set the fit from the window size. `true`: the fit changed (the frame must draw again).
 pub fn set_fit(w: f32, h: f32) -> bool {
+    WIN.store(
+        ((w as u32).min(0xFFFF) << 16) | (h as u32).min(0xFFFF),
+        std::sync::atomic::Ordering::Relaxed,
+    );
     SHORT.store(h < SHORT_H, std::sync::atomic::Ordering::Relaxed);
     let next = (fit_for(w, h) * 1000.).round() as u32;
     FIT.swap(next, std::sync::atomic::Ordering::Relaxed) != next
 }
 
 /// The text scale (the setting and the window fit) as a factor.
-fn factor() -> f32 {
+pub fn factor() -> f32 {
     UI_SCALE.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.
         * FIT.load(std::sync::atomic::Ordering::Relaxed) as f32
         / 1000.
@@ -71,7 +90,7 @@ pub fn sw(w: f32) -> Pixels {
 
 /// A text size of the interface: `size` px at 100 %, scaled by the interface text size.
 pub fn ts(size: f32) -> Pixels {
-    px(size * factor())
+    px(crate::look::snap(size) * factor())
 }
 
 pub fn hsla(rgba_hex: u32) -> Hsla {
@@ -336,7 +355,7 @@ fn pill_with(
         .items_center()
         .justify_center()
         .gap(px(8.))
-        .rounded_full()
+        .rounded(crate::look::r_pill())
         .text_size(ts(if small {
             crate::theme::T_SMALL
         } else {
@@ -413,6 +432,12 @@ pub fn menu(min_width: f32) -> Div {
         .border_color(rgba(crate::theme::pick(0x0D0D0E1F, tk().line_2)))
         .shadow(popover_shadow())
         .text_color(rgb(tk().ink))
+        .when(!crate::overlay_style::plain(), |_| {
+            crate::overlay_style::menu_frame()
+                .min_w(px(min_width))
+                .p(px(4.))
+                .shadow(popover_shadow())
+        })
 }
 
 /// A menu item (`.mi`); `on` shows the check mark.
@@ -431,12 +456,15 @@ pub fn menu_item(
         .items_center()
         .justify_between()
         .gap(px(12.))
-        .rounded(px(5.))
+        .rounded(crate::look::r_ctrl())
         .text_size(ts(crate::theme::T_BODY))
         .whitespace_nowrap()
         .cursor_pointer()
         .hover(|s| s.bg(rgb(tk().menu_hover)))
         .when(on, |d| d.font_weight(FontWeight::SEMIBOLD))
+        .when(!crate::overlay_style::plain(), |d| {
+            crate::overlay_style::menu_row(d, on)
+        })
         .child(left)
         .child(
             div()
@@ -479,7 +507,7 @@ pub fn seg_button(
         .flex()
         .items_center()
         .justify_center()
-        .rounded_full()
+        .rounded(crate::look::r_pill())
         .whitespace_nowrap()
         .text_size(ts(crate::theme::T_SMALL))
         .text_color(rgb(if on { tk().ink } else { tk().ink_2 }))
@@ -508,7 +536,7 @@ pub fn seg_track() -> Div {
         .gap(px(2.))
         .p(px(3.))
         .bg(rgb(tk().track))
-        .rounded_full()
+        .rounded(crate::look::r_pill())
 }
 
 /// Ask for the next animation frame, but at most about 30 times per second.
@@ -642,4 +670,35 @@ pub fn with_thumb(
         .flex_col()
         .child(scroll)
         .child(thumb(handle, color, width))
+}
+
+/// Show whole rows at the top of a chat that is scrolled to its end: when the top row is cut,
+/// move the content down until that row shows in full. The content needs a bottom padding of
+/// one row or more, because the last row moves down by the same distance. Call it in a frame
+/// after the scroll to the end took effect; it does nothing when the top is on a row edge.
+pub fn snap_rows(handle: &gpui::ScrollHandle) {
+    if f32::from(handle.max_offset().y).abs() < 0.5 {
+        return;
+    }
+    let (view, off) = (handle.bounds(), handle.offset());
+    let mut at = 0;
+    while let Some(b) = handle.bounds_for_item(at) {
+        if b.top() + off.y >= view.top() - px(0.5) {
+            break;
+        }
+        at += 1;
+    }
+    if at == 0 {
+        return;
+    }
+    let Some(cut) = handle.bounds_for_item(at - 1) else {
+        return;
+    };
+    if cut.bottom() + off.y <= view.top() + px(0.5) {
+        return;
+    }
+    let by = view.top() - (cut.top() + off.y);
+    if by > px(0.5) {
+        handle.set_offset(point(off.x, off.y + by));
+    }
 }

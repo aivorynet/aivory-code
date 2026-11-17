@@ -148,7 +148,7 @@ impl WarRoomScreen {
                         .flex()
                         .items_center()
                         .gap(px(6.))
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(T_CAPTION))
                         .font_weight(FontWeight::SEMIBOLD)
                         .whitespace_nowrap()
                         .child(ui::dot(rgb(state_tone(state))))
@@ -207,14 +207,14 @@ impl WarRoomScreen {
                     .child(
                         div()
                             .flex_none()
-                            .w(px(70.))
+                            .w(ui::sw(70.))
                             .text_color(rgb(tk().ink_3))
                             .child(entry.ts.clone()),
                     )
                     .child(
                         div()
                             .flex_none()
-                            .w(px(36.))
+                            .w(ui::sw(36.))
                             .font_weight(FontWeight::BOLD)
                             .text_color(rgb(color))
                             .child(short_id(&entry.session)),
@@ -240,13 +240,13 @@ impl WarRoomScreen {
             .child(
                 div()
                     .font_family(tk().display_figure)
-                    .text_size(ui::ts(26.))
+                    .text_size(ui::ts(crate::theme::T_DISPLAY))
                     .line_height(px(28.))
                     .child(war.queued.to_string()),
             )
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(if war.queued == 0 {
                         "No task waits for a slot."
@@ -282,18 +282,26 @@ impl WarRoomScreen {
             div()
                 .flex()
                 .items_baseline()
+                .gap(px(8.))
                 .child(
                     div()
+                        .flex_1()
+                        .min_w(px(0.))
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
                         .text_size(ui::ts(T_CAPTION))
                         .text_color(rgb(tk().ink_3))
                         .child(k),
                 )
                 .child(
                     div()
+                        .flex_none()
+                        .whitespace_nowrap()
                         .ml_auto()
                         .font_family(tk().mono)
                         .font_weight(FontWeight::BOLD)
-                        .text_size(ui::ts(T_SMALL))
+                        .text_size(ui::ts(T_CAPTION))
                         .text_color(rgb(color))
                         .child(v),
                 )
@@ -317,11 +325,11 @@ impl WarRoomScreen {
                 format!("${:.2}", self.shown.1),
                 tk().ink,
             ))
-            .child(metric("Average wait for you", avg, tk().q_text));
+            .child(metric("Avg wait for you", avg, tk().q_text));
 
         div()
             .flex_none()
-            .h(px(STRIP_H))
+            .h(px(STRIP_H * ui::factor().max(1.)))
             .flex()
             .gap(px(super::GAP))
             .child(

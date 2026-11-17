@@ -373,7 +373,7 @@ fn entry_name(s: &OsScheduler, id: &str) -> String {
     }
 }
 
-fn run(program: &str, args: &[&str], stdin: Option<&str>) -> Result<(), String> {
+pub(crate) fn run(program: &str, args: &[&str], stdin: Option<&str>) -> Result<(), String> {
     let mut cmd = Command::new(program);
     cmd.args(args)
         .stdin(if stdin.is_some() {
@@ -399,7 +399,7 @@ fn run(program: &str, args: &[&str], stdin: Option<&str>) -> Result<(), String> 
     }
 }
 
-fn run_out(program: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn run_out(program: &str, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new(program);
     cmd.args(args).stdin(Stdio::null()).stderr(Stdio::null());
     no_window(&mut cmd);
@@ -423,7 +423,7 @@ fn no_window(cmd: &mut Command) {
     let _ = cmd;
 }
 
-fn xml_escape(s: &str) -> String {
+pub(crate) fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -456,7 +456,7 @@ pub fn windows_task_xml(exe: &Path, id: &str, at: UnixMs, t: DateTime<Local>) ->
     )
 }
 
-fn utf16_bom(text: &str) -> Vec<u8> {
+pub(crate) fn utf16_bom(text: &str) -> Vec<u8> {
     let mut out = vec![0xFF, 0xFE];
     for unit in text.encode_utf16() {
         out.extend_from_slice(&unit.to_le_bytes());
@@ -464,7 +464,7 @@ fn utf16_bom(text: &str) -> Vec<u8> {
     out
 }
 
-fn systemd_dir() -> Option<PathBuf> {
+pub(crate) fn systemd_dir() -> Option<PathBuf> {
     let config = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::home_dir().map(|h| h.join(".config")))?;

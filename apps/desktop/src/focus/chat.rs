@@ -244,7 +244,7 @@ impl FocusScreen {
             .child(
                 div()
                     .font_family(tk().display_heading)
-                    .text_size(ui::ts(T_HEADING))
+                    .text_size(ui::ts(T_TITLE))
                     .line_height(ui::ts(26.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .overflow_hidden()
@@ -254,7 +254,7 @@ impl FocusScreen {
             )
             .child(
                 div()
-                    .font_family(tk().mono)
+                    .font_family(tk().sans)
                     .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .overflow_hidden()
@@ -286,7 +286,7 @@ impl FocusScreen {
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_size(px(8.))
+                .text_size(ui::ts(T_CAPTION))
                 .text_color(rgb(0xFFFFFF))
                 .map(|d| match t.state {
                     TodoState::Done => d.bg(rgb(tk().ink)).child("✓"),
@@ -498,7 +498,7 @@ impl FocusScreen {
                 .child(div().min_w(px(0.)).child(text.clone()))
                 .into_any_element(),
             Item::Error(text) => div()
-                .text_size(ui::ts(T_SMALL))
+                .text_size(ui::ts(T_CAPTION))
                 .text_color(rgb(tk().e_text))
                 .child(text.clone())
                 .into_any_element(),
@@ -560,7 +560,7 @@ impl FocusScreen {
         if let Some(given) = &given {
             answers = answers.child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(format!("Answered: {given}")),
             );
@@ -582,7 +582,7 @@ impl FocusScreen {
         } else {
             answers = answers.child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child("Answer in its terminal"),
             );
@@ -597,7 +597,7 @@ impl FocusScreen {
             .shadow(ui::card_shadow())
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(color))
                     .child(ask.kind.label()),
@@ -610,13 +610,13 @@ impl FocusScreen {
                     .rounded(px(6.))
                     .bg(rgb(tk().track))
                     .font_family(tk().mono)
-                    .text_size(ui::ts(12.5))
+                    .text_size(ui::ts(T_CAPTION))
                     .child(ask.text.clone()),
             );
         } else {
             col = col.child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .line_height(ui::ts(20.))
                     .text_color(rgb(tk().ink_2))
                     .child(ask.text.clone()),
@@ -625,7 +625,7 @@ impl FocusScreen {
         if let Some(reason) = &ask.reason {
             col = col.child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_2))
                     .child(reason.clone()),
             );
@@ -635,7 +635,7 @@ impl FocusScreen {
                 div()
                     .flex()
                     .gap(px(8.))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .child(
                         div()
                             .text_color(rgb(tk().ink_3))
@@ -706,14 +706,6 @@ impl FocusScreen {
                     cx.notify();
                 }),
             ));
-        }
-        if self.refs.is_empty() && self.tools.attachments.is_empty() {
-            media = media.child(
-                div()
-                    .text_size(ui::ts(T_CAPTION))
-                    .text_color(rgb(tk().ink_3))
-                    .child("Select lines in the editor to reference them here"),
-            );
         }
         let status = compose::status(&self.tools, "focus", compose::Palette::page(), |action| {
             Box::new(cx.listener(move |this, _, window, cx| {
@@ -844,6 +836,7 @@ impl FocusScreen {
                     .child(ui::icon("icons/mic.svg", 15., rgb(tk().ink_3))),
             );
         }
+        let has_media = !self.refs.is_empty() || !self.tools.attachments.is_empty();
         div()
             .flex_none()
             .mx(px(14.))
@@ -851,7 +844,7 @@ impl FocusScreen {
             .rounded(px(14.))
             .bg(rgb(tk().card))
             .shadow(ui::card_shadow())
-            .child(media)
+            .when(has_media, |d| d.child(media))
             .children(status)
             .child(cb)
             .child(dr)
@@ -904,7 +897,7 @@ fn turn_chip(turn: u32) -> Div {
         .bg(rgb(CLAUDE))
         .text_color(rgb(0xFFFFFF))
         .font_family(tk().mono)
-        .text_size(ui::ts(11.))
+        .text_size(ui::ts(crate::theme::T_CAPTION))
         .child(turn.to_string())
 }
 

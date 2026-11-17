@@ -7,7 +7,7 @@
 use std::rc::Rc;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Div, Window, div, px, rgb};
+use gpui::{AnyElement, Context, Div, Window, div, rgb};
 
 use super::{Screen, Shell, first_windows};
 use crate::actions::{Action, act};
@@ -17,7 +17,8 @@ use crate::model::Link;
 /// The three shapes of the frame.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
-    /// The war room: the planet view draws the header; only the navigation is the frame's.
+    /// The war room: the same frame and navigation as the Overview, with a lower frame; the
+    /// planet view draws its own title and stats.
     Planet,
     /// The other main screens: the header bars; the screen draws its islands below.
     Overview,
@@ -35,60 +36,6 @@ struct Facts {
     idle: Vec<String>,
     /// The live sessions in switcher order: id, short name, color.
     switcher: Vec<(String, String, u32)>,
-}
-
-/// A segment of the war room board: label, top, height, color, screen.
-type PlanetSeg = (&'static str, f32, f32, Option<u32>, Option<usize>);
-
-/// The navigation of the war room board: segments on the swept frame, labels at the lower right.
-fn planet_nav(art: Art, level: u8, inbox: u32, go: &NavFn, look: AnyElement) -> Div {
-    let top = [0xFF9900, 0xCC99CC, 0xFF9966][usize::from(level.min(2))];
-    let segs: [PlanetSeg; 6] = [
-        ("AIV code", 0., 104., Some(top), Some(0)),
-        ("01 War room", 108., 70., None, Some(0)),
-        ("02 Inbox", 330., 48., None, Some(1)),
-        ("03 Tasks", 382., 150., Some(0x9C9CFF), Some(2)),
-        ("04 Repos", 536., 54., Some(0xFF9900), Some(3)),
-        ("05 Settings", 594., 306. + art.dy, Some(0xFF9966), Some(4)),
-    ];
-    let mut out = div().absolute().inset_0();
-    for (k, (name, y, h, color, to)) in segs.into_iter().enumerate() {
-        let label = if k == 2 && inbox > 0 {
-            format!("{name} {inbox:02}")
-        } else {
-            name.to_string()
-        };
-        let go = go.clone();
-        let mut el = rect(0., y, 188., h, 0x000000)
-            .id(("pl-nav", k))
-            .flex()
-            .justify_end()
-            .pr(px(12.))
-            .cursor_pointer()
-            .font_family(LABEL)
-            .text_size(px(18.))
-            .line_height(px(24.))
-            .text_color(rgb(0x000000))
-            .whitespace_nowrap()
-            .on_click(move |_, w, cx| {
-                if let Some(i) = to {
-                    go(i, w, cx);
-                }
-            })
-            .child(label.to_uppercase());
-        el = match color {
-            Some(c) => el.bg(rgb(c)),
-            None => el.bg(gpui::transparent_black()),
-        };
-        // The first war room label sits at the top of its segment, as in the board.
-        el = if k == 1 || k == 5 {
-            el.items_start().pt(px(6.))
-        } else {
-            el.items_end().pb(px(6.))
-        };
-        out = out.child(el);
-    }
-    out.child(look)
 }
 
 impl Shell {
@@ -200,14 +147,26 @@ impl Shell {
             Screen::Lens => Some(3),
             _ => None,
         };
-        let level = self.war_room.read(cx).bridge_level();
-        let mut frame: Vec<AnyElement> = if shape == Shape::Planet {
-            Vec::new()
-        } else {
-            nav(active, sub, facts.inbox, detail_id.is_some(), &go)
-        };
+        let mut frame: Vec<AnyElement> = nav(active, sub, facts.inbox, true, &go);
         let look = self.bridge_look_button(cx);
+        // The war room map is opaque and fills the window: its frame parts draw above it.
+        let mut over: Vec<AnyElement> = Vec::new();
         match shape {
+            Shape::Planet => {
+                over.append(&mut frame);
+                // The elbow sweeps into the bar with its inner curve; the black notch belongs
+                // to the header panel, inside the frame shape.
+                over.extend(
+                    upper_elbow(art)
+                        .into_iter()
+                        .take(2)
+                        .map(|d| d.occlude().into_any_element()),
+                );
+                over.push(
+                    bar_text(bar(art.rx(986.), 234., 316., PK), &facts.status).into_any_element(),
+                );
+                over.push(look(art.rx(1306.), 234., 118., 16.));
+            }
             Shape::Overview => {
                 frame.extend(
                     upper_elbow(art)
@@ -222,7 +181,21 @@ impl Shell {
             Shape::Plain => {
                 frame.push(rect(16., 188., 150., art.by(786.) - 188., PU).into_any_element());
             }
-            Shape::Planet => {}
+        }
+        // The war room draws its lower frame over the map.
+        if shape == Shape::Planet {
+            // No lower elbow: the map fills the window and the bars float over it.
+            over.push(
+                bar(16., art.by(868.), 786. + art.dx, PU)
+                    .occlude()
+                    .into_any_element(),
+            );
+            over.push(self.bridge_park_bar(art, &facts, cx));
+            over.push(
+                bar(art.rx(1040.), art.by(868.), 384., PU)
+                    .occlude()
+                    .into_any_element(),
+            );
         }
         if shape != Shape::Overview && shape != Shape::Planet {
             frame.extend(
@@ -290,22 +263,33 @@ impl Shell {
             .absolute()
             .flex()
             .gap(px(8.))
-            .map(|d| match shape {
-                Shape::Planet => d.left(px(204.)).bottom(px(16.)),
-                Shape::Overview | Shape::Plain => d.left(px(16.)).top(px(262.)),
+            .map(|d| match (shape, &self.screen) {
+                // The war room and the session screen: the pills sit in the header, top right.
+                (Shape::Planet, _) => d.right(px(24.)).top(px(92.)),
+                _ => d.right(px(24.)).top(px(70.)),
             })
-            .children(crate::new_session::launch_buttons("bridge", |id, label| {
-                pill(id, if label == "Organizer" { OR } else { PK }, label).w(px(130.))
-            }));
-        let planet = (shape == Shape::Planet).then(|| {
-            planet_nav(
-                art,
-                level,
-                facts.inbox,
-                &go,
-                look(art.rx(1379.), 232., 61., 22.),
+            // The session screen: a Back key in the header goes to the screen before.
+            .when(
+                matches!(self.screen, Screen::Session(_) | Screen::Lens),
+                |d| {
+                    d.child(
+                        pill("lb-back", SA, "Back")
+                            .w(px(150.))
+                            .min_h(px(44.))
+                            .text_size(px(S_LEAD))
+                            .line_height(px(S_LEAD))
+                            .on_click(cx.listener(|t, _, _, cx| t.go_back(cx))),
+                    )
+                },
             )
-        });
+            .children(crate::new_session::launch_buttons("bridge", |id, label| {
+                let c = if label == "Organizer" { OR } else { PK };
+                let el = pill(id, c, label).w(px(130.));
+                el.w(px(150.))
+                    .min_h(px(44.))
+                    .text_size(px(S_LEAD))
+                    .line_height(px(S_LEAD))
+            }));
         let menu = self.look_menu.then(|| {
             let y = if matches!(shape, Shape::Overview | Shape::Planet) {
                 254.
@@ -324,7 +308,7 @@ impl Shell {
             .children(frame)
             .child(body)
             .children((shape != Shape::Planet).then_some(heading))
-            .children(planet)
+            .children(over)
             .child(launch)
             .children(menu)
             .children(toasts)
@@ -405,9 +389,11 @@ impl Shell {
             format!("{n:02} Idle · park all")
         };
         let ids = facts.idle.clone();
-        bar_text(bar(art.rx(806.), art.by(868.), 230., GY), &label)
+        let tone = if n > 0 { PK } else { PU };
+        bar_text(bar(art.rx(806.), art.by(868.), 230., tone), &label)
             .id("lc-park")
-            .when(n > 0, |d| d.cursor_pointer().hover(|s| s.bg(rgb(lit(GY)))))
+            .occlude()
+            .when(n > 0, |d| d.cursor_pointer().hover(|s| s.bg(rgb(lit(PK)))))
             .on_click(cx.listener(move |this, _, _, cx| {
                 for id in &ids {
                     act(&this.model, Action::Park(id.clone()), cx);

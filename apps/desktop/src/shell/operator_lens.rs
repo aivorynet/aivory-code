@@ -20,7 +20,6 @@ use super::operator_screens::{
 };
 use crate::lens::logic::{OutlineRow, bare_name, flatten_outline};
 use crate::model::Model;
-use crate::ui;
 use crate::warroom::skins::operator::kit::*;
 
 /// How old a read gets before the view asks again.
@@ -591,7 +590,7 @@ impl Render for OperatorLens {
                     .child(div().text_color(rgb(BLUE_HI)).child(path.clone()))
                     .child(
                         div()
-                            .text_size(ui::ts(T_LABEL))
+                            .text_size(ts(T_LABEL))
                             .text_color(rgb(BLUE_SOFT))
                             .child(format!(
                                 "{} lines · {}",
@@ -672,7 +671,7 @@ impl Render for OperatorLens {
                                 .child(
                                     div()
                                         .flex_none()
-                                        .text_size(ui::ts(T_LABEL))
+                                        .text_size(ts(T_LABEL))
                                         .text_color(rgb(BLUE_SOFT))
                                         .child(p.preview.clone()),
                                 );
@@ -680,7 +679,7 @@ impl Render for OperatorLens {
                     }
                     Deep::Source => {
                         body = body.child(caption("Source"));
-                        let mut src = div().flex().flex_col().text_size(ui::ts(T_LABEL));
+                        let mut src = div().flex().flex_col().text_size(ts(T_LABEL));
                         for (i, l) in f.text.lines().take(SOURCE_LINES).enumerate() {
                             src = src.child(
                                 div()

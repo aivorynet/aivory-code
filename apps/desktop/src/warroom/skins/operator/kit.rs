@@ -44,10 +44,12 @@ fn painter(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Painter)) {
 pub const FONT: &str = "IBM Plex Mono";
 
 // The one type scale of the look (all sizes go through `ui::ts`). Use these, never a literal.
-pub const MX_DISPLAY: f32 = 16.;
-pub const MX_TITLE: f32 = 11.5;
-pub const MX_BODY: f32 = 10.5;
-pub const MX_SMALL: f32 = 9.5;
+pub const MX_DISPLAY: f32 = 30.;
+pub const MX_TITLE: f32 = 17.;
+pub const MX_BODY: f32 = 14.;
+pub const MX_SMALL: f32 = 12.;
+/// The text of the black label on the bezel.
+pub const MX_TAG: f32 = 10.;
 pub const T_TITLE: f32 = MX_DISPLAY;
 pub const T_SECTION: f32 = MX_TITLE;
 pub const T_ENTRY: f32 = MX_BODY;
@@ -135,61 +137,359 @@ pub fn ease(x: f32) -> f32 {
     1. - (1. - x).powi(3)
 }
 
+// ---- text and scroll ---------------------------------------------------------------------------
+
+/// A text size on the Operator screens: the board size at the default interface scale (115 %),
+/// following the owner's text setting but not the window fit. A larger window shows more text
+/// instead of larger text (owner 2026-11-14).
+pub fn ts(size: f32) -> gpui::Pixels {
+    px(size * f32::from(ui::ui_scale()) / 115.)
+}
+
+/// "Follow the bottom" of a console: new lines scroll into view while the owner is at the
+/// bottom; a scroll up by the owner stops it, a scroll back to the bottom starts it again.
+#[derive(Default)]
+pub struct Follow {
+    last_max: f32,
+    loose: bool,
+}
+
+impl Follow {
+    /// Follow again from the next frame (a new session on the screen).
+    pub fn reset(&mut self) {
+        self.loose = false;
+        self.last_max = -1.;
+    }
+
+    /// Call once per frame with the handle of the scroll area.
+    pub fn update(&mut self, handle: &gpui::ScrollHandle) {
+        let max = f32::from(handle.max_offset().y);
+        let off = -f32::from(handle.offset().y);
+        let at_bottom = max - off <= 8.;
+        if at_bottom {
+            self.loose = false;
+        } else if (max - self.last_max).abs() < 0.5 {
+            // The content did not grow, yet the view is not at the bottom: the owner scrolled.
+            self.loose = true;
+        }
+        if !self.loose && !at_bottom {
+            handle.scroll_to_bottom();
+        }
+        self.last_max = max;
+    }
+}
+
+// ---- chat input --------------------------------------------------------------------------------
+
+/// The chat input of a green console, as a familiar text field (owner 2026-11-14: the old prompt
+/// line looked like nothing and distracted): a quiet "To ..." line, then a rounded field box a
+/// little darker than the screen with a thin green border (brighter while typing), the input,
+/// and an Enter key at the right.
+pub fn chat_field(to: String, input: AnyElement, enter: &'static str, typing: bool) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(5.))
+        .child(
+            div()
+                .text_size(ts(MX_SMALL))
+                .text_color(rgb(GREEN_MID))
+                .child(to),
+        )
+        .child(
+            div()
+                .h(px(38.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .rounded(px(6.))
+                .bg(rgb(0x020C06))
+                .border_1()
+                .border_color(hca(GREEN, if typing { 200 } else { 110 }))
+                .text_size(ts(MX_BODY))
+                .text_color(rgb(GREEN_HI))
+                .child(div().flex_1().min_w(px(0.)).child(input))
+                .child(
+                    div()
+                        .flex_none()
+                        .h(px(22.))
+                        .px(px(8.))
+                        .flex()
+                        .items_center()
+                        .rounded(px(4.))
+                        .bg(rgb(0x0D2A18))
+                        .border_1()
+                        .border_color(hca(GREEN, 80))
+                        .text_size(ts(MX_SMALL))
+                        .text_color(rgb(GREEN_MID))
+                        .child(enter),
+                ),
+        )
+}
+
+// ---- room -----------------------------------------------------------------------------------
+
+/// The dark, gray, blurred photo of the operator room with the desk top across the bottom
+/// (assets/operator/room.jpg, 2400x800). The war room slides it with its pages.
+pub fn room_image() -> std::sync::Arc<gpui::RenderImage> {
+    static ROOM: std::sync::OnceLock<std::sync::Arc<gpui::RenderImage>> =
+        std::sync::OnceLock::new();
+    ROOM.get_or_init(|| {
+        let bytes = include_bytes!("../../../../assets/operator/room.jpg");
+        let px = image::load_from_memory(bytes)
+            .map(|i| i.to_rgba8())
+            .unwrap_or_else(|_| image::RgbaImage::new(1, 1));
+        crate::rts::to_render_owned(px)
+    })
+    .clone()
+}
+
+/// The room behind the monitors: the photo at the window height, shifted left by `shift`
+/// (0 = the left end, 1 = the right end).
+pub fn room(shift: f32) -> AnyElement {
+    let image = room_image();
+    canvas(
+        |_, _, _| (),
+        move |bounds, _, window, _| {
+            let h = f32::from(bounds.size.height);
+            let w = h * 3.;
+            let free = (w - f32::from(bounds.size.width)).max(0.);
+            let x = f32::from(bounds.origin.x) - free * shift.clamp(0., 1.);
+            let rect = gpui::Bounds::new(point(px(x), bounds.origin.y), gpui::size(px(w), px(h)));
+            window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
+                let _ = window.paint_image(
+                    rect,
+                    rect,
+                    gpui::Corners::default(),
+                    image.clone(),
+                    0,
+                    false,
+                );
+            });
+        },
+    )
+    .absolute()
+    .inset_0()
+    .into_any_element()
+}
+
+// ---- keys -------------------------------------------------------------------------------------
+
+/// A physical key of the console (accepted board): flat dark cap, a hard dark edge below and a
+/// soft shadow. The lit key has green text and a small LED.
+pub fn keycap(on: bool) -> Div {
+    let el = div()
+        .flex_none()
+        .h(px(26.))
+        .px(px(10.))
+        .flex()
+        .items_center()
+        .gap(px(6.))
+        .rounded(px(5.))
+        .border_1()
+        .border_color(rgb(0x000000))
+        .bg(rgb(0x2A2D2F))
+        .shadow(vec![
+            BoxShadow {
+                color: hc(0x0A0B0B),
+                offset: point(px(0.), px(3.)),
+                blur_radius: px(0.),
+                spread_radius: px(0.),
+                inset: false,
+            },
+            BoxShadow {
+                color: hca(0x000000, 153),
+                offset: point(px(0.), px(5.)),
+                blur_radius: px(9.),
+                spread_radius: px(0.),
+                inset: false,
+            },
+        ])
+        .text_size(px(MX_SMALL))
+        .line_height(px(MX_SMALL))
+        .text_color(rgb(if on { 0x3BD16F } else { 0xB9C3C8 }))
+        .cursor_pointer()
+        .hover(|h| h.bg(rgb(0x34383A)));
+    if on {
+        el.child(
+            div()
+                .flex_none()
+                .size(px(6.))
+                .rounded_full()
+                .bg(rgb(0x3BD16F))
+                .shadow(vec![BoxShadow {
+                    color: hca(0x3BD16F, 160),
+                    offset: point(px(0.), px(0.)),
+                    blur_radius: px(4.),
+                    spread_radius: px(0.),
+                    inset: false,
+                }]),
+        )
+    } else {
+        el
+    }
+}
+
+// ---- mounts -----------------------------------------------------------------------------------
+
+/// One steel slab, `w` long, at the height fraction `at` of its parent; `left` slabs reach
+/// out of the left side of the parent, the others out of the right side. A heavy bar (bright top
+/// edge, dark bottom edge, faint brushed lines) and a tall bracket plate where it meets the monitor.
+fn slab(w: f32, at: f32, left: bool) -> Div {
+    let shadow = |d: Div| {
+        d.shadow(vec![BoxShadow {
+            color: hca(0x000000, 160),
+            offset: point(px(6.), px(8.)),
+            blur_radius: px(8.),
+            spread_radius: px(0.),
+            inset: false,
+        }])
+    };
+    let line = |y: f32| {
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .top(px(y))
+            .h(px(1.))
+            .bg(hca(0xFFFFFF, 12))
+    };
+    let bar = shadow(
+        div()
+            .absolute()
+            .top(px(6.))
+            .left_0()
+            .right_0()
+            .h(px(22.))
+            .flex()
+            .items_center()
+            .bg(rgb(0x33383A))
+            .border_t_1()
+            .border_b_1()
+            .border_color(rgb(0x111314)),
+    )
+    .child(
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .top_0()
+            .h(px(1.))
+            .bg(rgb(0x8A9496)),
+    )
+    .child(line(7.))
+    .child(line(13.));
+    // The bracket plate on the side of the monitor.
+    let plate = shadow(
+        div()
+            .absolute()
+            .top_0()
+            .w(px(9.))
+            .h(px(34.))
+            .bg(rgb(0x2B2F31))
+            .border_1()
+            .border_color(rgb(0x111314)),
+    )
+    .child(
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .top_0()
+            .h(px(1.))
+            .bg(rgb(0x7F898B)),
+    );
+    let plate = if left {
+        plate.right_0()
+    } else {
+        plate.left_0()
+    };
+    let el = div()
+        .absolute()
+        .top(gpui::relative(at))
+        .mt(px(-17.))
+        .w(px(w))
+        .h(px(34.))
+        .child(bar)
+        .child(plate);
+    if left {
+        el.left(px(-w))
+    } else {
+        el.right(px(-w))
+    }
+}
+
+/// The monitors hang on short horizontal steel slabs (no bolts): from the side walls into the
+/// outer monitors and between neighbours (accepted board, v21 mounts). `left` and `right` are how far
+/// the slabs reach out of each side (0 = none); the parent must be `relative`.
+pub fn slabs(el: Div, left: f32, right: f32) -> Div {
+    let mut el = el.relative();
+    for at in [0.22, 0.78] {
+        if left > 0. {
+            el = el.child(slab(left, at, true));
+        }
+        if right > 0. {
+            el = el.child(slab(right, at, false));
+        }
+    }
+    el
+}
+
 // ---- monitors -----------------------------------------------------------------------------
 
-/// The frame of a monitor with depth: a light top edge, a dark bottom edge, a drop shadow and
-/// a faint glow of the screen in `tint`.
-pub fn bezel(tint: u32) -> Div {
+/// The plastic of a monitor (accepted board 2026-11-14): solid dark gray, a thin rim (10 px on
+/// the top and the sides, the chin is the foot), a neutral light line on the top edge from the
+/// ceiling light and a cast shadow down onto the wall. No gradient, no colored glow.
+pub const RIM: u32 = 0x2A2A2A;
+pub fn bezel(_tint: u32) -> Div {
     div()
         .relative()
         .flex()
         .flex_col()
         .rounded(px(14.))
-        .px(px(11.))
-        .pt(px(11.))
-        .bg(linear_gradient(
-            180.,
-            linear_color_stop(rgb(0x1E241F), 0.),
-            linear_color_stop(rgb(0x0F120F), 1.),
-        ))
+        .px(px(10.))
+        .pt(px(10.))
+        .bg(rgb(RIM))
+        .border_1()
+        .border_color(rgb(0x181818))
         .shadow(vec![
             BoxShadow {
-                color: hca(0x000000, 190),
-                offset: point(px(0.), px(7.)),
-                blur_radius: px(16.),
+                color: hca(0x000000, 204),
+                offset: point(px(8.), px(42.)),
+                blur_radius: px(50.),
                 spread_radius: px(0.),
                 inset: false,
             },
             BoxShadow {
-                color: hca(tint, 34),
-                offset: point(px(0.), px(0.)),
-                blur_radius: px(24.),
-                spread_radius: px(1.),
+                color: hca(0x000000, 184),
+                offset: point(px(2.), px(14.)),
+                blur_radius: px(18.),
+                spread_radius: px(0.),
+                inset: false,
+            },
+            BoxShadow {
+                color: hca(0x000000, 230),
+                offset: point(px(0.), px(2.)),
+                blur_radius: px(3.),
+                spread_radius: px(0.),
                 inset: false,
             },
         ])
         .child(
             div()
                 .absolute()
-                .top(px(1.))
+                .top(px(0.))
                 .left(px(12.))
                 .right(px(12.))
                 .h(px(1.))
-                .bg(hca(0xFFFFFF, 56)),
-        )
-        .child(
-            div()
-                .absolute()
-                .bottom(px(1.))
-                .left(px(12.))
-                .right(px(12.))
-                .h(px(1.))
-                .bg(hca(0x000000, 220)),
+                .bg(hca(0xCDCDCD, 107)),
         )
 }
 
-/// The glass of a monitor: blue (information) or green (agent). Add the content, then
-/// `glaze` as the last child.
+/// The glass of a monitor: blue (information) or green (agent). A curved tube (round
+/// corners), set into the plastic with a dark recess ring. Add the content, then `glaze` as
+/// the last child.
 pub fn glass(blue: bool) -> Div {
     div()
         .relative()
@@ -197,8 +497,24 @@ pub fn glass(blue: bool) -> Div {
         .min_h(px(0.))
         .rounded(px(CORNER))
         .overflow_hidden()
-        .bg(rgb(if blue { BLUE_INK } else { 0x010A03 }))
+        .bg(rgb(if blue { 0x10243A } else { 0x041A0E }))
         .text_color(rgb(if blue { BLUE } else { GREEN }))
+        .shadow(vec![
+            BoxShadow {
+                color: hc(0x383838),
+                offset: point(px(0.), px(0.)),
+                blur_radius: px(0.),
+                spread_radius: px(4.),
+                inset: false,
+            },
+            BoxShadow {
+                color: hc(0x121212),
+                offset: point(px(0.), px(0.)),
+                blur_radius: px(0.),
+                spread_radius: px(3.),
+                inset: false,
+            },
+        ])
         .child(fx(blue))
 }
 
@@ -208,55 +524,90 @@ pub fn screen(blue: bool, content: impl IntoElement) -> Div {
 }
 
 /// The radius of the glass. The glaze rounds the content to it.
-const CORNER: f32 = 6.;
+const CORNER: f32 = 16.;
 
-/// What lies over the content of a glass: an inner shadow, a faint reflection of the room and
-/// the four rounded corners. The corners cut the square content to the round glass, so
-/// nothing sticks out of the bezel.
-pub fn glaze(blue: bool) -> AnyElement {
+/// What lies over the content of a glass (the CRT of paul-piper.de, adapted): scanlines every
+/// 3 px, a fine aperture grille, the inner shadow of the tube, the glass sheen (light at the
+/// top, darker at the bottom), the glare of the ceiling light strips and the round corners of
+/// the tube. The corners cut the square content to the round glass.
+pub fn glaze(_blue: bool) -> AnyElement {
     canvas(
         |_, _, _| (),
         move |bounds, _, window, cx| {
             let (x, y) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
             let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
             painter(window, cx, |p| {
-                for i in 0..6 {
-                    let a = 0.34 * (1. - i as f32 / 6.);
-                    let o = i as f32 * 1.5;
-                    p.rect((x, y + o, w, 1.5), 0x000000, a);
-                    p.rect((x, y + h - o - 1.5, w, 1.5), 0x000000, a * 0.6);
-                    p.rect((x + o, y, 1.5, h), 0x000000, a * 0.7);
-                    p.rect((x + w - o - 1.5, y, 1.5, h), 0x000000, a * 0.7);
+                // scanlines: the dark middle of every third pixel row
+                let mut line = y + 2.;
+                while line < y + h {
+                    p.rect((x, line, w, 1.), 0x000000, 0.18);
+                    line += 3.;
                 }
-                let tint = if blue { 0xBFE6FF } else { 0xD8FFE4 };
-                p.polygon(
-                    &[
-                        [x + 2., y + 2.],
-                        [x + w * 0.58, y + 2.],
-                        [x + w * 0.22, y + h * 0.5],
-                        [x + 2., y + h * 0.62],
-                    ],
-                    tint,
-                    0.035,
-                );
-                // The corners: a square minus a quarter disc, in the color of the bezel.
+                // aperture grille: every second pixel column a little darker
+                let mut col = x + 1.;
+                while col < x + w {
+                    p.rect((col, y, 1., h), 0x000000, 0.05);
+                    col += 2.;
+                }
+                // the inner shadow of the tube: 60 px, strongest at the edge
+                for i in 0..16 {
+                    let o = i as f32 * 3.;
+                    let a = 0.7 * (1. - i as f32 / 16.).powf(2.2) / 3.;
+                    p.rect((x, y + o, w, 3.), 0x000000, a);
+                    p.rect((x, y + h - o - 3., w, 3.), 0x000000, a);
+                    p.rect((x + o, y, 3., h), 0x000000, a);
+                    p.rect((x + w - o - 3., y, 3., h), 0x000000, a);
+                }
+                // the glass sheen: light from the top to 38 %, dark from 60 % to the bottom
+                for i in 0..20 {
+                    let f = i as f32 / 20.;
+                    p.rect(
+                        (x, y + h * 0.38 * f, w, h * 0.38 / 20. + 0.5),
+                        0xFFFFFF,
+                        0.09 - 0.07 * f,
+                    );
+                    p.rect(
+                        (x, y + h * (0.6 + 0.4 * f), w, h * 0.4 / 20. + 0.5),
+                        0x000000,
+                        0.22 * f,
+                    );
+                }
+                // glare: the ceiling light strips reflect as two soft bars near the top
+                for (bx, by, bw, bh, a) in
+                    [(0.07, 0.07, 0.44, 9., 0.13), (0.58, 0.05, 0.22, 6., 0.08)]
+                {
+                    for k in 0..4 {
+                        let g = k as f32 * 2.;
+                        p.rect(
+                            (
+                                x + w * bx - g,
+                                y + h * by - g * 0.5,
+                                w * bw + 2. * g,
+                                bh + g,
+                            ),
+                            0xEBFAFF,
+                            a / 4.,
+                        );
+                    }
+                }
+                // the corners: a square minus a quarter disc, in the color of the recess ring
                 let r = CORNER;
-                for (cx0, cy0, a0, color) in [
-                    (x + r, y + r, PI, 0x1D231E),
-                    (x + w - r, y + r, 1.5 * PI, 0x1D231E),
-                    (x + w - r, y + h - r, 0., 0x111511),
-                    (x + r, y + h - r, FRAC_PI_2, 0x111511),
+                for (cx0, cy0, a0) in [
+                    (x + r, y + r, PI),
+                    (x + w - r, y + r, 1.5 * PI),
+                    (x + w - r, y + h - r, 0.),
+                    (x + r, y + h - r, FRAC_PI_2),
                 ] {
                     let (sx, sy) = (
                         if cx0 < x + w / 2. { -1. } else { 1. },
                         if cy0 < y + h / 2. { -1. } else { 1. },
                     );
                     let mut pts = vec![[cx0 + sx * r, cy0 + sy * r]];
-                    for k in 0..=6 {
-                        let a = a0 + FRAC_PI_2 * k as f32 / 6.;
+                    for k in 0..=8 {
+                        let a = a0 + FRAC_PI_2 * k as f32 / 8.;
                         pts.push([cx0 + a.cos() * r, cy0 + a.sin() * r]);
                     }
-                    p.polygon(&pts, color, 1.);
+                    p.polygon(&pts, 0x121212, 1.);
                 }
             });
         },
@@ -277,28 +628,93 @@ pub fn dimmed(id: SharedString) -> Stateful<Div> {
         .hover(|s| s.opacity(1.))
 }
 
-/// The foot of a monitor: a round badge and some parts of text.
-pub fn foot(_badge: &str, badge_color: u32, parts: Vec<(String, u32)>, height: f32) -> Div {
-    // Only a thin bar in the state color: the screens are no sequence, so no number.
-    let mut row = div()
+/// The chin of a monitor (28 px): a black label of fixed width with the name of the screen
+/// (gray, 10 px, right-aligned, at most 30 characters) next to the power LED in the state
+/// color. The label keeps 6 px from the edges of the rim.
+pub fn foot(_badge: &str, badge_color: u32, parts: Vec<(String, u32)>, _height: f32) -> Div {
+    let text: String = parts
+        .iter()
+        .map(|(t, _)| t.trim())
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>()
+        .join(" · ")
+        .to_uppercase()
+        .chars()
+        .take(30)
+        .collect();
+    let tag = div()
         .flex_none()
-        .h(px(height))
+        .w(px(212.))
+        .h(px(16.))
+        .px(px(5.))
+        .py(px(2.))
         .flex()
         .items_center()
-        .gap(px(8.))
-        .px(px(4.))
+        .justify_end()
         .overflow_hidden()
         .whitespace_nowrap()
-        .text_size(ui::ts(T_LABEL))
-        .text_color(rgb(FOOT))
-        .child(div().flex_none().w(px(3.)).h(px(12.)).bg(rgb(badge_color)));
-    for (text, color) in parts {
-        row = row.child(div().text_color(rgb(color)).child(text));
-    }
-    row
+        .bg(rgb(0x050505))
+        .border_1()
+        .border_color(rgb(0x000000))
+        .text_size(px(MX_TAG))
+        .line_height(px(MX_TAG))
+        .text_color(rgb(0x7C8285))
+        .child(
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .right_0()
+                .h(px(8.))
+                .bg(linear_gradient(
+                    180.,
+                    linear_color_stop(hca(0xFFFFFF, 40), 0.),
+                    linear_color_stop(hca(0xFFFFFF, 0), 1.),
+                )),
+        )
+        .child(text);
+    let led = div()
+        .flex_none()
+        .size(px(11.))
+        .rounded_full()
+        .bg(rgb(0x121212))
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(
+            div()
+                .relative()
+                .size(px(6.))
+                .rounded_full()
+                .bg(rgb(badge_color))
+                .shadow(vec![BoxShadow {
+                    color: hca(badge_color, 140),
+                    offset: point(px(0.), px(0.)),
+                    blur_radius: px(4.),
+                    spread_radius: px(0.),
+                    inset: false,
+                }])
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(1.))
+                        .top(px(1.))
+                        .size(px(2.))
+                        .rounded_full()
+                        .bg(hca(0xFFFFFF, 204)),
+                ),
+        );
+    div()
+        .flex_none()
+        .h(px(28.))
+        .flex()
+        .items_center()
+        .justify_end()
+        .gap(px(9.))
+        .pr(px(3.))
+        .child(div().relative().child(tag))
+        .child(led)
 }
-
-// ---- token streams ------------------------------------------------------------------------
 
 /// A text with its colored runs.
 pub struct Stream {
@@ -500,35 +916,10 @@ pub fn activity(pane: &Pane) -> f32 {
     (0.35 + 0.65 * busy as f32 / n as f32).clamp(0., 1.)
 }
 
-/// A faint glow along the edge of a screen and fine dark scanlines. It is the first child of
-/// a glass, so the content of the screen paints over it.
-fn fx(blue: bool) -> AnyElement {
-    let tint = if blue { BLUE } else { GREEN };
-    canvas(
-        |_, _, _| (),
-        move |bounds, _, window, cx| {
-            let (x, y) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
-            let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-            painter(window, cx, |p| {
-                for i in 0..4 {
-                    let a = 0.08 * (1. - i as f32 / 4.);
-                    let o = i as f32 * 2.;
-                    p.rect((x, y + o, w, 2.), tint, a);
-                    p.rect((x, y + h - o - 2., w, 2.), tint, a);
-                    p.rect((x + o, y, 2., h), tint, a);
-                    p.rect((x + w - o - 2., y, 2., h), tint, a);
-                }
-                let mut line = y;
-                while line < y + h {
-                    p.rect((x, line, w, 1.), 0x000000, 0.22);
-                    line += 3.;
-                }
-            });
-        },
-    )
-    .absolute()
-    .inset_0()
-    .into_any_element()
+/// Kept as the first child of a glass for the layout; the CRT effect paints in the glaze,
+/// over the content (owner 2026-11-14: no colored glow around the screens).
+fn fx(_blue: bool) -> AnyElement {
+    div().absolute().inset_0().into_any_element()
 }
 
 /// Code rain: a few clear falling streams per screen. A stream is a piece of the output of the
@@ -564,7 +955,7 @@ pub fn rain(source: &str, activity: f32, dim: f32, t: f32, seed: u32, tint: u32)
             let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
             let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
             // Small glyphs, so that a screen shows many lines (owner 2026-11-05).
-            let size = f32::from(ui::ts(8.5));
+            let size = f32::from(ts(MX_SMALL));
             let lh = size * 1.15;
             let col_w = size * 1.05;
             let cols = ((w - 8.) / col_w).max(0.) as u32;
@@ -696,7 +1087,7 @@ pub fn reveal(
         move |bounds, _, window, cx| {
             let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
             let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-            let size = f32::from(ui::ts(text_size));
+            let size = f32::from(ts(text_size));
             let lh = (size * 1.5).round();
             let cw = size * 0.6;
             let cols = ((w - 2. * pad) / cw).max(1.) as usize;
@@ -826,15 +1217,10 @@ pub fn interference(t: f32) -> AnyElement {
         move |bounds, _, window, cx| {
             let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
             let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-            let band = (t / 9.).fract() * (h + 200.) - 100.;
             painter(window, cx, |p| {
                 // A little darker, with the faint green cast of the look.
                 p.rect((x0, y0, w, h), 0x000000, 0.35);
                 p.rect((x0, y0, w, h), GREEN_DIM, 0.10);
-                for i in 0..4 {
-                    let bh = 200. - i as f32 * 45.;
-                    p.rect((x0, y0 + band - bh / 2., w, bh), 0x000000, 0.08);
-                }
                 for i in 0..8 {
                     let o = i as f32 * 8.;
                     let a = 0.06;
@@ -868,29 +1254,18 @@ pub fn interference(t: f32) -> AnyElement {
 
 /// The idle center screen: dark green, faint scanlines, and a slow noise band. Cheap: about a
 /// hundred rectangles per frame.
-pub fn idle(t: f32) -> AnyElement {
+pub fn idle(_t: f32) -> AnyElement {
     canvas(
         |_, _, _| (),
         move |bounds, _, window, cx| {
             let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
             let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-            let band = (t / 14.).fract() * (h + 120.) - 60.;
-            let step = ((t * 6.) as u32) % 64;
             painter(window, cx, |p| {
                 p.rect((x0, y0, w, h), 0x021208, 1.0);
                 let mut y = 0.;
                 while y < h {
                     p.rect((x0, y0 + y, w, 1.), 0x000000, 0.22);
                     y += 4.;
-                }
-                p.rect((x0, y0 + band - 30., w, 60.), GREEN_DIM, 0.05);
-                for i in 0..40u32 {
-                    let hx = hash(i, step);
-                    let fx = (hx % 997) as f32 / 997. * w;
-                    let fy = band - 30. + (hash(hx, 7) % 60) as f32;
-                    if fy >= 0. && fy < h {
-                        p.rect((x0 + fx, y0 + fy, 2. + (hx % 14) as f32, 1.), GREEN, 0.10);
-                    }
                 }
             });
         },
@@ -904,7 +1279,8 @@ pub fn idle(t: f32) -> AnyElement {
 /// another page at the left or the right edge of the strip (earlier pages left, later right).
 #[derive(Clone, Copy)]
 pub enum LineFrom {
-    Slot(usize),
+    /// A screen of the sliding row at a slot position that need not be whole (it moves).
+    At(f32),
     Left,
     Right,
 }
@@ -948,8 +1324,9 @@ pub fn state_lines(
                     // comes in from the edge of the strip as one line of a flat bundle in
                     // the upper half of the gap, then turns up to its end point.
                     let pts: Vec<[f32; 2]> = match from {
-                        LineFrom::Slot(s) => {
-                            let sx = x0 + *s as f32 * (tile_w + gap) + tile_w / 2.;
+                        LineFrom::At(s) => {
+                            let s = *s;
+                            let sx = x0 + s * (tile_w + gap) + tile_w / 2.;
                             let my = (bottom + top) / 2.;
                             curve([sx, bottom], [sx, my], [ex, my], [ex, top])
                         }
@@ -966,7 +1343,8 @@ pub fn state_lines(
                             let lane = if left { k - 1 } else { of - k };
                             let band = (bottom - top) * 0.45;
                             let y = top + 6. + band * (lane as f32 + 0.5) / of.max(1) as f32;
-                            let sx = if left { x0 } else { x0 + w };
+                            // Inside the frame of the wall: the bezel at the edge stays clear.
+                            let sx = if left { x0 + 8. } else { x0 + w - 8. };
                             let turn = if left { ex - 14. } else { ex + 14. };
                             let mut v = vec![[sx, y], [turn, y]];
                             v.extend(
@@ -993,7 +1371,7 @@ pub fn state_lines(
                     let end = pts[pts.len() - 1];
                     p.rect((end[0] - 3., end[1], 6., 4.), 0x1A1F1B, 1.);
                     p.rect((end[0] - 3., end[1], 6., 1.), 0x3A423C, 1.);
-                    if let LineFrom::Slot(_) = from {
+                    if let LineFrom::At(_) = from {
                         let st = pts[0];
                         p.rect((st[0] - 3., st[1] - 4., 6., 4.), 0x1A1F1B, 1.);
                     }
@@ -1003,6 +1381,16 @@ pub fn state_lines(
                     let at = head as i32;
                     if (3..len).contains(&at) {
                         signal.push(pts[(at - 3) as usize..=at as usize].to_vec());
+                    }
+                }
+                // A soft shadow of every cable on the wall below it: three widening passes.
+                for set in &sheath {
+                    let shadow: Vec<Vec<[f32; 2]>> = set
+                        .iter()
+                        .map(|l| l.iter().map(|q| [q[0] + 3., q[1] + 8.]).collect())
+                        .collect();
+                    for (w, a) in [(10., 0.10), (7., 0.14), (4., 0.2)] {
+                        p.polylines(&shadow, 0x000000, w, a);
                     }
                 }
                 p.polylines(&sheath[0], 0x020402, 4., 1.);

@@ -12,6 +12,7 @@ pub const PREFIX: &str = "vtext/";
 const FONT: &[u8] = include_bytes!("../assets/fonts/IBMPlexSans-SemiBold.ttf");
 
 /// The asset path of `text` at `size` px.
+#[allow(dead_code)]
 pub fn asset_path(text: &str, size: u32) -> String {
     format!("{PREFIX}{size}/{text}.svg")
 }

@@ -12,13 +12,14 @@ use aivory_protocol::{
 use gpui::AnimationExt;
 use gpui::prelude::*;
 use gpui::{
-    Context, Entity, EventEmitter, FontWeight, KeyDownEvent, Rgba, SharedString, Subscription,
-    Window, div, px, relative, rgb, rgba,
+    Context, Entity, EventEmitter, FontWeight, KeyDownEvent, SharedString, Subscription, Window,
+    div, px, relative, rgb, rgba,
 };
 use gpui_base::input::{InputEvent, TextareaState};
 
 use crate::compose;
 use crate::model::Model;
+use crate::overlay_style::{color as c, fonts, style};
 use crate::theme::tk;
 use crate::ui;
 
@@ -62,6 +63,18 @@ pub fn launch_buttons(
     prefix: &'static str,
     style: impl Fn(&'static str, &'static str) -> gpui::Stateful<gpui::Div>,
 ) -> [gpui::Stateful<gpui::Div>; 2] {
+    launch_buttons_open(prefix, None, move |id, label, _pressed| style(id, label))
+}
+
+/// [`launch_buttons`] with the open state: `open` is the launcher that is on screen. The style
+/// gets `pressed` (true for the button of the open launcher) to show the pressed state.
+pub fn launch_buttons_open(
+    prefix: &'static str,
+    open: Option<Purpose>,
+    style: impl Fn(&'static str, &'static str, bool) -> gpui::Stateful<gpui::Div>,
+) -> [gpui::Stateful<gpui::Div>; 2] {
+    let org = open == Some(Purpose::Organizer);
+    let new = matches!(open, Some(Purpose::Task | Purpose::Session));
     let ids: [&'static str; 2] = match prefix {
         "bridge" => ["bridge-organizer", "bridge-new-task"],
         "holo" => ["holo-organizer", "holo-new-task"],
@@ -75,13 +88,15 @@ pub fn launch_buttons(
         _ => ["minimal-organizer", "minimal-new-task"],
     };
     [
-        style(ids[0], "Organizer")
+        style(ids[0], "Organizer", org)
             .tooltip(ui::tip(
                 "Start an organizer session that watches all sessions",
             ))
             .on_click(|_, _, cx| request(Purpose::Organizer, cx)),
-        style(ids[1], "New task")
-            .tooltip(ui::tip("Create a task and start its first session"))
+        style(ids[1], "New session", new)
+            .tooltip(ui::tip(
+                "Create a session. It starts at once or waits in the queue",
+            ))
             .on_click(|_, _, cx| request(Purpose::Task, cx)),
     ]
 }
@@ -109,12 +124,21 @@ pub struct NewSessionDialog {
     adding: bool,
     /// The result of the last start: "Queued …" or "Started …", or an error.
     note: Option<(String, bool)>,
+    /// The online machines of the mesh: (node id, name). Empty: no "Run on" picker.
+    nodes: Vec<(String, String)>,
+    /// Where the session runs: `None` this machine, `auto`, or a node id.
+    node: Option<String>,
     _events: Subscription,
 }
 
 impl EventEmitter<DialogEvent> for NewSessionDialog {}
 
 impl NewSessionDialog {
+    /// What the dialog starts.
+    pub fn purpose(&self) -> Purpose {
+        self.purpose
+    }
+
     pub fn new(
         model: Entity<Model>,
         purpose: Purpose,
@@ -148,6 +172,23 @@ impl NewSessionDialog {
             }
         });
         input.update(cx, |s, cx| s.focus(window, cx));
+        let peers = model
+            .read(cx)
+            .call::<method::PeersList>(aivory_protocol::rpc::Empty {}, cx);
+        cx.spawn(async move |this, cx| {
+            if let Ok(list) = peers.await {
+                let _ = this.update(cx, |this, cx| {
+                    this.nodes = list
+                        .peers
+                        .into_iter()
+                        .filter(|p| p.online)
+                        .map(|p| (p.id, p.name))
+                        .collect();
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
         Self {
             model,
             input,
@@ -170,8 +211,30 @@ impl NewSessionDialog {
             busy: false,
             adding: false,
             note: None,
+            nodes: Vec::new(),
+            node: None,
             _events: events,
         }
+    }
+
+    /// The label of the "Run on" picker.
+    fn node_label(&self) -> String {
+        match self.node.as_deref() {
+            None => "This machine".to_string(),
+            Some("auto") => "Best free".to_string(),
+            Some(id) => self.nodes.iter().find(|(n, _)| n == id).map_or_else(
+                || id[..8.min(id.len())].to_string(),
+                |(_, name)| name.clone(),
+            ),
+        }
+    }
+
+    /// The next choice of the "Run on" picker: this machine, best free, then each machine.
+    fn next_node(&mut self) {
+        let mut choices: Vec<Option<String>> = vec![None, Some("auto".to_string())];
+        choices.extend(self.nodes.iter().map(|(id, _)| Some(id.clone())));
+        let i = choices.iter().position(|c| *c == self.node).unwrap_or(0);
+        self.node = choices[(i + 1) % choices.len()].clone();
     }
 
     /// The codebases, the one with the newest session first.
@@ -224,9 +287,7 @@ impl NewSessionDialog {
 
     fn title(&self) -> &'static str {
         match self.purpose {
-            Purpose::Session if tk().look == Look::Command => "New unit",
-            Purpose::Session => "New session",
-            Purpose::Task => "New task",
+            Purpose::Session | Purpose::Task => "New session",
             Purpose::Organizer => "Organizer",
         }
     }
@@ -271,6 +332,7 @@ impl NewSessionDialog {
             effort: Some(self.effort),
             mode: Some(self.mode),
             prompt: prompt.clone(),
+            node: self.node.clone(),
         };
         let place = self.model.read(cx).war.as_ref().map_or(1, |w| w.queued + 1);
         let call = self
@@ -448,308 +510,6 @@ fn tidy_path(path: &str) -> String {
     p
 }
 
-/// The colors and sizes of one look (the boards in `docs/design/looks/newsession/`).
-struct Style {
-    scrim: u32,
-    panel: u32,
-    edge: Option<u32>,
-    radius: f32,
-    /// Bridge: the orange frame on the left and on top.
-    frame: Option<u32>,
-    /// Navigator: the blue title bar.
-    title_bar: Option<u32>,
-    label: u32,
-    text: u32,
-    bright: u32,
-    muted: u32,
-    field: u32,
-    field_edge: Option<u32>,
-    field_radius: f32,
-    sel_bg: u32,
-    sel_edge: u32,
-    sel_text: u32,
-    chip_on_bg: u32,
-    chip_on_text: u32,
-    chip_off_bg: u32,
-    chip_off_edge: Option<u32>,
-    chip_radius: f32,
-    free: u32,
-    primary: u32,
-    primary_text: u32,
-    s_title: f32,
-    s_entry: f32,
-    s_label: f32,
-    caps: bool,
-}
-
-fn style() -> Style {
-    let t = tk();
-    match t.look {
-        Look::Bridge => Style {
-            scrim: 0x000000FF,
-            panel: 0x000000,
-            edge: None,
-            radius: 0.,
-            frame: Some(0xFF9C00),
-            title_bar: None,
-            label: 0xFF9C00,
-            text: 0xE9DCCB,
-            bright: 0xF3E3CF,
-            muted: 0xA88AA8,
-            field: 0x120D14,
-            field_edge: None,
-            field_radius: 18.,
-            sel_bg: 0x160F12,
-            sel_edge: 0xFF9C00,
-            sel_text: 0xF3E3CF,
-            chip_on_bg: 0xFFCC99,
-            chip_on_text: 0x000000,
-            chip_off_bg: 0x2A2130,
-            chip_off_edge: None,
-            chip_radius: 20.,
-            free: 0xA88AA8,
-            primary: 0xFF9C00,
-            primary_text: 0x000000,
-            s_title: 28.,
-            s_entry: 18.,
-            s_label: 14.,
-            caps: true,
-        },
-        Look::Operator => Style {
-            scrim: 0x010302F2,
-            panel: 0x07120D,
-            edge: Some(0x2F6B4A),
-            radius: 0.,
-            frame: None,
-            title_bar: Some(0x0B1A12),
-            label: 0x6DB596,
-            text: 0x8FD3AE,
-            bright: 0xCFFFE0,
-            muted: 0x6DB596,
-            field: 0x010A04,
-            field_edge: Some(0x1D3A2A),
-            field_radius: 0.,
-            sel_bg: 0x0F2A1C,
-            sel_edge: 0x9BFFC0,
-            sel_text: 0xCFFFE0,
-            chip_on_bg: 0x9BFFC0,
-            chip_on_text: 0x04140B,
-            chip_off_bg: 0x07120D,
-            chip_off_edge: Some(0x1D3A2A),
-            chip_radius: 0.,
-            free: 0x6DB596,
-            primary: 0x9BFFC0,
-            primary_text: 0x04140B,
-            s_title: 14.,
-            s_entry: 14.,
-            s_label: 12.,
-            caps: false,
-        },
-        Look::Neon => Style {
-            scrim: 0x050609F2,
-            panel: 0x0E1016,
-            edge: Some(0x2A2F3D),
-            radius: 0.,
-            frame: None,
-            title_bar: None,
-            label: 0xA9AEBB,
-            text: 0xD9DCE4,
-            bright: 0xE6E8EE,
-            muted: 0x8A90A0,
-            field: 0x0B0C10,
-            field_edge: Some(0x2A2F3D),
-            field_radius: 0.,
-            sel_bg: 0x15160F,
-            sel_edge: 0xE8DA3A,
-            sel_text: 0xFFFFFF,
-            chip_on_bg: 0x0E1016,
-            chip_on_text: 0xE6E8EE,
-            chip_off_bg: 0x0E1016,
-            chip_off_edge: Some(0x2A2F3D),
-            chip_radius: 0.,
-            free: 0x4FB8C4,
-            primary: 0xE8DA3A,
-            primary_text: 0x0B0C10,
-            s_title: 44.,
-            s_entry: 18.,
-            s_label: 14.,
-            caps: true,
-        },
-        Look::Navigator => Style {
-            scrim: 0x141E2DE6,
-            panel: 0xC6C6C6,
-            edge: Some(0x6B6B6B),
-            radius: 0.,
-            frame: None,
-            title_bar: Some(0x5A7299),
-            label: 0x111111,
-            text: 0x111111,
-            bright: 0x111111,
-            muted: 0x444444,
-            field: 0xFFFFFF,
-            field_edge: Some(0x6B6B6B),
-            field_radius: 0.,
-            sel_bg: 0x3D5A8A,
-            sel_edge: 0x3D5A8A,
-            sel_text: 0xFFFFFF,
-            chip_on_bg: 0xB4B4B4,
-            chip_on_text: 0x111111,
-            chip_off_bg: 0xC6C6C6,
-            chip_off_edge: Some(0x6B6B6B),
-            chip_radius: 0.,
-            free: 0x444444,
-            primary: 0xC6C6C6,
-            primary_text: 0x111111,
-            s_title: 15.,
-            s_entry: 15.,
-            s_label: 13.,
-            caps: false,
-        },
-        Look::Holo => Style {
-            scrim: 0x02060EF0,
-            panel: 0x0A182E,
-            edge: Some(0x3A5A7A),
-            radius: 0.,
-            frame: None,
-            title_bar: None,
-            label: 0x93AECB,
-            text: 0xDCEAF8,
-            bright: 0xFFFFFF,
-            muted: 0x8AA6C4,
-            field: 0x061024,
-            field_edge: Some(0x34506E),
-            field_radius: 0.,
-            sel_bg: 0x10243C,
-            sel_edge: 0x7FD8FF,
-            sel_text: 0xFFFFFF,
-            chip_on_bg: 0x10283F,
-            chip_on_text: 0xE6F2FF,
-            chip_off_bg: 0x0A182E,
-            chip_off_edge: Some(0x34506E),
-            chip_radius: 0.,
-            free: 0x7FD8FF,
-            primary: 0x7FD8FF,
-            primary_text: 0x04101E,
-            s_title: 40.,
-            s_entry: 18.,
-            s_label: 14.,
-            caps: true,
-        },
-        Look::Tactical => Style {
-            scrim: 0x000400F2,
-            panel: 0x021206,
-            edge: Some(0x128A35),
-            radius: 0.,
-            frame: None,
-            title_bar: None,
-            label: 0x22C24E,
-            text: 0x8FFFAE,
-            bright: 0x39FF6A,
-            muted: 0x1FA845,
-            field: 0x000400,
-            field_edge: Some(0x128A35),
-            field_radius: 0.,
-            sel_bg: 0x0B4A1E,
-            sel_edge: 0x39FF6A,
-            sel_text: 0xE8FFE8,
-            chip_on_bg: 0x39FF6A,
-            chip_on_text: 0x001A06,
-            chip_off_bg: 0x021206,
-            chip_off_edge: Some(0x128A35),
-            chip_radius: 0.,
-            free: 0x39FF6A,
-            primary: 0x39FF6A,
-            primary_text: 0x001A06,
-            s_title: 40.,
-            s_entry: 16.,
-            s_label: 12.,
-            caps: true,
-        },
-        Look::Command => Style {
-            scrim: 0x050605F2,
-            panel: 0x1E2124,
-            edge: Some(0x6A7076),
-            radius: 0.,
-            frame: None,
-            title_bar: Some(0x0A0C0A),
-            label: 0xA8AE96,
-            text: 0xE6E8DA,
-            bright: 0xF2F2E6,
-            muted: 0x7E8A70,
-            field: 0x050605,
-            field_edge: Some(0x3A4038),
-            field_radius: 0.,
-            sel_bg: 0x1E2A16,
-            sel_edge: 0xFFC21A,
-            sel_text: 0xF2F2E6,
-            chip_on_bg: 0x5EA634,
-            chip_on_text: 0x0B0D07,
-            chip_off_bg: 0x3C4247,
-            chip_off_edge: Some(0x6E767C),
-            chip_radius: 0.,
-            free: 0x8FE05A,
-            primary: 0x5EA634,
-            primary_text: 0x0B0D07,
-            s_title: 30.,
-            s_entry: 21.,
-            s_label: 17.,
-            caps: true,
-        },
-        _ => Style {
-            scrim: if t.night { 0x000000A0 } else { 0x1A1C2266 },
-            panel: t.card,
-            edge: Some(t.edge),
-            radius: f32::from(t.r_card),
-            frame: None,
-            title_bar: None,
-            label: t.ink_2,
-            text: t.ink,
-            bright: t.ink,
-            muted: t.ink_3,
-            field: t.page,
-            field_edge: Some(t.field_line),
-            field_radius: f32::from(t.r_button),
-            sel_bg: t.track,
-            sel_edge: t.ink,
-            sel_text: t.ink,
-            chip_on_bg: t.ink,
-            chip_on_text: t.card,
-            chip_off_bg: t.card,
-            chip_off_edge: Some(t.edge),
-            chip_radius: 999.,
-            free: t.ok_text,
-            primary: t.primary,
-            primary_text: 0xFFFFFF,
-            s_title: 22.,
-            s_entry: 15.,
-            s_label: 12.,
-            caps: false,
-        },
-    }
-}
-
-/// The fonts of the look: body, mono (paths) and heading.
-fn fonts() -> (&'static str, &'static str, &'static str) {
-    let t = tk();
-    match t.look {
-        Look::Command => (
-            crate::command_kit::SANS,
-            crate::command_kit::SANS,
-            crate::command_kit::SANS,
-        ),
-        Look::Tactical => (
-            crate::tactical_kit::SANS,
-            crate::tactical_kit::MONO,
-            crate::tactical_kit::SANS,
-        ),
-        _ => (t.sans, t.mono, t.display_heading),
-    }
-}
-
-fn c(v: u32) -> Rgba {
-    if v > 0xFFFFFF { rgba(v) } else { rgb(v) }
-}
-
 impl Render for NewSessionDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let st = style();
@@ -766,7 +526,11 @@ impl Render for NewSessionDialog {
             Some(war) => {
                 let folders = Self::folders(war);
                 if self.folder.is_none() {
-                    self.folder = folders.first().map(|f| f.0.clone());
+                    self.folder = folders
+                        .iter()
+                        .find(|f| Self::slots(war, &f.0).0 > 0)
+                        .or(folders.first())
+                        .map(|f| f.0.clone());
                 }
                 let slots: Vec<(u32, u32, u32)> =
                     folders.iter().map(|f| Self::slots(war, &f.0)).collect();
@@ -879,18 +643,28 @@ impl Render for NewSessionDialog {
         let small = |id: &'static str, name: &str, value: SharedString| {
             div()
                 .id(id)
+                .h(px(32.))
+                .px(px(12.))
                 .flex()
                 .items_center()
                 .gap(px(8.))
                 .cursor_pointer()
-                .text_size(px(st.s_label))
+                .rounded(px(st.chip_radius.min(16.)))
+                .bg(c(st.chip_off_bg))
+                .border_1()
+                .border_color(c(st.chip_off_edge.unwrap_or(st.muted)))
+                .hover(|s| s.border_color(c(st.sel_edge)))
+                .text_size(px(st.s_label.max(12.)))
                 .child(div().text_color(c(st.muted)).child(caps(name)))
                 .child(div().text_color(c(st.bright)).child(value))
-                .child(ui::icon("icons/chevron-down.svg", 10., c(st.text)))
+                .when(look != Look::Bridge, |d| {
+                    d.child(ui::icon("icons/chevron-down.svg", 10., c(st.text)))
+                })
         };
         let pickers = div()
             .flex()
-            .gap(px(28.))
+            .flex_wrap()
+            .gap(px(10.))
             .child(
                 small("ns-model", "Model", model_name.into()).on_click(cx.listener(
                     |this, _, _, cx| {
@@ -922,6 +696,19 @@ impl Render for NewSessionDialog {
                     this.mode = MODES[(i + 1) % MODES.len()];
                     cx.notify();
                 })),
+            )
+            .when(
+                !self.nodes.is_empty() && self.purpose == Purpose::Session,
+                |d| {
+                    d.child(
+                        small("ns-node", "Run on", caps(&self.node_label())).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.next_node();
+                                cx.notify();
+                            },
+                        )),
+                    )
+                },
             )
             .when(self.purpose == Purpose::Organizer, |d| {
                 d.child(
@@ -1040,7 +827,7 @@ impl Render for NewSessionDialog {
         } else {
             (
                 format!("No free slot in {folder}."),
-                format!("The task waits in the queue, place {}.", queued.1),
+                format!("Queued, place {}.", queued.1),
             )
         };
         let (line1, line2) = match &self.note {
@@ -1086,7 +873,9 @@ impl Render for NewSessionDialog {
                     .rounded(px(if st.chip_radius > 0. { 26. } else { 0. }))
                     .bg(c(st.primary))
                     .text_color(c(st.primary_text))
-                    .when(navigator, |d| ui::bevel_edges(true, d.border_2()))
+                    .when(navigator || look == Look::Command, |d| {
+                        ui::bevel_edges(true, d.border_2())
+                    })
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_size(px(st.s_entry))
                     .cursor_pointer()
@@ -1094,10 +883,8 @@ impl Render for NewSessionDialog {
                     .on_click(cx.listener(|this, _, window, cx| this.start(window, cx)))
                     .child(caps(if organizer {
                         "Start organizer"
-                    } else if free_now {
-                        "Start"
                     } else {
-                        "Queue task"
+                        "New session"
                     }))
                     .child(
                         div()
@@ -1130,11 +917,14 @@ impl Render for NewSessionDialog {
                         .id("ns-close")
                         .cursor_pointer()
                         .text_size(px(st.s_label))
-                        .text_color(c(st.muted))
+                        .text_color(c(st.bright))
+                        .border_1()
+                        .border_color(c(st.chip_off_edge.unwrap_or(st.muted)))
                         .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
                         .px(px(10.))
                         .py(px(6.))
-                        .child(caps("X")),
+                        .tooltip(ui::tip("Close (Esc)"))
+                        .child(caps("Close")),
                 )
             });
         let body = div()
@@ -1193,11 +983,15 @@ impl Render for NewSessionDialog {
                 .id("ns-close")
                 .cursor_pointer()
                 .text_size(px(st.s_label))
-                .text_color(c(st.muted))
+                .text_color(c(st.bright))
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
                 .px(px(10.))
                 .py(px(6.))
-                .child(caps("X"))
+                .when(navigator, |d| {
+                    ui::bevel_edges(true, d.bg(c(0xC6C6C6)).text_color(c(0x111111)))
+                })
+                .tooltip(ui::tip("Close (Esc)"))
+                .child(caps("Close"))
         };
         let content = div()
             .pl(px(if st.frame.is_some() {
@@ -1239,7 +1033,7 @@ impl Render for NewSessionDialog {
             let h: f32 = if self.purpose == Purpose::Organizer {
                 800.
             } else {
-                720.
+                624.
             };
             let h = h.min(f32::from(window.viewport_size().height) - 24.);
             shell
@@ -1247,7 +1041,7 @@ impl Render for NewSessionDialog {
                 .child(crate::command_kit::window(
                     1040.,
                     h,
-                    self.title(),
+                    crate::command_kit::up(self.title()),
                     close_btn(cx),
                     content,
                 ))
@@ -1256,9 +1050,34 @@ impl Render for NewSessionDialog {
             shell
                 .w(px(1040.))
                 .child(
-                    crate::tactical_kit::tbox("Launch")
+                    crate::tactical_kit::tbox("LAUNCH")
                         .bg(crate::tactical_kit::c(crate::tactical_kit::PANEL, 1.))
                         .child(content),
+                )
+                .into_any_element()
+        } else if look == Look::Operator {
+            // The dialog is a monitor: the bezel and the glass of the look, with the title bar.
+            use crate::warroom::skins::operator::kit as op;
+            let bar = div()
+                .h(px(32.))
+                .pl(px(14.))
+                .pr(px(4.))
+                .flex()
+                .items_center()
+                .justify_between()
+                .bg(c(0x0B1A12))
+                .text_size(px(st.s_label))
+                .text_color(c(st.bright))
+                .font_weight(FontWeight::BOLD)
+                .child(caps(self.title()))
+                .child(close_btn(cx));
+            shell
+                .w(px(1040.))
+                .child(
+                    op::bezel(op::GREEN).pb(px(11.)).child(
+                        op::screen(false, div().flex().flex_col().child(bar).child(content))
+                            .flex_none(),
+                    ),
                 )
                 .into_any_element()
         } else {
@@ -1337,6 +1156,45 @@ impl Render for NewSessionDialog {
                             .cursor_pointer()
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(DialogEvent::Close)))
                             .child(caps("Close")),
+                    )
+                })
+                .when(look == Look::Holo, |d| {
+                    let tick = |right: bool, bottom: bool| {
+                        let t = div().absolute().size(px(20.)).border_color(c(0x7FD8FF));
+                        let t = if right {
+                            t.right_0().border_r_2()
+                        } else {
+                            t.left_0().border_l_2()
+                        };
+                        if bottom {
+                            t.bottom_0().border_b_2()
+                        } else {
+                            t.top_0().border_t_2()
+                        }
+                    };
+                    d.child(tick(false, false))
+                        .child(tick(true, false))
+                        .child(tick(false, true))
+                        .child(tick(true, true))
+                })
+                .when(look == Look::Neon, |d| {
+                    d.child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .w(px(160.))
+                            .h(px(3.))
+                            .bg(c(0x4FB8C4)),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .bottom_0()
+                            .right_0()
+                            .w(px(160.))
+                            .h(px(3.))
+                            .bg(c(0x4FB8C4)),
                     )
                 })
                 .child(content)

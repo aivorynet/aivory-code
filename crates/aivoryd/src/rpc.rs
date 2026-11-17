@@ -99,28 +99,44 @@ pub struct Daemon {
     live: Option<std::sync::Arc<LiveBackend>>,
     /// Paired phones of the remote endpoint; set by `serve --remote` (demo or live).
     pairings: Option<std::sync::Arc<crate::remote::Pairings>>,
+    /// `peers/*`: the machine mesh (ADR 0026); set by `serve --iroh`.
+    mesh: Option<std::sync::Arc<crate::mesh::Mesh>>,
+    /// `peers/share*`: live file sync of the mesh.
+    files: Option<std::sync::Arc<crate::mesh_sync::FileSync>>,
     /// `code/*` and `ledger/*` (demo or live).
     code: Option<std::sync::Arc<crate::code::CodeService>>,
     /// `resources/memory`: the RAM samples of the machine and the agents.
     resources: crate::resources::Sampler,
     /// `theme/*` and `registry/*` (ADR 0024).
     themes: std::sync::Arc<crate::theme::ThemeService>,
+    /// Connections that get `theme/changed` (they called `theme/sync` or `theme/list`).
+    theme_subs: std::sync::Arc<std::sync::Mutex<Vec<Outbox>>>,
 }
 
 impl Daemon {
+    /// The live backend (`serve` without `--demo`). The mesh merges peer sessions into it.
+    pub fn live_backend(&self) -> Option<&std::sync::Arc<LiveBackend>> {
+        self.live.as_ref()
+    }
+
     pub fn new(config: Config) -> Self {
         let themes = std::sync::Arc::new(crate::theme::ThemeService::new(
             crate::theme::Store::for_cache_file(config.cache_file.as_deref()),
             std::sync::Arc::new(crate::theme::HttpFetcher::new()),
         ));
+        let theme_subs = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        Self::hook_themes(&themes, &theme_subs);
         Self {
             themes,
+            theme_subs,
             config,
             shutdown: AtomicBool::new(false),
             restart: AtomicBool::new(false),
             demo: None,
             live: None,
             pairings: None,
+            mesh: None,
+            files: None,
             code: None,
             resources: crate::resources::Sampler::default(),
         }
@@ -128,14 +144,64 @@ impl Daemon {
 
     /// Replace the theme service (tests use a fake fetcher and a scratch folder).
     pub fn with_themes(mut self, themes: std::sync::Arc<crate::theme::ThemeService>) -> Self {
+        Self::hook_themes(&themes, &self.theme_subs);
         self.themes = themes;
         self
+    }
+
+    /// Send `theme/changed` to the subscribers when the service reports a change.
+    fn hook_themes(
+        themes: &crate::theme::ThemeService,
+        subs: &std::sync::Arc<std::sync::Mutex<Vec<Outbox>>>,
+    ) {
+        let subs = std::sync::Arc::clone(subs);
+        themes.set_notifier(std::sync::Arc::new(move |note| {
+            Self::broadcast_themes(&subs, &note);
+        }));
+    }
+
+    fn broadcast_themes(
+        subs: &std::sync::Mutex<Vec<Outbox>>,
+        note: &aivory_protocol::theme::ThemeChanged,
+    ) {
+        let message = json!({
+            "jsonrpc": "2.0",
+            "method": aivory_protocol::rpc::THEME_CHANGED,
+            "params": note,
+        });
+        let mut subs = subs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        subs.retain(|o| o.try_send(message.clone()));
+    }
+
+    /// Register a connection for `theme/changed` (once).
+    pub(crate) fn theme_subscribe(&self, out: &Outbox) {
+        let mut subs = self
+            .theme_subs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !subs.iter().any(|o| o.same_channel(out)) {
+            subs.push(out.clone());
+        }
     }
 
     /// A daemon that serves the war room on the native sessions of this machine.
     /// Let `devices/pair` and `devices/remove` use the remote endpoint.
     pub fn with_pairings(mut self, pairings: std::sync::Arc<crate::remote::Pairings>) -> Self {
         self.pairings = Some(pairings);
+        self
+    }
+
+    /// Let `peers/share*` use the file sync of the mesh.
+    pub fn with_files(mut self, files: std::sync::Arc<crate::mesh_sync::FileSync>) -> Self {
+        self.files = Some(files);
+        self
+    }
+
+    /// Let `peers/*` use the machine mesh.
+    pub fn with_mesh(mut self, mesh: std::sync::Arc<crate::mesh::Mesh>) -> Self {
+        self.mesh = Some(mesh);
         self
     }
 
@@ -307,7 +373,17 @@ impl Daemon {
                 ),
             ));
         };
-        let result = self.dispatch(method, req.params.unwrap_or(Value::Null), &id, out);
+        let params = req.params.unwrap_or(Value::Null);
+        let selects = method == "settings/set"
+            && matches!(
+                params["key"].as_str(),
+                Some("display.look" | "display.customTheme")
+            );
+        let result = self.dispatch(method, params, &id, out);
+        if selects && result.is_ok() {
+            self.themes
+                .notify(aivory_protocol::theme::ThemeChangeReason::Select, None);
+        }
         req.id.as_ref()?;
         match result {
             Ok(Some(v)) => Some(json!({ "jsonrpc": "2.0", "id": id, "result": v })),
@@ -338,6 +414,30 @@ impl Daemon {
             "daemon/restart" => return self.restart(params).map(Some),
             "settings/importClaude" => return self.import_claude(params).map(Some),
             _ => {}
+        }
+        if let crate::remote::Caller::Peer(peer) = crate::remote::current_caller()
+            && !aivory_protocol::mesh::PEER_METHODS.contains(&method)
+        {
+            return Err(RpcError::new(
+                NOT_AVAILABLE,
+                format!("'{method}' is not open to peer {peer}"),
+            ));
+        }
+        if method == "machines/list" {
+            let _: Empty = parse_params(params)?;
+            return Ok(Some(json!(self.machines(id, out))));
+        }
+        if method.starts_with("peers/") {
+            return self.peers(method, params).map(Some);
+        }
+        if let Some(mesh) = &self.mesh
+            && matches!(
+                crate::remote::current_caller(),
+                crate::remote::Caller::Local
+            )
+            && let Some(result) = crate::mesh_host::route(mesh, method, &params)
+        {
+            return result.map(Some).map_err(|e| RpcError::new(SERVER_ERROR, e));
         }
         if let Some(pairings) = &self.pairings {
             match method {
@@ -537,9 +637,9 @@ impl Daemon {
                 .and_then(|v| v["codebases"][0]["id"].as_str().map(str::to_string))
                 .ok_or_else(|| RpcError::new(INVALID_STATE, "no codebase".to_string()))?,
         };
-        let exe = std::env::current_exe()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| "aivoryd".to_string());
+        let exe = crate::autostart::daemon_exe()
+            .to_string_lossy()
+            .into_owned();
         let new = aivory_protocol::rpc::NewSessionParams {
             codebase,
             part: None,
@@ -553,6 +653,7 @@ impl Daemon {
             }),
             task: None,
             attachments: Vec::new(),
+            node: None,
         };
         war(
             "session/new",
@@ -588,6 +689,18 @@ impl Daemon {
             "media/get" => {
                 let p: aivory_protocol::media::MediaGetParams = parse_params(params)?;
                 Ok(json!(media_get(&p.src)?))
+            }
+            "media/put" => {
+                let p: aivory_protocol::media::MediaPutParams = parse_params(params)?;
+                let dir = aivory_sessions::cache_dir()
+                    .map(|d| d.join("uploads"))
+                    .ok_or_else(|| {
+                        RpcError::new(
+                            aivory_protocol::rpc::code::SERVER_ERROR,
+                            "no cache folder".to_string(),
+                        )
+                    })?;
+                Ok(json!(media_put(&dir, &p)?))
             }
             "sessions/list" => {
                 let p: ListParams = parse_params(params)?;
@@ -640,6 +753,16 @@ impl Daemon {
 
 /// The methods that change the machine or its files: a paired phone cannot call them.
 const LOCAL_ONLY: &[&str] = &[
+    "peers/invite",
+    "peers/join",
+    "peers/list",
+    "peers/check",
+    "peers/remove",
+    "peers/call",
+    "peers/share",
+    "peers/unshare",
+    "peers/shares",
+    "peers/vcs",
     "repos/add",
     "repos/remove",
     "project/new",
@@ -661,6 +784,115 @@ const LOCAL_ONLY: &[&str] = &[
 ];
 
 impl Daemon {
+    /// `machines/list`: this machine, then the mesh peers, each with its look.
+    fn machines(&self, id: &Value, out: &Outbox) -> aivory_protocol::mesh::MachineList {
+        use aivory_protocol::mesh::Machine;
+        let look = self
+            .war_call("settings/get", json!({}), id, out)
+            .and_then(Result::ok)
+            .flatten()
+            .and_then(|v| {
+                v["settings"]["display"]["look"]
+                    .as_str()
+                    .map(str::to_string)
+            })
+            .unwrap_or_default();
+        let node = self.mesh.as_ref().map(|m| m.node()).unwrap_or_default();
+        let mut machines = vec![Machine {
+            id: if node.is_empty() {
+                "local".into()
+            } else {
+                node
+            },
+            name: crate::actions::host_name(),
+            look,
+            local: true,
+            online: true,
+        }];
+        if let Some(mesh) = &self.mesh {
+            let online = mesh.online();
+            for p in mesh.list().peers {
+                let name = if p.name.is_empty() {
+                    p.id[..8.min(p.id.len())].to_string()
+                } else {
+                    p.name.clone()
+                };
+                machines.push(Machine {
+                    online: online.contains(&p.id),
+                    look: p.state.map(|s| s.look).unwrap_or_default(),
+                    id: p.id,
+                    name,
+                    local: false,
+                });
+            }
+        }
+        aivory_protocol::mesh::MachineList { machines }
+    }
+
+    /// `peers/*`: the machine mesh (ADR 0026).
+    fn peers(&self, method: &str, params: Value) -> Result<Value, RpcError> {
+        use aivory_protocol::mesh::{PeerJoinParams, PeerRef};
+        let Some(mesh) = &self.mesh else {
+            return Err(RpcError::new(
+                NOT_AVAILABLE,
+                format!(
+                    "'{method}' needs the iroh link; start the daemon with `aivoryd serve --iroh`"
+                ),
+            ));
+        };
+        let failed = |e: String| RpcError::new(SERVER_ERROR, e);
+        let value = match method {
+            "peers/invite" => json!(mesh.invite().map_err(failed)?),
+            "peers/join" => {
+                let p: PeerJoinParams = parse_params(params)?;
+                json!(mesh.join(&p.link).map_err(failed)?)
+            }
+            "peers/list" => {
+                let _: Empty = parse_params(params)?;
+                json!(mesh.list())
+            }
+            "peers/check" => {
+                let p: PeerRef = parse_params(params)?;
+                json!(mesh.check(&p.id).map_err(failed)?)
+            }
+            "peers/vcs" => json!(mesh.vcs()),
+            "peers/share" | "peers/unshare" | "peers/shares" => {
+                let files = self
+                    .files
+                    .as_ref()
+                    .ok_or_else(|| RpcError::new(NOT_AVAILABLE, "this daemon has no file sync"))?;
+                match method {
+                    "peers/share" => {
+                        let p: aivory_protocol::mesh::ShareParams = parse_params(params)?;
+                        json!(files.share(&p).map_err(failed)?)
+                    }
+                    "peers/unshare" => {
+                        let p: aivory_protocol::mesh::ShareRef = parse_params(params)?;
+                        files.unshare(&p.id).map_err(failed)?;
+                        json!({ "ok": true })
+                    }
+                    _ => json!(files.view()),
+                }
+            }
+            "peers/call" => {
+                let p: aivory_protocol::mesh::PeerCallParams = parse_params(params)?;
+                mesh.call(&p.id, &p.method, p.params).map_err(failed)?
+            }
+            "peers/remove" => {
+                let p: PeerRef = parse_params(params)?;
+                mesh.remove(&p.id).map_err(failed)?;
+                json!({ "ok": true })
+            }
+            _ => {
+                return Err(RpcError::new(
+                    METHOD_NOT_FOUND,
+                    format!("unknown method '{method}'"),
+                ));
+            }
+        };
+        Ok(value)
+    }
+
     /// `daemon/restart`: only the local daemon restarts. A remote daemon of the demo answers
     /// `ok` and changes nothing.
     fn restart(&self, params: Value) -> Result<Value, RpcError> {
@@ -742,9 +974,67 @@ fn media_get(src: &str) -> Result<aivory_protocol::media::MediaData, RpcError> {
     })
 }
 
+/// `media/put`: store an image of a phone in `dir` under a unique name. Only png, jpeg, gif
+/// and webp; at most [`aivory_protocol::media::MEDIA_GET_MAX_BYTES`].
+fn media_put(
+    dir: &std::path::Path,
+    p: &aivory_protocol::media::MediaPutParams,
+) -> Result<aivory_protocol::media::MediaStored, RpcError> {
+    use aivory_protocol::media::{MEDIA_GET_MAX_BYTES, Media, MediaKind};
+    use base64::Engine as _;
+    let bad = |m: &str| RpcError::new(aivory_protocol::rpc::code::INVALID_PARAMS, m.to_string());
+    let stem: String = p
+        .name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("")
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .take(64)
+        .collect();
+    let ok = Media::of(&stem)
+        .filter(|m| m.kind == MediaKind::Image && m.mime.as_deref() != Some("image/svg+xml"));
+    if ok.is_none() || stem.starts_with('.') {
+        return Err(bad("not a png, jpeg, gif, or webp file name"));
+    }
+    if p.data.len() as u64 > MEDIA_GET_MAX_BYTES / 3 * 4 + 4 {
+        return Err(bad("larger than 20 MB"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(p.data.as_bytes())
+        .map_err(|_| bad("the data is not base64"))?;
+    if bytes.is_empty() || bytes.len() as u64 > MEDIA_GET_MAX_BYTES {
+        return Err(bad("empty, or larger than 20 MB"));
+    }
+    let internal =
+        |e: std::io::Error| RpcError::new(aivory_protocol::rpc::code::SERVER_ERROR, e.to_string());
+    std::fs::create_dir_all(dir).map_err(internal)?;
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let mut path = dir.join(format!("{ms}-{stem}"));
+    let mut n = 1;
+    while path.exists() {
+        path = dir.join(format!("{ms}-{n}-{stem}"));
+        n += 1;
+    }
+    std::fs::write(&path, &bytes).map_err(internal)?;
+    Ok(aivory_protocol::media::MediaStored {
+        path: path.to_string_lossy().into_owned(),
+        size: bytes.len() as u64,
+    })
+}
+
 #[cfg(test)]
 mod media_get_tests {
-    use super::media_get;
+    use super::{media_get, media_put};
 
     #[test]
     fn media_get_reads_media_files_only() {
@@ -761,6 +1051,34 @@ mod media_get_tests {
         assert!(media_get(&src.to_string_lossy()).is_err());
         assert!(media_get("a.png").is_err(), "a relative path");
         assert!(media_get(&dir.join("gone.png").to_string_lossy()).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn media_put_stores_images_only() {
+        use aivory_protocol::media::MediaPutParams;
+        let dir = std::env::temp_dir().join(format!("aivoryd-put-{}", std::process::id()));
+        let put = |name: &str, data: &str| {
+            media_put(
+                &dir,
+                &MediaPutParams {
+                    name: name.to_string(),
+                    data: data.to_string(),
+                },
+            )
+        };
+        let got = put("../shot 1.PNG", "AQID").unwrap();
+        assert_eq!(got.size, 3);
+        let path = std::path::Path::new(&got.path);
+        assert_eq!(path.parent(), Some(dir.as_path()));
+        assert!(got.path.ends_with("-shot_1.PNG"), "{}", got.path);
+        assert_eq!(std::fs::read(path).unwrap(), [1u8, 2, 3]);
+        let again = put("../shot 1.PNG", "AQID").unwrap();
+        assert_ne!(again.path, got.path);
+        assert!(put("main.rs", "AQID").is_err());
+        assert!(put("a.svg", "AQID").is_err());
+        assert!(put("a.png", "not base64!").is_err());
+        assert!(put("a.png", "").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

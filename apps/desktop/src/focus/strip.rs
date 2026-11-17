@@ -117,18 +117,18 @@ impl FocusScreen {
             .rounded_full()
             .bg(rgb(tk().dark))
             .text_color(rgb(0xFFFFFF))
-            .text_size(ui::ts(T_SMALL))
+            .text_size(ui::ts(T_CAPTION))
             .font_weight(FontWeight::SEMIBOLD)
             .cursor_pointer()
             .hover(|s| s.bg(rgb(tk().dark_hover)))
-            .tooltip(ui::tip("Back to the war room (Esc)"))
+            .tooltip(ui::tip("Back to the screen you came from (Esc)"))
             .on_click(cx.listener(|_, _, _, cx| cx.emit(FocusEvent::Back)))
             .child(ui::icon("icons/back.svg", 15., rgb(0xFFFFFF)))
-            .child("War room")
+            .child("Back")
             .child(
                 div()
                     .font_family(tk().mono)
-                    .text_size(ui::ts(11.))
+                    .text_size(ui::ts(crate::theme::T_CAPTION))
                     .font_weight(FontWeight::MEDIUM)
                     .opacity(0.7)
                     .child("Esc"),
@@ -203,7 +203,7 @@ impl FocusScreen {
                     .h_full()
                     .overflow_hidden()
                     .child(row)
-                    .child(div().absolute().top_0().bottom_0().right_0().w(px(36.)).bg(
+                    .child(div().absolute().top_0().bottom_0().right_0().w(px(56.)).bg(
                         gpui::linear_gradient(
                             90.,
                             gpui::linear_color_stop(rgba(tk().page << 8), 0.),
@@ -214,7 +214,8 @@ impl FocusScreen {
             .child(
                 div()
                     .flex_none()
-                    .font_family(tk().mono)
+                    .ml(px(16.))
+                    .font_family(tk().sans)
                     .text_size(ui::ts(T_CAPTION))
                     .text_color(rgb(tk().ink_3))
                     .child(count),
@@ -242,7 +243,7 @@ impl FocusScreen {
                     .gap(px(7.))
                     .rounded_full()
                     .bg(rgb(if needs { tk().q_bg } else { tk().track }))
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .cursor_pointer()
                     .when(current, |d| {
                         d.bg(rgb(tk().page)).shadow(ui::ring(tk().ink, 2.))
@@ -350,6 +351,7 @@ impl FocusScreen {
             .bg(rgb(tk().card))
             .rounded(px(14.))
             .shadow(ui::popover_shadow())
+            .map(crate::overlay_style::skin)
             .child(
                 div()
                     .text_size(ui::ts(T_CAPTION))
@@ -366,12 +368,12 @@ impl FocusScreen {
             .child(
                 div()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .child(chip.title.clone()),
             )
             .child(
                 div()
-                    .text_size(ui::ts(T_SMALL))
+                    .text_size(ui::ts(T_CAPTION))
                     .line_height(gpui::relative(1.45))
                     .text_color(rgb(tk().ink_2))
                     .when(ask.kind == aivory_protocol::AskKind::Permission, |d| {
@@ -420,6 +422,7 @@ impl FocusScreen {
                 .bg(rgb(tk().card))
                 .rounded(px(14.))
                 .shadow(ui::popover_shadow())
+                .map(crate::overlay_style::skin)
                 .child(
                     div()
                         .text_size(ui::ts(T_CAPTION))
@@ -517,6 +520,7 @@ impl FocusScreen {
                 composer: pane.composer.clone(),
                 task: None,
                 attachments: Vec::new(),
+                node: None,
             },
             cx,
         );

@@ -34,6 +34,7 @@ mod media;
 mod model;
 mod new_session;
 mod notice;
+mod overlay_style;
 mod radar;
 mod repos;
 mod rts;

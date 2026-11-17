@@ -27,6 +27,77 @@ pub fn name(look: Look) -> &'static str {
         .map_or("Minimal", |(_, n)| n)
 }
 
+/// The four text sizes of a look: title, section, entry, label (`docs/design/looks/DESIGN.md`).
+/// Minimal keeps the full interface scale.
+pub fn sizes(look: Look) -> Option<[f32; 4]> {
+    match look {
+        Look::Minimal => None,
+        Look::Bridge => Some([64., 28., 18., 14.]),
+        Look::Operator => Some([30., 18., 15., 13.]),
+        Look::Neon => Some([34., 21., 15., 13.]),
+        Look::Navigator => Some([22., 16., 14., 12.]),
+        Look::Holo => Some([30., 18., 15., 12.]),
+        Look::Tactical => Some([32., 20., 15., 12.]),
+        Look::Command => Some([30., 22., 18., 16.]),
+    }
+}
+
+/// A shared screen asks for a size of the interface scale (`theme::T_*`). In a look it gets the
+/// nearest of the look's four sizes (the larger one on a tie). Other sizes pass unchanged.
+pub fn snap(size: f32) -> f32 {
+    use crate::theme::{T_BODY, T_CAPTION, T_DISPLAY, T_HEADING, T_SMALL, T_TITLE};
+    let scale = [T_CAPTION, T_SMALL, T_BODY, T_TITLE, T_HEADING, T_DISPLAY];
+    if !scale.contains(&size) {
+        return size;
+    }
+    let Some(set) = sizes(tk().look) else {
+        return size;
+    };
+    let mut best = set[0];
+    for s in set {
+        let (d, b) = ((s - size).abs(), (best - size).abs());
+        if d < b || (d == b && s > best) {
+            best = s;
+        }
+    }
+    best
+}
+
+/// The radius of a pill (a badge, a switch, a chip): round in Minimal and Bridge, otherwise the
+/// corner style of the look.
+pub fn r_pill() -> gpui::Pixels {
+    match tk().look {
+        Look::Minimal | Look::Bridge => px(999.),
+        _ => tk().r_button,
+    }
+}
+
+/// The radius of a control (a button, a field, a segment).
+pub fn r_ctrl() -> gpui::Pixels {
+    match tk().look {
+        Look::Minimal => px(6.),
+        _ => tk().r_button,
+    }
+}
+
+/// A corner radius of a shared screen: Minimal keeps `base` px; a look gives its own corner
+/// style (card radius for a large box, button radius for a small one).
+pub fn rc(base: f32) -> gpui::Pixels {
+    match tk().look {
+        Look::Minimal => px(base),
+        _ if base >= 10. => tk().r_card,
+        _ => tk().r_button,
+    }
+}
+
+/// The surface of a text field or a list that sits inside a card.
+pub fn field() -> u32 {
+    match tk().look {
+        Look::Navigator => 0xE6E6E6,
+        _ => tk().page,
+    }
+}
+
 /// Minimal on a dark page (Display theme Dark).
 pub const MINIMAL_DARK: Tokens = Tokens {
     night: true,
@@ -329,53 +400,54 @@ pub const HOLO: Tokens = Tokens {
     ..MINIMAL
 };
 
-/// Tactical: a phosphor-green radar monitor, mono text, square edges, white only for a wait.
+/// Tactical: a military terminal. Dark olive slate, bone text, amber for a wait, cyan for
+/// information and the selection, muted green for nominal, red for a fault (DESIGN.md).
 pub const TACTICAL: Tokens = Tokens {
     look: Look::Tactical,
     night: true,
     sans: "B612",
-    ink: 0xCFFFD8,
-    ink_2: 0x7BE08F,
-    ink_3: 0x4FB866,
-    muted: 0x2E8A45,
-    logo: 0x39FF6A,
-    page: 0x000400,
-    card: 0x001A06,
-    track: 0x00240A,
-    track_2: 0x0B4A1E,
-    rail_on: 0x0B4A1E,
-    line: 0x39FF6A26,
-    line_2: 0x39FF6A55,
-    dark: 0x128A35,
-    dark_hover: 0x1FA845,
-    switch_off: 0x0B4A1E,
-    switch_on: 0x22C24E,
-    q: 0xE8FFE8,
-    q_text: 0xFFFFFF,
-    q_bg: 0x0B4A1E,
-    e: 0xE8FFE8,
-    e_text: 0xE8FFE8,
-    e_bg: 0x0B4A1E,
-    quiet: 0x1F6B33,
-    ok: 0x39FF6A,
-    primary: 0x128A35,
-    primary_hover: 0x1FA845,
-    link: 0x39FF6A,
-    idle_ring: 0x2E8A45,
-    menu_hover: 0x00240A,
+    ink: 0xE9EBDA,
+    ink_2: 0xCDD3BC,
+    ink_3: 0x9AA586,
+    muted: 0x7E8A6C,
+    logo: 0xE9EBDA,
+    page: 0x0F120E,
+    card: 0x171C14,
+    track: 0x1D2318,
+    track_2: 0x252D20,
+    rail_on: 0x252D20,
+    line: 0x9AA58626,
+    line_2: 0x9AA58655,
+    dark: 0x3F4A37,
+    dark_hover: 0x4F5B45,
+    switch_off: 0x252D20,
+    switch_on: 0x7FBAC0,
+    q: 0xE5A63A,
+    q_text: 0xE5A63A,
+    q_bg: 0x2A2412,
+    e: 0xE0604A,
+    e_text: 0xE0604A,
+    e_bg: 0x2A1612,
+    quiet: 0x5B6650,
+    ok: 0x9DB86A,
+    primary: 0x7FBAC0,
+    primary_hover: 0x93C8CD,
+    link: 0x7FBAC0,
+    idle_ring: 0x5B6650,
+    menu_hover: 0x1D2318,
     r_button: px(0.),
     r_card: px(0.),
     r_tile: px(0.),
     r_pane: px(0.),
     r_rail_item: px(0.),
-    board_bg: 0x000400,
-    work: 0x39FF6A,
-    work_bg: 0x00240A,
-    work_text: 0x7BE08F,
-    ok_bg: 0x00240A,
-    ok_text: 0x39FF6A,
-    edge: 0x128A35,
-    field_line: 0x128A35,
+    board_bg: 0x0F120E,
+    work: 0x7FBAC0,
+    work_bg: 0x1D2318,
+    work_text: 0x7FBAC0,
+    ok_bg: 0x1D2318,
+    ok_text: 0x9DB86A,
+    edge: 0x3F4A37,
+    field_line: 0x3F4A37,
     ..MINIMAL
 };
 

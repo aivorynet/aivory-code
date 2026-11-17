@@ -62,9 +62,14 @@ impl ControlStyle {
             menu: rgb(t.card),
             menu_text: rgb(t.ink),
             menu_hover: rgb(t.menu_hover),
-            font: None,
-            radius: None,
-            text: None,
+            font: (t.look == aivory_protocol::Look::Bridge)
+                .then(|| SharedString::from(crate::bridge_kit::BODY)),
+            // A pill in Minimal and Bridge, otherwise the corner style of the look.
+            radius: match t.look {
+                aivory_protocol::Look::Minimal | aivory_protocol::Look::Bridge => None,
+                _ => Some(f32::from(t.r_button)),
+            },
+            text: (t.look != aivory_protocol::Look::Minimal).then(label_size),
         }
     }
 
@@ -82,8 +87,8 @@ impl ControlStyle {
             menu_hover: rgb(0x125A2A),
             font,
             radius: Some(0.),
-            // MX_SMALL of the Operator kit.
-            text: Some(9.5),
+            // The label size of the look (12 px or more).
+            text: Some(label_size()),
         }
     }
 
@@ -100,9 +105,20 @@ impl ControlStyle {
             menu_hover: rgb(accent),
             font,
             radius: Some(2.),
-            text: None,
+            // The entry size: the row must read at a glance in a dark console.
+            text: Some(entry_size()),
         }
     }
+}
+
+/// The entry size (one of the 4 sizes) of the current look.
+fn entry_size() -> f32 {
+    crate::look::sizes(tk().look).map_or(13., |s| s[2])
+}
+
+/// The label size (one of the 4 sizes) of the current look.
+fn label_size() -> f32 {
+    crate::look::sizes(tk().look).map_or(12., |s| s[3])
 }
 
 /// The state of the controls of one chat window.
@@ -157,7 +173,7 @@ impl Controls {
             .flex()
             .flex_wrap()
             .items_center()
-            .gap(px(if style.text.is_some() { 2. } else { 6. }))
+            .gap(px(if style.text.is_some() { 4. } else { 6. }))
             .text_size(ui::ts(style.text.unwrap_or(T_CAPTION)));
         if let Some(f) = &style.font {
             row = row.font_family(f.clone());
@@ -285,7 +301,8 @@ impl Controls {
             .bg(style.menu)
             .text_color(style.menu_text)
             .rounded(px(style.radius.unwrap_or(8.)))
-            .shadow(ui::card_shadow());
+            .shadow(ui::card_shadow())
+            .map(crate::overlay_style::skin);
         for (i, (value, on)) in values.into_iter().enumerate() {
             let base = cur.clone();
             let pid = pane.to_string();
@@ -305,6 +322,9 @@ impl Controls {
                     .whitespace_nowrap()
                     .cursor_pointer()
                     .hover(|s| s.bg(style.menu_hover))
+                    .when(!crate::overlay_style::plain(), |d| {
+                        crate::overlay_style::menu_row(d, on)
+                    })
                     .when(on, |d| d.font_weight(FontWeight::SEMIBOLD))
                     .child(value)
                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -407,8 +427,8 @@ fn pill(
     let hover = style.pill_hover;
     div()
         .id(id)
-        .h(px(if style.text.is_some() { 20. } else { 24. }))
-        .px(px(if style.text.is_some() { 6. } else { 9. }))
+        .h(px(style.text.map_or(24., |t| (t * 1.8).max(20.).ceil())))
+        .px(px(if style.text.is_some() { 8. } else { 9. }))
         .flex()
         .flex_none()
         .items_center()
@@ -418,6 +438,11 @@ fn pill(
         .cursor_pointer()
         .bg(bg)
         .text_color(fg)
+        .border_1()
+        .border_color(Rgba {
+            a: if on { 0. } else { 0.6 },
+            ..style.pill_text
+        })
         .when(!on, |d| d.hover(move |s| s.bg(hover)))
         .child(label.into())
 }

@@ -74,6 +74,7 @@ impl Fixture {
                 secret_file: Some(dir.join("iroh.key")),
                 relay: RelayChoice::Disabled,
                 bind: Some("127.0.0.1:0".parse().unwrap()),
+                mesh: None,
             },
         )
         .expect("the iroh link starts");

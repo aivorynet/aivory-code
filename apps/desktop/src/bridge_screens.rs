@@ -16,7 +16,7 @@ use aivory_protocol::{
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Div, Entity, EventEmitter, SharedString, Stateful, Task as GpuiTask,
-    Window, div, px, rgb,
+    Window, div, rgb,
 };
 
 use crate::actions::{Action, act};
@@ -62,17 +62,23 @@ pub fn island(art: Art, i: Island) -> Div {
         .left(px(316.))
         .top(px(88.))
         .flex()
-        .gap(px(64.));
+        .gap(px(if art.dx < 200. { 28. } else { 64. }));
     for (label, value, color) in i.stats {
         stats = stats.child(
-            div().flex().flex_col().gap(px(8.)).child(th(label)).child(
-                div()
-                    .font_family(LABEL)
-                    .text_size(px(S_BIG))
-                    .line_height(px(34.))
-                    .text_color(rgb(color))
-                    .child(value),
-            ),
+            div()
+                .flex()
+                .flex_none()
+                .flex_col()
+                .gap(px(8.))
+                .child(th(label).whitespace_nowrap())
+                .child(
+                    div()
+                        .font_family(LABEL)
+                        .text_size(px(S_BIG))
+                        .line_height(px(34.))
+                        .text_color(rgb(color))
+                        .child(value),
+                ),
         );
     }
     let title = |text: String, color: u32| {
@@ -84,39 +90,38 @@ pub fn island(art: Art, i: Island) -> Div {
             .text_color(rgb(color))
             .child(text.to_uppercase())
     };
-    let col_h = art.by(808.) - 384.;
-    // The text keeps 32 px from the frame bars on every side.
-    let body_h = art.by(790.) - 424.;
+    let col_h = art.by(832.) - 320.;
+    let bh = body_h(art);
     div()
         .size_full()
         .relative()
         .overflow_hidden()
         .child(stats)
         // The left island.
-        .child(rect(16., 300., 300., 76., c).rounded_tl(px(66.)))
-        .child(rect(186., 336., 133., 40., BLACK).rounded_tl(px(28.)))
+        .child(rect(16., ISL_T, 300., 52., c).rounded_tl(px(46.)))
+        .child(rect(186., ISL_T + 30., 133., 22., BLACK).rounded_tl(px(20.)))
         .child(
-            area(320., 300., 440., 36.)
+            area(320., ISL_T, 440., 30.)
                 .flex()
                 .items_center()
                 .gap(px(12.))
-                .child(div().flex_1().h(px(36.)).bg(rgb(c)))
+                .child(div().flex_1().h(px(30.)).bg(rgb(c)))
                 .child(title(i.left_title.to_string(), PE)),
         )
         .child(
-            area(16., 384., 170., col_h)
+            area(16., ISL_T + 58., 170., col_h)
                 .flex()
                 .flex_col()
                 .gap(px(3.))
                 .children(i.left_tabs)
                 .child(div().flex_1().bg(rgb(c))),
         )
-        .child(rect(16., art.by(812.), 300., 72., SK).rounded_bl(px(66.)))
-        .child(rect(186., art.by(812.), 133., 36., BLACK).rounded_bl(px(28.)))
-        .child(rect(320., art.by(848.), 400., 36., SK))
-        .child(rect(724., art.by(848.), 36., 36., SK).rounded_r(px(18.)))
+        .child(rect(16., art.by(832.), 300., 52., SK).rounded_bl(px(46.)))
+        .child(rect(186., art.by(832.), 133., 22., BLACK).rounded_bl(px(20.)))
+        .child(rect(320., art.by(862.), 400., 22., SK))
+        .child(rect(724., art.by(862.), 22., 22., SK).rounded_r(px(11.)))
         .child(
-            area(222., 424., 504., body_h)
+            area(222., BODY_T, 504., bh)
                 .flex()
                 .flex_col()
                 .overflow_hidden()
@@ -124,41 +129,51 @@ pub fn island(art: Art, i: Island) -> Div {
         )
         // The right island.
         .child(
-            area(800., 300., 320. + art.dx, 36.)
+            area(800., ISL_T, 320. + art.dx, 30.)
                 .flex()
                 .items_center()
                 .gap(px(4.))
                 .child(
                     div()
                         .flex_none()
-                        .size(px(36.))
+                        .size(px(30.))
                         .bg(rgb(PE))
-                        .rounded_l(px(18.)),
+                        .rounded_l(px(15.)),
                 )
                 .child(div().px(px(8.)).child(title(i.right_title, PE)))
-                .child(div().flex_1().h(px(36.)).bg(rgb(PE))),
+                .child(div().flex_1().h(px(30.)).bg(rgb(PE))),
         )
-        .child(rect(art.rx(1124.), 300., 300., 76., PE).rounded_tr(px(66.)))
-        .child(rect(art.rx(1124.) - 3., 336., 133., 40., BLACK).rounded_tr(px(28.)))
+        .child(rect(art.rx(1124.), ISL_T, 300., 52., PE).rounded_tr(px(46.)))
+        .child(rect(art.rx(1124.) - 3., ISL_T + 30., 133., 22., BLACK).rounded_tr(px(20.)))
         .child(
-            area(art.rx(1254.), 384., 170., col_h)
+            area(art.rx(1254.), ISL_T + 58., 170., col_h)
                 .flex()
                 .flex_col()
                 .gap(px(4.))
                 .children(i.right_tabs)
                 .child(div().flex_1().bg(rgb(SK))),
         )
-        .child(rect(art.rx(1124.), art.by(812.), 300., 72., SK).rounded_br(px(66.)))
-        .child(rect(art.rx(1124.) - 3., art.by(812.), 133., 36., BLACK).rounded_br(px(28.)))
-        .child(rect(840., art.by(848.), 280. + art.dx, 36., SK))
-        .child(rect(800., art.by(848.), 36., 36., SK).rounded_l(px(18.)))
+        .child(rect(art.rx(1124.), art.by(832.), 300., 52., SK).rounded_br(px(46.)))
+        .child(rect(art.rx(1124.) - 3., art.by(832.), 133., 22., BLACK).rounded_br(px(20.)))
+        .child(rect(840., art.by(862.), 280. + art.dx, 22., SK))
+        .child(rect(800., art.by(862.), 22., 22., SK).rounded_l(px(11.)))
         .child(
-            area(856., 424., 352. + art.dx, body_h)
+            area(856., BODY_T, 352. + art.dx, bh)
                 .flex()
                 .flex_col()
                 .overflow_hidden()
                 .child(i.right),
         )
+}
+
+/// The top of an island frame, in art px.
+const ISL_T: f32 = 264.;
+/// The top of the text in an island.
+const BODY_T: f32 = 310.;
+
+/// The height of the text area in an island, in art px.
+pub fn body_h(art: Art) -> f32 {
+    art.by(848.) - BODY_T
 }
 
 /// A row of a list: a number chip, a title with a line below, and a note at the right.
@@ -237,6 +252,18 @@ pub(crate) fn row(
         )
 }
 
+/// A quiet row under a list that selects the next hidden entry: "+3 more".
+pub(crate) fn more_row(id: &'static str, text: String) -> gpui::Stateful<Div> {
+    div()
+        .id(id)
+        .flex_none()
+        .h(px(32.))
+        .flex()
+        .items_center()
+        .cursor_pointer()
+        .child(th(text).text_color(rgb(OR)))
+}
+
 /// A block of prose in the right island.
 pub(crate) fn prose(text: &str) -> Div {
     div()
@@ -267,6 +294,58 @@ pub(crate) fn big(text: &str) -> Div {
         .child(text.to_string())
 }
 
+/// One line of a transcript or a file list: it never wraps.
+fn one_line(text: &str) -> Div {
+    prose(text).truncate().h(px(LH_BODY)).flex_none()
+}
+
+/// A small frame of a look: an elbow, two bars and a title, drawn in its five colors.
+fn look_preview(name: &str, c: [u32; 5], bg: u32) -> Div {
+    let bar = |x: f32, y: f32, w: f32, h: f32, col: u32| {
+        div()
+            .absolute()
+            .left(px(x))
+            .top(px(y))
+            .w(px(w))
+            .h(px(h))
+            .bg(rgb(col))
+    };
+    div()
+        .relative()
+        .flex_none()
+        .w(px(300.))
+        .h(px(110.))
+        .bg(rgb(bg))
+        .child(bar(0., 0., 70., 56., c[0]).rounded_tl(px(26.)))
+        .child(bar(34., 24., 36., 32., bg).rounded_tl(px(12.)))
+        .child(bar(74., 0., 150., 14., c[1]))
+        .child(bar(228., 0., 72., 14., c[2]))
+        .child(bar(0., 60., 34., 18., c[3]))
+        .child(bar(0., 82., 34., 28., c[4]))
+        .child(bar(74., 96., 226., 14., c[1]).rounded_r(px(7.)))
+        .child(
+            div()
+                .absolute()
+                .left(px(84.))
+                .top(px(26.))
+                .font_family(LABEL)
+                .text_size(px(S_TITLE))
+                .line_height(px(S_TITLE))
+                .text_color(rgb(c[3]))
+                .child(name.to_uppercase()),
+        )
+        .child(
+            div()
+                .absolute()
+                .left(px(84.))
+                .top(px(58.))
+                .font_family(BODY)
+                .text_size(px(S_SMALL))
+                .text_color(rgb(c[2]))
+                .child("Sessions · live"),
+        )
+}
+
 /// What a look is: a line about it, its type scale, and five swatch colors.
 fn look_card(look: aivory_protocol::Look) -> (&'static str, &'static str, [u32; 5]) {
     use aivory_protocol::Look;
@@ -278,7 +357,7 @@ fn look_card(look: aivory_protocol::Look) -> (&'static str, &'static str, [u32; 
         ),
         Look::Bridge => (
             "A starship console: colored frame islands on black, numbered segments, one decision at a time.",
-            "Antonio 44 · 22 · 16 · Barlow 16 · Plex Mono 14",
+            "Antonio 64 · 28 · 18 · 14 · Plex Mono 14",
             [OR, PK, PE, GD, RD],
         ),
         Look::Operator => (
@@ -488,7 +567,7 @@ impl Render for BridgeInbox {
         let stats = vec![
             (
                 "Waiting for you".to_string(),
-                format!("{} decisions", count(InboxFilter::Answers)),
+                count(InboxFilter::Answers).to_string(),
                 RS,
             ),
             (
@@ -533,7 +612,7 @@ impl Render for BridgeInbox {
 
         // The left island: the decision on screen, then the next in line.
         let mut left = div().flex().flex_col();
-        let mut right = div().flex().flex_col().gap(px(16.));
+        let mut right = div().flex().flex_col().gap(px(12.));
         let mut right_title = "Detail".to_string();
         if let Some(it) = &cur {
             let at = items.iter().position(|i| i.id == it.id).unwrap_or(0);
@@ -548,7 +627,7 @@ impl Render for BridgeInbox {
                                 if self.tab == InboxTab::Done {
                                     "Done"
                                 } else {
-                                    "Decision"
+                                    "Item"
                                 },
                                 at + 1,
                                 items.len(),
@@ -605,13 +684,14 @@ impl Render for BridgeInbox {
             }
             left = left.child(pills);
             let rest: Vec<&InboxItem> = items.iter().filter(|i| i.id != it.id).collect();
+            let next_rows = ((((body_h(art) - 250.) / 66.).floor()) as usize).clamp(2, 6);
             if !rest.is_empty() {
                 let mut list = div()
                     .mt(px(PAD))
                     .flex()
                     .flex_col()
                     .child(sec("Next in line").mb(px(12.)));
-                for (k, o) in rest.iter().take(2).enumerate() {
+                for (k, o) in rest.iter().take(next_rows).enumerate() {
                     let id = o.id.clone();
                     list = list.child(
                         row(
@@ -653,10 +733,21 @@ impl Render for BridgeInbox {
                         right = right.child(sec("Plan")).children(
                             it.steps
                                 .iter()
-                                .take(6)
+                                .take(3)
                                 .enumerate()
-                                .map(|(k, s)| prose(&format!("{}. {s}", k + 1))),
+                                .map(|(k, s)| one_line(&format!("{}. {s}", k + 1))),
                         );
+                    }
+                    let chat = chat_text(&it.tail, 3);
+                    if !chat.is_empty() {
+                        right = right
+                            .child(sec("Latest chat"))
+                            .children(chat.iter().map(|r| one_line(r)));
+                    }
+                    if !it.files.is_empty() {
+                        right = right
+                            .child(sec(format!("Files changed · {}", it.files.len())))
+                            .children(it.files.iter().take(3).map(|f| code(f, MUTED).truncate()));
                     }
                 }
                 Side::Files => {
@@ -898,11 +989,7 @@ impl Render for BridgeTasks {
         let n = |t| self.of(t).len();
         let stats = vec![
             ("Queued".to_string(), n(TaskTab::Queued).to_string(), TXT),
-            (
-                "Running".to_string(),
-                format!("{} tasks", n(TaskTab::Running)),
-                OR,
-            ),
+            ("Running".to_string(), n(TaskTab::Running).to_string(), OR),
             ("In review".to_string(), n(TaskTab::Review).to_string(), GD),
             ("Done".to_string(), n(TaskTab::Done).to_string(), TXT),
         ];
@@ -936,14 +1023,57 @@ impl Render for BridgeTasks {
             .or(tasks.first())
             .cloned();
         let mut left = div().flex().flex_col().child(
-            sec(format!(
-                "{} · {} tasks",
-                ["Queued", "Running", "Review", "Done"][self.tab as usize],
-                tasks.len()
-            ))
-            .mb(px(12.)),
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap(px(8.))
+                .mb(px(12.))
+                .child(sec(format!(
+                    "{} · {} tasks",
+                    ["Queued", "Running", "Review", "Done"][self.tab as usize],
+                    tasks.len()
+                )))
+                .child(
+                    pill(
+                        "lt-autopilot",
+                        PK,
+                        &format!(
+                            "Autopilot {} · {queued_n} queued",
+                            if autopilot { "on" } else { "off" }
+                        ),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        act(
+                            &this.model,
+                            Action::Autopilot(AutopilotPatch {
+                                on: Some(!autopilot),
+                                ..AutopilotPatch::default()
+                            }),
+                            cx,
+                        );
+                    })),
+                ),
         );
-        for (k, t) in tasks.iter().take(4).enumerate() {
+        // Four whole rows; the window follows the selected task.
+        let cur_i = cur
+            .as_ref()
+            .and_then(|c| tasks.iter().position(|t| t.id == c.id))
+            .unwrap_or(0);
+        let fit_rows = ((((body_h(art) - 80.) / 65.).floor()) as usize).clamp(3, 9);
+        let start = cur_i
+            .saturating_sub(fit_rows - 1)
+            .min(tasks.len().saturating_sub(fit_rows));
+        if start > 0 {
+            let prev = tasks[start - 1].id.clone();
+            left = left.child(more_row("lt-earlier", format!("{start} earlier")).on_click(
+                cx.listener(move |this, _, _, cx| {
+                    this.selected = Some(prev.clone());
+                    cx.notify();
+                }),
+            ));
+        }
+        for (k, t) in tasks.iter().enumerate().skip(start).take(fit_rows) {
             let id = t.id.clone();
             let c = if t.waiting_for.is_some() { RS } else { OR };
             let mut r = row(
@@ -966,40 +1096,33 @@ impl Render for BridgeTasks {
             }));
             left = left.child(r);
         }
-        left = left.child(
-            div()
-                .mt(px(22.))
-                .flex()
-                .gap(px(8.))
-                .child(
-                    pill(
-                        "lt-autopilot",
-                        PK,
-                        if autopilot {
-                            "Autopilot on"
-                        } else {
-                            "Autopilot off"
-                        },
-                    )
-                    .px(px(18.))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        act(
-                            &this.model,
-                            Action::Autopilot(AutopilotPatch {
-                                on: Some(!autopilot),
-                                ..AutopilotPatch::default()
-                            }),
-                            cx,
-                        );
-                    })),
-                )
-                .child(th(format!("{queued_n} queued for autopilot")).mt(px(6.))),
-        );
+        let hidden = tasks.len().saturating_sub(start + fit_rows);
+        if hidden > 0 {
+            let next = tasks[start + fit_rows].id.clone();
+            left = left.child(more_row("lt-more", format!("+{hidden} more")).on_click(
+                cx.listener(move |this, _, _, cx| {
+                    this.selected = Some(next.clone());
+                    cx.notify();
+                }),
+            ));
+        }
 
         let mut right = div().flex().flex_col().gap(px(14.));
         let mut open: Option<String> = None;
         if let Some(t) = &cur {
             open = t.sessions.first().map(|s| s.session.clone());
+            let latest: Vec<String> = self
+                .model
+                .read(cx)
+                .war
+                .as_ref()
+                .and_then(|w| {
+                    t.sessions
+                        .iter()
+                        .find_map(|s| w.sessions.iter().find(|p| p.id == s.session))
+                })
+                .map(|p| chat_text(&p.tail, 3))
+                .unwrap_or_default();
             right = right.child(big(&t.title)).child(th(format!(
                 "{} · {} / {} · ${:.2}",
                 t.agents.first().cloned().unwrap_or_default(),
@@ -1011,18 +1134,16 @@ impl Render for BridgeTasks {
                 TaskSide::Plan => {
                     right = right.child(sec(format!("Plan · {} steps", t.steps.len())).mt(px(16.)));
                     // Only whole rows: the window starts one step before the first open step.
-                    let fit =
-                        ((((art.by(790.) - 424. - 150.) / 54.).floor()) as usize).clamp(1, 12);
-                    let first_open = t
-                        .steps
-                        .iter()
-                        .position(|s| s.state != StepState::Done)
-                        .unwrap_or(0);
-                    let start = first_open
-                        .saturating_sub(1)
-                        .min(t.steps.len().saturating_sub(fit));
-                    for (k, s) in t.steps.iter().enumerate().skip(start).take(fit) {
-                        right = right.child(
+                    let fit = ((((body_h(art) - 150. - 110.) / 54.).floor()) as usize).clamp(1, 12);
+                    // All steps, from step 1; the list scrolls when it is longer than the fit.
+                    let mut list = div()
+                        .id("lt-plan-list")
+                        .flex()
+                        .flex_col()
+                        .max_h(px(fit as f32 * 54.))
+                        .overflow_y_scroll();
+                    for (k, s) in t.steps.iter().enumerate() {
+                        list = list.child(
                             div()
                                 .flex_none()
                                 .py(px(6.))
@@ -1059,11 +1180,21 @@ impl Render for BridgeTasks {
                                 ),
                         );
                     }
+                    right = right.child(list);
+                    if t.steps.len() > fit {
+                        right = right
+                            .child(th(format!("Scroll for {} more steps", t.steps.len() - fit)));
+                    }
+                    if !latest.is_empty() {
+                        right = right
+                            .child(sec("Latest output"))
+                            .children(latest.iter().map(|r| one_line(r)));
+                    }
                 }
                 TaskSide::Sessions => {
                     right =
                         right.child(sec(format!("Sessions · {}", t.sessions.len())).mt(px(16.)));
-                    let fit = ((((art.by(790.) - 424. - 150.) / 78.).floor()) as usize).clamp(1, 8);
+                    let fit = ((((body_h(art) - 150.) / 78.).floor()) as usize).clamp(1, 8);
                     for (k, s) in t.sessions.iter().enumerate().take(fit) {
                         let id = s.session.clone();
                         right = right.child(
@@ -1081,6 +1212,10 @@ impl Render for BridgeTasks {
                                 move |_, _, _, cx| cx.emit(BridgeEvent::OpenSession(id.clone())),
                             )),
                         );
+                    }
+                    if t.sessions.len() > fit {
+                        right =
+                            right.child(th(format!("+{} more sessions", t.sessions.len() - fit)));
                     }
                 }
             }
@@ -1144,6 +1279,8 @@ impl Render for BridgeTasks {
 pub struct BridgeRepos {
     model: Entity<Model>,
     selected: Option<String>,
+    /// 0 all codebases, 1 with a live session, 2 with a session that waits.
+    filter: u8,
     _obs: gpui::Subscription,
 }
 
@@ -1155,6 +1292,7 @@ impl BridgeRepos {
         Self {
             model,
             selected: None,
+            filter: 0,
             _obs: obs,
         }
     }
@@ -1190,12 +1328,40 @@ impl Render for BridgeRepos {
                 .filter(|s| s.codebase == c && s.ask.is_some())
                 .count()
         };
+        let kept = |f: u8, c: &str| match f {
+            1 => live(c) > 0,
+            2 => waits(c) > 0,
+            _ => true,
+        };
+        let list: Vec<_> = war
+            .codebases
+            .iter()
+            .filter(|c| kept(self.filter, &c.id))
+            .collect();
         let cur = self
             .selected
             .as_ref()
-            .and_then(|id| war.codebase(id))
-            .or(war.codebases.first())
+            .and_then(|id| list.iter().copied().find(|c| &c.id == id))
+            .or(list.first().copied())
             .cloned();
+        let mut left_tabs: Vec<AnyElement> = Vec::new();
+        for (f, label, color) in [(0u8, "All", PK), (1, "Live", OR), (2, "Waiting", RS)] {
+            let n = war.codebases.iter().filter(|c| kept(f, &c.id)).count();
+            left_tabs.push(
+                tab(
+                    format!("lr-tab-{label}"),
+                    &format!("{label} {n:02}"),
+                    color,
+                    self.filter == f,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.filter = f;
+                    this.selected = None;
+                    cx.notify();
+                }))
+                .into_any_element(),
+            );
+        }
         let stats = vec![
             (
                 "Codebases".to_string(),
@@ -1227,14 +1393,32 @@ impl Render for BridgeRepos {
             .flex_col()
             .child(sec("Codebases · click to show").mb(px(12.)));
         // Whole rows only (60 px each); a "+N more" line (24 px) when they do not all fit.
-        let left_h = art.by(790.) - 424. - 40.;
-        let n = war.codebases.len();
-        let shown = if (n as f32) * 60. <= left_h {
+        let left_h = body_h(art) - 40.;
+        const ROW_H: f32 = 48.;
+        let n = list.len();
+        let shown = if (n as f32) * ROW_H <= left_h {
             n
         } else {
-            (((left_h - 24.) / 60.).floor() as usize).max(1)
+            (((left_h - 64.) / ROW_H).floor() as usize).max(1)
         };
-        for (k, c) in war.codebases.iter().take(shown).enumerate() {
+        // The window follows the selected codebase.
+        let cur_i = cur
+            .as_ref()
+            .and_then(|c| list.iter().position(|x| x.id == c.id))
+            .unwrap_or(0);
+        let start = cur_i
+            .saturating_sub(shown.saturating_sub(1))
+            .min(n.saturating_sub(shown));
+        if start > 0 {
+            let prev = list[start - 1].id.clone();
+            left = left.child(more_row("lr-earlier", format!("{start} earlier")).on_click(
+                cx.listener(move |this, _, _, cx| {
+                    this.selected = Some(prev.clone());
+                    cx.notify();
+                }),
+            ));
+        }
+        for (k, c) in list.iter().copied().enumerate().skip(start).take(shown) {
             let id = c.id.clone();
             let w = waits(&c.id);
             left = left.child(
@@ -1243,21 +1427,29 @@ impl Render for BridgeRepos {
                     &format!("{:02}", k + 1),
                     if w > 0 { RS } else { PK },
                     &c.id,
-                    &format!("{} · {}", c.branch, c.path),
-                    &format!("{} live", live(&c.id)),
+                    "",
+                    &format!("{} · {} live", c.branch, live(&c.id)),
                     if w > 0 { RS } else { MUTED },
                     cur.as_ref().is_some_and(|x| x.id == c.id),
                 )
-                .min_h(px(60.))
-                .py(px(6.))
+                .min_h(px(ROW_H))
+                .py(px(4.))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.selected = Some(id.clone());
                     cx.notify();
                 })),
             );
         }
-        if n > shown {
-            left = left.child(th(format!("+ {} more", n - shown)).mt(px(6.)));
+        if n > start + shown {
+            let next = list[start + shown].id.clone();
+            left = left.child(
+                more_row("lr-more", format!("+{} more", n - start - shown)).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.selected = Some(next.clone());
+                        cx.notify();
+                    },
+                )),
+            );
         }
         let mut right = div().flex().flex_col().gap(px(14.));
         let mut open: Option<String> = None;
@@ -1273,28 +1465,39 @@ impl Render for BridgeRepos {
                     "{} · {} worktrees · {}",
                     c.branch, c.worktrees, c.daemon
                 )))
-                .child(code(&c.path, TXT))
-                .child(sec(format!("Parts · {}", c.parts.len())).mt(px(16.)));
-            for p in c.parts.iter().take(6) {
-                right = right.child(prose(&format!("{} · {}", p.name, p.paths.join(", "))));
+                .child(sec(format!("Parts · {}", c.parts.len())).mt(px(12.)));
+            for p in c.parts.iter().take(1) {
+                right = right.child(
+                    prose(&format!("{} · {}", p.name, p.paths.join(", ")))
+                        .truncate()
+                        .h(px(LH_BODY)),
+                );
+            }
+            if c.parts.len() > 1 {
+                right = right.child(th(format!("+{} more parts", c.parts.len() - 1)));
             }
             let sessions: Vec<&Pane> = war
                 .sessions
                 .iter()
                 .filter(|s| s.codebase == c.id && s.state.is_live())
                 .collect();
-            right = right.child(sec(format!("Live sessions · {}", sessions.len())).mt(px(16.)));
-            for (k, s) in sessions.iter().take(5).enumerate() {
+            right = right.child(sec(format!("Live sessions · {}", sessions.len())).mt(px(12.)));
+            // Whole rows only (60 px each), then a "+N more" line.
+            let rows = ((((body_h(art) - 248. - 40.) / 60.).floor()) as usize).clamp(1, 6);
+            let mut slist = div().id("lr-sessions").flex().flex_col();
+            for (k, s) in sessions.iter().enumerate().take(rows) {
                 let id = s.id.clone();
-                right =
-                    right.child(
+                slist =
+                    slist.child(
                         row(
                             format!("lr-s-{k}"),
                             &format!("{:02}", k + 1),
                             state_color(s),
                             &s.title,
+                            &chat_text(&s.tail, 1)
+                                .pop()
+                                .unwrap_or_else(|| s.provider.clone()),
                             &s.provider,
-                            "",
                             MUTED,
                             false,
                         )
@@ -1302,6 +1505,10 @@ impl Render for BridgeRepos {
                             cx.emit(BridgeEvent::OpenSession(id.clone()))
                         })),
                     );
+            }
+            right = right.child(slist);
+            if sessions.len() > rows {
+                right = right.child(th(format!("+{} more sessions", sessions.len() - rows)));
             }
         }
         let right_tabs = vec![
@@ -1320,7 +1527,7 @@ impl Render for BridgeRepos {
                 stats,
                 left_title: "Repos",
                 left_color: PK,
-                left_tabs: Vec::new(),
+                left_tabs,
                 left: left.into_any_element(),
                 right_title: "Codebase".into(),
                 right_tabs,
@@ -1398,8 +1605,14 @@ impl Render for BridgeSettings {
                     .into_any_element(),
             );
         }
+        // "All settings": the full settings screen (providers, devices, machines, notifications).
+        left_tabs.push(
+            tab("ls-tab-Other", "All settings ›", PK, false)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(BridgeEvent::AllSettings)))
+                .into_any_element(),
+        );
         let mut left = div().flex().flex_col();
-        let mut right = div().flex().flex_col().gap(px(14.));
+        let mut right = div().flex().flex_col().gap(px(10.));
         match self.section {
             Section::Looks => {
                 left = left.child(sec("Looks · click to switch").mb(px(8.)));
@@ -1411,14 +1624,13 @@ impl Render for BridgeSettings {
                             &format!("{:02}", k + 1),
                             if on { GD } else { PK },
                             name,
-                            "",
+                            look_card(look).0,
                             if on { "On" } else { "" },
                             GD,
                             on,
                         )
-                        .min_h(px(36.))
-                        .h(px(36.))
-                        .py(px(2.))
+                        .min_h(px(50.))
+                        .py(px(3.))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             act(&this.model, Action::SetLook(look), cx);
                         })),
@@ -1426,15 +1638,39 @@ impl Render for BridgeSettings {
                 }
                 let now = crate::theme::tk().look;
                 let (about, scale, swatches) = look_card(now);
+                // The Bridge scale comes from the real constants.
+                let scale = if now == aivory_protocol::Look::Bridge {
+                    format!("Antonio 64 · {S_TITLE} · {S_SECTION} · {S_SMALL} · Plex Mono {S_CODE}")
+                } else {
+                    scale.to_string()
+                };
                 let mut chips = div().flex().gap(px(8.));
                 for c in swatches {
                     chips = chips.child(div().w(px(56.)).h(px(28.)).rounded_l(px(14.)).bg(rgb(c)));
                 }
+                let bg = if now == aivory_protocol::Look::Bridge {
+                    BLACK
+                } else {
+                    0x101010
+                };
+                let mut sizes = div().flex().items_end().gap(px(18.));
+                for (txt, size) in [("Aa", S_TITLE), ("Aa", S_BODY), ("Aa", S_SMALL)] {
+                    sizes = sizes.child(
+                        div()
+                            .font_family(LABEL)
+                            .text_size(px(size))
+                            .line_height(px(size + 6.))
+                            .text_color(rgb(TXT))
+                            .child(format!("{txt} {size}")),
+                    );
+                }
                 right = right
                     .child(big(crate::look::name(now)))
+                    .child(look_preview(crate::look::name(now), swatches, bg))
                     .child(prose(about))
                     .child(sec("Type scale"))
-                    .child(code(scale, TXT))
+                    .child(sizes)
+                    .child(code(&scale, TXT))
                     .child(sec("Colors"))
                     .child(chips)
                     .child(
@@ -1534,16 +1770,11 @@ impl Render for BridgeSettings {
                     }
                 }
                 right = right.child(big("Providers and models")).child(prose(
-                    "Models, effort and permission mode per provider are set in the full settings.",
+                    "Models, effort and permission mode per provider are set under All settings.",
                 ));
             }
         }
-        let right_tabs = vec![
-            tab("rs-all", "All settings ›", OR, false)
-                .h(px(40.))
-                .on_click(cx.listener(|_, _, _, cx| cx.emit(BridgeEvent::AllSettings)))
-                .into_any_element(),
-        ];
+        let right_tabs: Vec<AnyElement> = Vec::new();
         island(
             art,
             Island {

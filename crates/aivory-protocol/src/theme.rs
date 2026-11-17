@@ -329,6 +329,51 @@ pub struct ThemeList {
     pub themes: Vec<InstalledTheme>,
 }
 
+/// The SHA-256 of one installed theme (the key of a phone cache).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeSha {
+    pub id: String,
+    /// The `sha256` of the `ThemeBundle`. Empty when the theme is invalid.
+    pub sha256: String,
+    /// The theme is invalid; a client must not cache it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Result of `theme/sync`: every installed theme with its SHA, and one revision of the list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeSync {
+    /// SHA-256 over the sorted `id@sha256` lines. It changes when any theme changes.
+    pub revision: String,
+    pub themes: Vec<ThemeSha>,
+}
+
+/// Why `theme/changed` was sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeChangeReason {
+    Add,
+    Update,
+    Remove,
+    /// `display.look` or `display.customTheme` changed.
+    Select,
+}
+
+/// Parameters of the `theme/changed` notification. A connection gets it after it called
+/// `theme/sync` or `theme/list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeChanged {
+    pub reason: ThemeChangeReason,
+    /// The theme that changed (a `select` of a built-in look has none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub revision: String,
+    pub themes: Vec<ThemeSha>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoveResult {

@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use gpui::{App, Bounds, Pixels, Window, linear_color_stop, linear_gradient};
 
+use super::camera::{PITCH0, YAW0};
 use super::layout::{BUILDING, City};
 use super::pins::{Rect, inside, overlap, place};
 use crate::warroom::skins::common::{Align, Painter, TextCache, ink, mix};
@@ -37,6 +38,10 @@ pub(super) const T_LABEL: f32 = 12.;
 /// The height of the district board at the bottom and its gap to the bottom edge.
 pub(super) const BOARD_H: f32 = 124.;
 pub(super) const BOARD_GAP: f32 = 22.;
+/// A layout size in design pixels, scaled like the text (the window fit and the setting).
+pub(super) fn sc(x: f32) -> f32 {
+    x * crate::ui::factor()
+}
 /// The room that the HUD column takes on the right.
 pub(super) const PANEL_W: f32 = 448.;
 /// The height of a beacon pillar over its light, in world units.
@@ -91,10 +96,16 @@ pub(super) struct Scene {
     pub hot: Vec<bool>,
     /// Per building: a session has an error there.
     pub fault: Vec<bool>,
-    /// Per district: the busy sessions and all live sessions.
-    pub load: Vec<(usize, usize)>,
     pub pins: Vec<BuildingPin>,
     pub lights: Vec<Light>,
+    /// The camera: the turn, the tilt and the zoom.
+    pub yaw: f32,
+    pub pitch: f32,
+    pub zoom: f32,
+    /// Per district: the session that a click on its plate selects.
+    pub picks: Vec<Option<String>>,
+    /// Per district: the readable state ("1 WAIT", "2 RUN") and its color.
+    pub states: Vec<(String, u32)>,
     pub t: f32,
     /// 0 to 1 while the screen glitches after a change.
     pub glitch: f32,
@@ -151,10 +162,7 @@ struct Cam {
 }
 
 impl Cam {
-    fn new(half: (f32, f32)) -> Self {
-        // A fixed angle: a tower stands still until a session starts or ends.
-        let th = -0.62f32;
-        let ph = 0.95f32;
+    fn new(half: (f32, f32), th: f32, ph: f32) -> Self {
         Self {
             cs: th.cos(),
             sn: th.sin(),
@@ -189,14 +197,17 @@ struct View {
 }
 
 impl View {
-    fn new(half: (f32, f32), bounds: Bounds<Pixels>) -> Self {
-        let cam = Cam::new(half);
+    fn new(half: (f32, f32), bounds: Bounds<Pixels>, scene: &Scene) -> Self {
+        // The fit uses the default camera, so a turn never changes the size of the city. The
+        // origin projects to (0, 0) at every turn, so the same offset centres every turn.
+        let fit = Cam::new(half, YAW0, PITCH0);
+        let cam = Cam::new(half, scene.yaw, scene.pitch);
         let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
         let (mut lo, mut hi) = ([f32::MAX; 2], [f32::MIN; 2]);
         for sx in [-half.0, half.0] {
             for sy in [-half.1, half.1] {
                 for z in [0., 200.] {
-                    let p = cam.proj(sx, sy, z);
+                    let p = fit.proj(sx, sy, z);
                     for i in 0..2 {
                         lo[i] = lo[i].min(p[i]);
                         hi[i] = hi[i].max(p[i]);
@@ -204,16 +215,18 @@ impl View {
                 }
             }
         }
-        let right = if w > 900. { w - PANEL_W } else { w - 24. };
+        let right = if w > 900. { w - sc(PANEL_W) } else { w - 24. };
         let (ax, ay) = (28., 28.);
         // Room at the bottom for the ticker and the ground plates under the front corner.
-        let (aw, ah) = (right - ax, h - BOARD_H - BOARD_GAP - 8. - ay);
+        let (aw, ah) = (right - ax, h - sc(BOARD_H + BOARD_GAP) - 8. - ay);
         let scale = (aw / (hi[0] - lo[0])).min(ah / (hi[1] - lo[1])).min(1.6);
+        let fitted = scale;
+        let scale = fitted * scene.zoom;
         Self {
-            ox: f32::from(bounds.origin.x) + ax + (aw - (hi[0] - lo[0]) * scale) / 2.
-                - lo[0] * scale,
-            oy: f32::from(bounds.origin.y) + ay + (ah - (hi[1] - lo[1]) * scale) / 2.
-                - lo[1] * scale,
+            ox: f32::from(bounds.origin.x) + ax + (aw - (hi[0] - lo[0]) * fitted) / 2.
+                - lo[0] * fitted,
+            oy: f32::from(bounds.origin.y) + ay + (ah - (hi[1] - lo[1]) * fitted) / 2.
+                - lo[1] * fitted,
             cam,
             scale,
         }
@@ -261,7 +274,7 @@ pub(super) fn paint(scene: &Scene, bounds: Bounds<Pixels>, window: &mut Window, 
     let mut cache = scene.cache.borrow_mut();
     let mut pen = Painter::new(window, cx, &mut cache);
     let city = &scene.city;
-    let v = View::new(city.half, bounds);
+    let v = View::new(city.half, bounds, scene);
     let (x0, y0) = (f32::from(bounds.origin.x), f32::from(bounds.origin.y));
     let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
     pen.rect((x0, y0, w, h), BG, 1.);
@@ -577,24 +590,24 @@ fn lights(pen: &mut Painter, v: &View, scene: &Scene) {
 /// stand at a fixed corner; the pins take free spots in a collision pass.
 fn pins(pen: &mut Painter, v: &View, scene: &Scene, (x0, y0, w, h): (f32, f32, f32, f32)) {
     let city = &scene.city;
-    let right = if w > 900. { PANEL_W } else { 24. };
+    let right = if w > 900. { sc(PANEL_W) } else { 24. };
     let area: Rect = [
         x0 + 8.,
         y0 + 8.,
         w - right - 8.,
-        h - BOARD_H - BOARD_GAP - 14.,
+        h - sc(BOARD_H + BOARD_GAP) - 14.,
     ];
     let board = [
         x0,
-        y0 + h - BOARD_H - BOARD_GAP,
+        y0 + h - sc(BOARD_H + BOARD_GAP),
         w - right,
-        BOARD_H + BOARD_GAP,
+        sc(BOARD_H + BOARD_GAP),
     ];
     let mut taken: Vec<Rect> = vec![board, [x0 + w - right, y0, right, h]];
     let mut hits = scene.hits.borrow_mut();
     hits.pins.clear();
-    let small = Painter::scaled(11.);
-    let big = Painter::scaled(12.);
+    let small = Painter::scaled(T_LABEL);
+    let big = Painter::scaled(T_ENTRY);
     let box_h = (big * 1.8).round();
 
     // The screen boxes of the buildings: a plate keeps off them.
@@ -634,12 +647,16 @@ fn pins(pen: &mut Painter, v: &View, scene: &Scene, (x0, y0, w, h): (f32, f32, f
                 .unwrap_or([0., 0.])
         };
         let (front, left, right) = (pick(&|p| p[1]), pick(&|p| -p[0]), pick(&|p| p[0]));
-        let name = pen.fit(&d.id.to_uppercase(), big, ORBITRON, true, 190.);
-        let (busy, all) = scene.load.get(di).copied().unwrap_or((0, 0));
-        let count = format!("{busy}/{all}");
+        let name = pen.fit(&d.id.to_uppercase(), big, ORBITRON, true, sc(200.));
+        let (count, count_color) = scene
+            .states
+            .get(di)
+            .cloned()
+            .unwrap_or_else(|| (String::new(), PALE));
         let code = format!("{:02}", di + 1);
         let wn = f32::from(pen.shaped(&name, big, ORBITRON, true, 0, 1.).width());
         let wc = f32::from(pen.shaped(&count, small, CHAKRA, true, 0, 1.).width());
+        let pick = scene.picks.get(di).cloned().flatten();
         let wk = f32::from(pen.shaped(&code, small, CHAKRA, true, 0, 1.).width());
         let block = wk + 12.;
         let pw = block + 10. + wn + 12. + wc + 10.;
@@ -656,6 +673,12 @@ fn pins(pen: &mut Painter, v: &View, scene: &Scene, (x0, y0, w, h): (f32, f32, f
             (front, 0.5, lower),
             (left, 1., above),
             (right, 0., above),
+            (front, 0.5, 28. + 2. * box_h),
+            (front, 1., lower),
+            (front, 0., lower),
+            (left, 0.5, above),
+            (right, 0.5, above),
+            (front, 0.5, -28. - 2. * box_h),
         ];
         let at = |&(c, k, dy): &([f32; 2], f32, f32)| (c, [c[0] - pw * k, c[1] + dy, pw, box_h]);
         let free = |r: &Rect, solid: bool| {
@@ -714,11 +737,15 @@ fn pins(pen: &mut Painter, v: &View, scene: &Scene, (x0, y0, w, h): (f32, f32, f
             &count,
             small,
             CHAKRA,
-            PALE,
-            0.75,
+            count_color,
+            1.,
             (cx2, rect[1], box_h),
             Align::Right,
         );
+        // A click on the plate selects the district's next ask, else a busy session.
+        if let Some(id) = pick {
+            hits.pins.push((id, rect));
+        }
     }
 
     // The beacon pins: on the pillar, as high as a free spot allows.

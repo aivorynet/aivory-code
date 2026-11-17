@@ -8,10 +8,12 @@
 use std::rc::Rc;
 use std::time::Duration;
 
-use aivory_protocol::rpc::{AutopilotPatch, InboxListParams, TaskListParams, method};
+use aivory_protocol::rpc::{
+    AutopilotPatch, InboxListParams, SettingsSetParams, TaskListParams, method,
+};
 use aivory_protocol::{
-    InboxFilter, InboxItem, InboxKind, InboxList, LineKind, SessionState, StepState, Task,
-    TaskColumn, TaskList,
+    Effort, InboxFilter, InboxItem, InboxKind, InboxList, LineKind, Mode, ProviderPrefs,
+    SessionState, SettingsView, StepState, Task, TaskColumn, TaskList,
 };
 use gpui::prelude::*;
 use gpui::{
@@ -73,7 +75,7 @@ pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -
             div()
                 .flex_none()
                 .whitespace_nowrap()
-                .text_size(ui::ts(T_TITLE))
+                .text_size(ts(T_TITLE))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(rgb(GREEN_HI))
                 .child(format!("{fkey} // {}", title.to_uppercase())),
@@ -97,13 +99,13 @@ pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -
                 .gap(px(8.))
                 .child(
                     div()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child(k.to_uppercase()),
                 )
                 .child(
                     div()
-                        .text_size(ui::ts(T_ENTRY))
+                        .text_size(ts(T_ENTRY))
                         .text_color(rgb(BLUE_HI))
                         .child(v),
                 ),
@@ -114,21 +116,33 @@ pub(super) fn head_line(fkey: &str, title: &str, stats: Vec<(String, String)>) -
 
 /// The layout of a screen: the title line over a row of screens.
 pub(super) fn page(head: Div, columns: Vec<AnyElement>) -> Div {
+    page_h(head, columns, None)
+}
+
+/// A page whose columns use the full height of the window.
+pub(super) fn page_full(head: Div, columns: Vec<AnyElement>) -> Div {
+    page_h(head, columns, None)
+}
+
+fn page_h(head: Div, columns: Vec<AnyElement>, cap: Option<f32>) -> Div {
     div()
         .size_full()
         .flex()
         .flex_col()
+        .relative()
         .px(px(28.))
         .pb(px(14.))
         .bg(rgb(PAGE))
+        .child(room(0.5))
         .font_family(FONT)
-        .text_size(ui::ts(T_ENTRY))
+        .text_size(ts(T_ENTRY))
         .text_color(rgb(GREEN))
         .child(head)
         .child(
             div()
                 .flex_1()
                 .min_h(px(0.))
+                .when_some(cap, |d, c| d.max_h(px(c)))
                 .flex()
                 .gap(px(GAP))
                 .children(columns),
@@ -153,13 +167,13 @@ pub(super) fn mon(
         .flex()
         .flex_col()
         .overflow_y_scroll()
-        .text_size(ui::ts(T_ENTRY))
+        .text_size(ts(T_ENTRY))
         .line_height(relative(1.45))
         .child(
             div()
                 .flex_none()
                 .pb(px(12.))
-                .text_size(ui::ts(T_SECTION))
+                .text_size(ts(T_SECTION))
                 .text_color(rgb(if blue { BLUE_HI } else { GREEN_HI }))
                 .child(title.to_uppercase()),
         )
@@ -221,22 +235,25 @@ pub(super) fn list_row(
     color: u32,
     on: bool,
 ) -> Stateful<Div> {
+    // A long description wraps to two lines. A short one and a path stay on one line.
+    let wrap = sub.len() > 48 && sub.contains(' ');
     div()
         .id(eid(id))
         .flex_none()
-        .h(px(52.))
+        .min_h(px(52.))
+        .py(px(4.))
         .px(px(10.))
         .flex()
         .items_center()
         .gap(px(12.))
         .cursor_pointer()
-        .when(on, |d| d.bg(rgb(BLUE_DIM)))
+        .when(on, |d| d.bg(rgb(SELECT)))
         .when(!on, |d| d.hover(|h| h.bg(hca(BLUE_DIM, 150))))
         .child(
             div()
                 .flex_none()
                 .w(px(24.))
-                .text_color(rgb(color))
+                .text_color(rgb(if on { BLUE_INK } else { color }))
                 .child(format!("{no:02}")),
         )
         .child(
@@ -250,26 +267,89 @@ pub(super) fn list_row(
                         .overflow_hidden()
                         .whitespace_nowrap()
                         .text_ellipsis()
-                        .text_color(rgb(if on { BLUE_HI } else { BLUE }))
+                        .text_color(rgb(if on { BLUE_INK } else { BLUE_HI }))
                         .child(title.to_string()),
                 )
                 .child(
                     div()
                         .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .text_size(ui::ts(T_LABEL))
-                        .text_color(rgb(BLUE_SOFT))
+                        .when(!wrap, |d| d.whitespace_nowrap().text_ellipsis())
+                        .when(wrap, |d| d.max_h(px(30.)))
+                        .text_size(ts(T_LABEL))
+                        .text_color(rgb(if on { 0x1D3A50 } else { BLUE_SOFT }))
                         .child(sub.to_string()),
                 ),
         )
-        .child(
+        .child(if right.ends_with('›') {
+            // An action word: it looks like a button and lights on hover of the row.
             div()
                 .flex_none()
-                .text_size(ui::ts(T_LABEL))
-                .text_color(rgb(color))
-                .child(right.to_string()),
-        )
+                .h(px(26.))
+                .px(px(10.))
+                .flex()
+                .items_center()
+                .text_size(ts(T_LABEL))
+                .text_color(rgb(BLUE_HI))
+                .bg(hca(BLUE_RING, 70))
+                .child(right.to_uppercase())
+        } else {
+            div()
+                .flex_none()
+                .text_size(ts(T_LABEL))
+                .text_color(rgb(if on { BLUE_INK } else { color }))
+                .child(right.to_string())
+        })
+}
+
+/// The lit row of a list and the lit key tab: reverse video, like the operator menu.
+const SELECT: u32 = 0xA9D8F2;
+
+/// A filter as a key of the console: "[A] All 6". The lit one is reverse video.
+pub(super) fn tab_key(id: String, label: &str, count: usize, on: bool) -> Stateful<Div> {
+    // Each key is unique on its screen: Review takes V, as R is Running or Reviews.
+    let key = match label {
+        "Review" => 'V',
+        _ => label.chars().next().unwrap_or(' ').to_ascii_uppercase(),
+    };
+    div()
+        .id(eid(id))
+        .flex_none()
+        .h(px(30.))
+        .px(px(12.))
+        .flex()
+        .items_center()
+        .cursor_pointer()
+        .text_size(ts(T_ENTRY))
+        .when(on, |d| d.bg(rgb(SELECT)).text_color(rgb(BLUE_INK)))
+        .when(!on, |d| {
+            d.border_1()
+                .border_color(hca(BLUE, 90))
+                .text_color(rgb(BLUE_HI))
+                .hover(|h| h.bg(hca(BLUE_DIM, 150)))
+        })
+        .child(format!("[{key}] {label} {count}"))
+}
+
+/// The column names over a table of the console.
+pub(super) fn table_head(cols: &[(&str, f32)]) -> Div {
+    let mut row = div()
+        .flex_none()
+        .flex()
+        .px(px(10.))
+        .pb(px(6.))
+        .mb(px(4.))
+        .border_b_1()
+        .border_color(hca(BLUE, 76))
+        .text_size(ts(T_LABEL))
+        .text_color(rgb(BLUE_SOFT));
+    for (name, w) in cols {
+        row = if *w > 0. {
+            row.child(div().flex_none().w(px(*w)).child(name.to_string()))
+        } else {
+            row.child(div().flex_1().child(name.to_string()))
+        };
+    }
+    row
 }
 
 /// A button: an operator command. `strong` = lit.
@@ -282,7 +362,7 @@ pub(super) fn btn(id: String, text: &str, strong: bool) -> Stateful<Div> {
         .flex()
         .items_center()
         .cursor_pointer()
-        .text_size(ui::ts(T_ENTRY))
+        .text_size(ts(T_ENTRY))
         .when(strong, |d| {
             d.bg(rgb(BLUE))
                 .text_color(rgb(BLUE_INK))
@@ -306,7 +386,7 @@ pub(super) fn caption(text: &str) -> Div {
     div()
         .flex_none()
         .mt(px(10.))
-        .text_size(ui::ts(T_LABEL))
+        .text_size(ts(T_LABEL))
         .text_color(rgb(BLUE_SOFT))
         .child(text.to_uppercase())
 }
@@ -513,8 +593,8 @@ impl Render for OperatorInbox {
             ],
         );
 
-        // The menu.
-        let mut menu = div().flex().flex_col().gap(px(2.));
+        // The filters: key tabs at the top of the console.
+        let mut tabs = div().flex_none().flex().flex_wrap().gap(px(6.)).pb(px(14.));
         for (t, label, n) in [
             (InboxTab::All, "All", all),
             (InboxTab::Waiting, "Waiting", count(InboxFilter::Answers)),
@@ -522,24 +602,24 @@ impl Render for OperatorInbox {
             (InboxTab::Reviews, "Reviews", count(InboxFilter::Reviews)),
             (InboxTab::Done, "Done", done),
         ] {
-            menu = menu.child(
-                menu_item(format!("mi-tab-{label}"), label, Some(n), self.tab == t).on_click(
-                    cx.listener(move |this, _, _, cx| {
+            tabs = tabs.child(
+                tab_key(format!("mi-tab-{label}"), label, n, self.tab == t).on_click(cx.listener(
+                    move |this, _, _, cx| {
                         this.tab = t;
                         this.selected = None;
                         cx.notify();
-                    }),
-                ),
+                    },
+                )),
             );
         }
-        let menu = menu_col(
-            "mi-menu",
-            mon("mi-menu-s", true, "Menu", "1", "filter", menu),
-        );
 
         // The list.
-        let mut list = div().flex().flex_col();
-        for (k, it) in items.iter().take(9).enumerate() {
+        let mut list = div().flex().flex_col().child(tabs).child(table_head(&[
+            ("NO", 36.),
+            ("SESSION", 0.),
+            ("AGE", 64.),
+        ]));
+        for (k, it) in items.iter().take(12).enumerate() {
             let id = it.id.clone();
             list = list.child(
                 list_row(
@@ -563,12 +643,12 @@ impl Render for OperatorInbox {
         let list = mon(
             "mi-list",
             true,
-            &format!("Incoming · {}", items.len()),
+            &format!("Inbox · {} open · oldest first", items.len()),
             "2",
-            "oldest first",
+            "Inbox",
             list,
         )
-        .w(px(430.))
+        .w(px(720.))
         .flex_none()
         .into_any_element();
 
@@ -585,7 +665,7 @@ impl Render for OperatorInbox {
                     div()
                         .flex()
                         .justify_between()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child(format!(
                             "{} {:02} of {:02}",
@@ -601,13 +681,15 @@ impl Render for OperatorInbox {
                 )
                 .child(
                     div()
+                        .text_size(ts(T_SECTION))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(rgb(BLUE_HI))
-                        .line_height(relative(1.5))
+                        .line_height(relative(1.4))
                         .child(it.title.clone()),
                 )
                 .child(
                     div()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child(format!(
                             "{} · {} / {}",
@@ -621,7 +703,11 @@ impl Render for OperatorInbox {
             if let Some(result) = &it.result {
                 body = body.child(prose(&format!("Done · {result}")));
             } else {
-                let mut options = div().flex().flex_col().gap(px(4.));
+                let mut options = div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(4.))
+                    .child(caption("Your decision"));
                 for (k, o) in it.options.iter().take(5).enumerate() {
                     let (id, opt) = (it.id.clone(), o.clone());
                     options = options.child(
@@ -705,11 +791,72 @@ impl Render for OperatorInbox {
         } else {
             body = body.child(prose("Nothing waits for you."));
         }
-        let detail = mon("mi-detail", true, &title, "3", "decision", body)
+        let detail = mon("mi-detail", true, &title, "3", "Decision", body)
+            .flex_1()
+            .min_h(px(0.));
+        // Under the decision: the chat of that session on a green agent screen, with the
+        // prompt line that opens the session to answer there.
+        let (chat_title, chat_lines, chat_open, prompt) = match &cur {
+            Some(it) => (
+                format!("Chat · {}", it.title),
+                chat_text(&it.tail, 10),
+                Some(it.session.clone()),
+                format!(
+                    "{}@{}:~$",
+                    it.agents.first().map_or("agent", |a| a.provider.as_str()),
+                    it.codebase
+                ),
+            ),
+            None => (
+                "Chat".to_string(),
+                Vec::new(),
+                None,
+                "operator:~$".to_string(),
+            ),
+        };
+        let mut chat = div().flex().flex_col().gap(px(4.));
+        for line in &chat_lines {
+            chat = chat.child(div().text_color(rgb(GREEN)).child(line.clone()));
+        }
+        if chat_lines.is_empty() {
+            chat = chat.child(div().text_color(rgb(GREEN_MID)).child("No chat yet."));
+        }
+        chat = chat.child(
+            div()
+                .id("mi-chat-prompt")
+                .mt(px(10.))
+                .pt(px(10.))
+                .border_t_1()
+                .border_color(hca(GREEN, 64))
+                .flex()
+                .gap(px(8.))
+                .cursor_pointer()
+                .child(div().text_color(rgb(GREEN_HI)).child(prompt))
+                .child(
+                    div()
+                        .text_color(rgb(GREEN_MID))
+                        .hover(|h| h.text_color(rgb(GREEN_HI)))
+                        .child("answer the agent in its session ›"),
+                )
+                .on_click(cx.listener(move |_, _, _, cx| {
+                    if let Some(id) = &chat_open {
+                        cx.emit(OperatorEvent::OpenSession(id.clone()));
+                    }
+                })),
+        );
+        let chat = mon("mi-chat", false, &chat_title, "4", &chat_title, chat)
+            .flex_none()
+            .h(px(320.));
+        let right = div()
             .flex_1()
             .min_w(px(0.))
+            .flex()
+            .flex_col()
+            .gap(px(20.))
+            .child(detail)
+            .child(chat)
             .into_any_element();
-        page(head, vec![menu, list.into_any_element(), detail])
+        page(head, vec![list.into_any_element(), right])
     }
 }
 
@@ -842,15 +989,22 @@ impl Render for OperatorTasks {
                 ("done".into(), n(TaskTab::Done).to_string()),
             ],
         );
-        let mut menu = div().flex().flex_col().gap(px(2.));
+        // The filters and the autopilot: keys at the top of the console.
+        let mut tabs = div()
+            .flex_none()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(px(6.))
+            .pb(px(14.));
         for (t, label) in [
             (TaskTab::Queued, "Queued"),
             (TaskTab::Running, "Running"),
             (TaskTab::Review, "Review"),
             (TaskTab::Done, "Done"),
         ] {
-            menu = menu.child(
-                menu_item(format!("mt-tab-{label}"), label, Some(n(t)), self.tab == t).on_click(
+            tabs = tabs.child(
+                tab_key(format!("mt-tab-{label}"), label, n(t), self.tab == t).on_click(
                     cx.listener(move |this, _, _, cx| {
                         this.tab = t;
                         this.selected = None;
@@ -859,17 +1013,28 @@ impl Render for OperatorTasks {
                 ),
             );
         }
-        menu = menu.child(caption("Autopilot")).child(
-            div().mt(px(4.)).child(
-                btn(
-                    "mt-autopilot".into(),
+        tabs = tabs.child(
+            div()
+                .id("mt-autopilot")
+                .flex_none()
+                .h(px(30.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .text_size(ts(T_ENTRY))
+                .border_1()
+                .border_color(hca(if autopilot { GREEN } else { BLUE }, 120))
+                .text_color(rgb(if autopilot { GREEN_HI } else { BLUE_HI }))
+                .hover(|h| h.bg(hca(BLUE_DIM, 150)))
+                .tooltip(ui::tip(&format!(
+                    "{} · {queued_n} queued for autopilot",
                     if autopilot {
-                        "Autopilot on"
+                        "Turn autopilot off"
                     } else {
-                        "Autopilot off"
-                    },
-                    autopilot,
-                )
+                        "Turn autopilot on"
+                    }
+                )))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     act(
                         &this.model,
@@ -879,19 +1044,11 @@ impl Render for OperatorTasks {
                         }),
                         cx,
                     );
-                })),
-            ),
-        );
-        menu = menu.child(
-            div()
-                .mt(px(6.))
-                .text_size(ui::ts(T_LABEL))
-                .text_color(rgb(BLUE_SOFT))
-                .child(format!("{queued_n} queued for autopilot")),
-        );
-        let menu = menu_col(
-            "mt-menu",
-            mon("mt-menu-s", true, "Menu", "1", "column", menu),
+                }))
+                .child(format!(
+                    "[P] Autopilot {}",
+                    if autopilot { "on" } else { "off" }
+                )),
         );
 
         let tasks = self.of(self.tab);
@@ -901,7 +1058,7 @@ impl Render for OperatorTasks {
             .and_then(|id| tasks.iter().find(|t| &t.id == id))
             .or(tasks.first())
             .cloned();
-        let mut list = div().flex().flex_col();
+        let mut list = div().flex().flex_col().child(tabs);
         for (k, t) in tasks.iter().take(9).enumerate() {
             let id = t.id.clone();
             let c = if t.waiting_for.is_some() {
@@ -956,7 +1113,7 @@ impl Render for OperatorTasks {
             title = t.title.clone();
             body = body.child(
                 div()
-                    .text_size(ui::ts(T_LABEL))
+                    .text_size(ts(T_LABEL))
                     .text_color(rgb(BLUE_SOFT))
                     .child(format!(
                         "{} · {} / {} · ${:.2}",
@@ -1018,7 +1175,7 @@ impl Render for OperatorTasks {
                                 .child(
                                     div()
                                         .flex_none()
-                                        .text_size(ui::ts(T_LABEL))
+                                        .text_size(ts(T_LABEL))
                                         .text_color(rgb(step_color(s.state)))
                                         .child(step_word(s.state).to_uppercase()),
                                 ),
@@ -1058,11 +1215,11 @@ impl Render for OperatorTasks {
         } else {
             body = body.child(prose("No task here."));
         }
-        let detail = mon("mt-detail", true, &title, "3", "plan", body)
+        let detail = mon("mt-detail", true, &title, "3", "plan of the task", body)
             .flex_1()
             .min_w(px(0.))
             .into_any_element();
-        page(head, vec![menu, list, detail])
+        page(head, vec![list, detail])
     }
 }
 
@@ -1161,7 +1318,7 @@ impl Render for OperatorRepos {
                 })),
             );
         }
-        let list = mon("mr-list", true, "Codebases", "1", "click to show", list)
+        let list = mon("mr-list", true, "Codebases", "1", "pick a codebase", list)
             .w(px(470.))
             .flex_none()
             .into_any_element();
@@ -1178,7 +1335,7 @@ impl Render for OperatorRepos {
             body = body
                 .child(
                     div()
-                        .text_size(ui::ts(T_LABEL))
+                        .text_size(ts(T_LABEL))
                         .text_color(rgb(BLUE_SOFT))
                         .child(format!(
                             "{} · {} worktrees · {}",
@@ -1212,10 +1369,17 @@ impl Render for OperatorRepos {
                 body = body.child(prose("No live session in this codebase."));
             }
         }
-        let detail = mon("mr-detail", true, &title, "2", "codebase", body)
-            .flex_1()
-            .min_w(px(0.))
-            .into_any_element();
+        let detail = mon(
+            "mr-detail",
+            true,
+            &title,
+            "2",
+            "facts of the codebase",
+            body,
+        )
+        .flex_1()
+        .min_w(px(0.))
+        .into_any_element();
         page(head, vec![list, detail])
     }
 }
@@ -1227,10 +1391,13 @@ enum Section {
     Looks,
     Autopilot,
     Providers,
+    Models,
 }
 
 pub struct OperatorSettings {
     model: Entity<Model>,
+    /// The settings and the providers of the daemon, for Models and effort.
+    view: Option<SettingsView>,
     section: Section,
     /// The row of the list that the detail shows. The current look for the Looks section.
     sel: Option<usize>,
@@ -1242,12 +1409,53 @@ impl EventEmitter<OperatorEvent> for OperatorSettings {}
 impl OperatorSettings {
     pub fn new(model: Entity<Model>, cx: &mut Context<Self>) -> Self {
         let obs = cx.observe(&model, |_, _, cx| cx.notify());
-        Self {
+        let mut this = Self {
             model,
+            view: None,
             section: Section::Looks,
             sel: None,
             _obs: obs,
-        }
+        };
+        this.refresh(cx);
+        this
+    }
+
+    /// Read the settings and the providers from the daemon.
+    fn refresh(&mut self, cx: &mut Context<Self>) {
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SettingsGet>(Default::default(), cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| {
+                if let Ok(view) = result {
+                    this.view = Some(view);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Save one value of the settings and show what the daemon returns.
+    fn save(&mut self, key: String, value: serde_json::Value, cx: &mut Context<Self>) {
+        let call = self
+            .model
+            .read(cx)
+            .call::<method::SettingsSet>(SettingsSetParams { key, value }, cx);
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| {
+                if let Ok(settings) = result
+                    && let Some(view) = &mut this.view
+                {
+                    view.settings = settings;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 }
 
@@ -1270,6 +1478,9 @@ fn look_blurb(name: &str) -> &'static str {
         "Holo" => "See-through glass panels over slow rings. One decision at a time.",
         "Tactical" => {
             "A radar: the bearing is the codebase, the range is the time since a session moved."
+        }
+        "Command" => {
+            "A command deck: pixel-art rooms, steel panels. One decision at a time over a calm map."
         }
         _ => "A look for the whole app.",
     }
@@ -1306,6 +1517,7 @@ impl Render for OperatorSettings {
             (Section::Looks, "Looks"),
             (Section::Autopilot, "Autopilot"),
             (Section::Providers, "Providers"),
+            (Section::Models, "Models and effort"),
         ] {
             menu = menu.child(
                 menu_item(format!("ms-tab-{label}"), label, None, self.section == s).on_click(
@@ -1319,12 +1531,18 @@ impl Render for OperatorSettings {
         }
         menu = menu.child(
             menu_item("ms-all".into(), "All settings ›", None, false)
-                .mt(px(14.))
                 .on_click(cx.listener(|_, _, _, cx| cx.emit(OperatorEvent::AllSettings))),
         );
         let menu = menu_col(
             "ms-menu",
-            mon("ms-menu-s", true, "Menu", "1", "section", menu),
+            mon(
+                "ms-menu-s",
+                true,
+                "Menu",
+                "1",
+                "↑ ↓ section · F1-F5 screens",
+                menu,
+            ),
         );
 
         let mut list = div().flex().flex_col();
@@ -1369,25 +1587,22 @@ impl Render for OperatorSettings {
                     } else {
                         "This look is off. Switching changes the frame, the colors and the fonts of every screen."
                     }))
-                    .child(
-                        div().mt(px(8.)).child(
-                            btn(
-                                "ms-switch".into(),
-                                &if sel == current {
-                                    format!("{name} is on")
-                                } else {
-                                    format!("Switch to {name}")
-                                },
-                                sel != current,
-                            )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                act(&this.model, Action::SetLook(look), cx);
-                            })),
-                        ),
-                    )
+                    .when(sel != current, |d| {
+                        d.child(
+                            div().mt(px(8.)).child(
+                                btn("ms-switch".into(), &format!("Switch to {name}"), true)
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        act(&this.model, Action::SetLook(look), cx);
+                                    })),
+                            ),
+                        )
+                    })
                     .child(prose(
                         "The choice is saved in the settings of the daemon.",
-                    ));
+                    ))
+                    .child(caption("Keys"))
+                    .child(prose("F1 war room · F2 inbox · F3 tasks · F4 repos · F5 settings"))
+                    .child(prose("Up and Down pick a row. Enter opens it. Escape goes back."));
             }
             Section::Autopilot => {
                 list_title = "Autopilot";
@@ -1491,6 +1706,140 @@ impl Render for OperatorSettings {
                     }
                 }
             }
+            Section::Models => {
+                list_title = "Providers";
+                let providers = self
+                    .view
+                    .as_ref()
+                    .map(|v| v.providers.clone())
+                    .unwrap_or_default();
+                let sel = self.sel.unwrap_or(0).min(providers.len().saturating_sub(1));
+                let prefs_of = |id: &str, first: Option<&String>| {
+                    self.view
+                        .as_ref()
+                        .and_then(|v| v.settings.providers.get(id).cloned())
+                        .unwrap_or_else(|| ProviderPrefs {
+                            enabled: false,
+                            model: first.cloned().unwrap_or_default(),
+                            effort: Effort::High,
+                            mode: Mode::Edit,
+                        })
+                };
+                for (k, p) in providers.iter().enumerate() {
+                    let prefs = prefs_of(&p.id, p.models.first());
+                    list = list.child(
+                        list_row(
+                            format!("ms-prov-{k}"),
+                            k + 1,
+                            &p.name,
+                            &format!("{} · {:?}", prefs.model, prefs.effort).to_lowercase(),
+                            if prefs.enabled { "ON" } else { "OFF" },
+                            if prefs.enabled { GREEN } else { BLUE_SOFT },
+                            k == sel,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.sel = Some(k);
+                            cx.notify();
+                        })),
+                    );
+                }
+                match providers.get(sel) {
+                    Some(p) => {
+                        detail_title = p.name.clone();
+                        let prefs = prefs_of(&p.id, p.models.first());
+                        let mut models = p.models.clone();
+                        if !models.contains(&prefs.model) {
+                            models.insert(0, prefs.model.clone());
+                        }
+                        // One group of choices: a caption, then a button per value.
+                        let group = |title: &str,
+                                         id: String,
+                                         key: String,
+                                         choices: Vec<(String, serde_json::Value, bool)>| {
+                            let mut row = div().flex().flex_wrap().gap(px(8.));
+                            for (i, (label, value, on)) in choices.into_iter().enumerate() {
+                                let key = key.clone();
+                                row = row.child(
+                                    btn(format!("{id}-{i}"), &label, on).on_click(cx.listener(
+                                        move |this, _, _, cx| {
+                                            if !on {
+                                                this.save(key.clone(), value.clone(), cx);
+                                            }
+                                        },
+                                    )),
+                                );
+                            }
+                            div()
+                                .flex()
+                                .flex_col()
+                                .child(caption(title))
+                                .child(div().mt(px(6.)).child(row))
+                        };
+                        let pid = p.id.clone();
+                        let key = |field: &str| format!("providers.{pid}.{field}");
+                        body = body
+                            .child(prose(&p.auth))
+                            .child(group(
+                                "Use this provider",
+                                format!("ms-pv-{pid}-on"),
+                                key("enabled"),
+                                vec![
+                                    ("On".into(), serde_json::json!(true), prefs.enabled),
+                                    ("Off".into(), serde_json::json!(false), !prefs.enabled),
+                                ],
+                            ))
+                            .child(group(
+                                "Default model",
+                                format!("ms-pv-{pid}-model"),
+                                key("model"),
+                                models
+                                    .iter()
+                                    .map(|m| (m.clone(), serde_json::json!(m), *m == prefs.model))
+                                    .collect(),
+                            ))
+                            .child(group(
+                                "Effort",
+                                format!("ms-pv-{pid}-effort"),
+                                key("effort"),
+                                [
+                                    (Effort::Low, "Low"),
+                                    (Effort::Medium, "Medium"),
+                                    (Effort::High, "High"),
+                                    (Effort::Max, "Max"),
+                                ]
+                                .into_iter()
+                                .map(|(e, l)| {
+                                    (l.to_string(), serde_json::json!(e), e == prefs.effort)
+                                })
+                                .collect(),
+                            ))
+                            .child(group(
+                                "Permission mode",
+                                format!("ms-pv-{pid}-mode"),
+                                key("mode"),
+                                [
+                                    (Mode::Plan, "Plan"),
+                                    (Mode::Edit, "Edit"),
+                                    (Mode::Auto, "Auto"),
+                                ]
+                                .into_iter()
+                                .map(|(m, l)| {
+                                    (l.to_string(), serde_json::json!(m), m == prefs.mode)
+                                })
+                                .collect(),
+                            ))
+                            .child(
+                                div()
+                                    .mt(px(10.))
+                                    .child(prose("A session can change these in its input box.")),
+                            );
+                    }
+                    None => {
+                        detail_title = "Providers".to_string();
+                        list = list.child(prose("No provider data yet."));
+                    }
+                }
+            }
             Section::Providers => {
                 list_title = "Usage windows";
                 let usage = war.as_ref().map(|w| w.usage.clone()).unwrap_or_default();
@@ -1528,7 +1877,7 @@ impl Render for OperatorSettings {
                         body = body
                             .child(
                                 div()
-                                    .text_size(ui::ts(T_TITLE))
+                                    .text_size(ts(T_TITLE))
                                     .text_color(rgb(if hot { ERR } else { BLUE_HI }))
                                     .child(format!("{}%", u.pct)),
                             )
@@ -1547,7 +1896,7 @@ impl Render for OperatorSettings {
                                 "The value comes from the provider."
                             }))
                             .child(prose(
-                                "Models, effort and permission mode per provider are in All settings.",
+                                "Models, effort and permission mode per provider are in Models and effort.",
                             ));
                     }
                     None => {
@@ -1557,14 +1906,21 @@ impl Render for OperatorSettings {
                 }
             }
         }
-        let list = mon("ms-list", true, list_title, "2", "pick a row", list)
+        let list = mon("ms-list", true, list_title, "2", "↑ ↓ row · ↵ open", list)
             .w(px(470.))
             .flex_none()
             .into_any_element();
-        let detail = mon("ms-detail", true, &detail_title, "3", "detail", body)
-            .flex_1()
-            .min_w(px(0.))
-            .into_any_element();
+        let detail = mon(
+            "ms-detail",
+            true,
+            &detail_title,
+            "3",
+            "↵ switch · Esc back",
+            body,
+        )
+        .flex_1()
+        .min_w(px(0.))
+        .into_any_element();
         page(head, vec![menu, list, detail])
     }
 }

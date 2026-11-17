@@ -57,19 +57,19 @@ pub const PAGE: u32 = 0x02070F;
 pub const LABEL: &str = "Rajdhani";
 pub const FIGURE: &str = "Rajdhani";
 /// Entry text: rows, chat lines, questions.
-pub const BODY: &str = "IBM Plex Sans";
+pub const BODY: &str = "IBM Plex Mono";
 /// Code, commands, paths.
-pub const CODE: &str = "JetBrains Mono";
+pub const CODE: &str = "IBM Plex Mono";
 
 /// The type scale of the look: screen title > section title > entry text > label.
 /// Entry text stays under 0.8 x the section title.
 pub const S_TITLE: f32 = 34.;
 /// A figure or the title of a panel.
-pub const S_BIG: f32 = 26.;
+pub const S_BIG: f32 = 21.;
 /// A section title above a list or a block.
 pub const S_SECTION: f32 = 21.;
 /// The lead entry: the question of a decision.
-pub const S_LEAD: f32 = 17.;
+pub const S_LEAD: f32 = 15.;
 /// Entry text: rows, chat lines, list items.
 pub const S_BODY: f32 = 15.;
 /// A label or a button text.
@@ -483,7 +483,7 @@ pub fn button(id: impl Into<SharedString>, tone: Tone, label: &str) -> Stateful<
         .rounded(px(4.))
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(ui::ts(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL))
         .whitespace_nowrap()
         .cursor_pointer();
     match tone {
@@ -530,7 +530,7 @@ pub fn link(id: impl Into<SharedString>, label: &str, c: u32) -> Stateful<Div> {
         .items_center()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(ui::ts(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL))
         .text_color(ink(c, 0.8))
         .whitespace_nowrap()
         .cursor_pointer()
@@ -550,7 +550,7 @@ pub(crate) fn tab(id: impl Into<SharedString>, label: &str, color: u32, on: bool
         .items_center()
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_size(ui::ts(S_SMALL + 1.))
+        .text_size(ui::ts(S_SMALL))
         .whitespace_nowrap()
         .cursor_pointer()
         .border_b_2()
@@ -574,6 +574,18 @@ pub struct Island {
     pub right_title: String,
     pub right_tabs: Vec<AnyElement>,
     pub right: AnyElement,
+}
+
+thread_local! {
+    /// The scroll state of the island bodies, by element id. The island is a plain function,
+    /// so the handles live here between frames (one window, one UI thread).
+    static SCROLLS: std::cell::RefCell<std::collections::HashMap<&'static str, gpui::ScrollHandle>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// The scroll handle of an island body, the same one in every frame.
+fn scroll_handle(id: &'static str) -> gpui::ScrollHandle {
+    SCROLLS.with(|m| m.borrow_mut().entry(id).or_default().clone())
 }
 
 /// The layer of a list screen: the title and the readouts on top, then two glass panels. The
@@ -611,14 +623,23 @@ pub fn island_with(_art: Art, i: Island, one: bool) -> Div {
         );
     }
     let body = |id: &'static str, child: AnyElement| {
+        let scroll = scroll_handle(id);
         div()
-            .id(id)
             .flex_1()
             .min_h(px(0.))
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .child(child)
+            .relative()
+            .child(
+                div()
+                    .id(id)
+                    .size_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&scroll)
+                    .flex()
+                    .flex_col()
+                    .pr(px(10.))
+                    .child(child),
+            )
+            .child(ui::thumb(&scroll, gpui::rgba(PA << 8 | 0x70), 4.))
     };
     let menu = |tabs: Vec<AnyElement>| {
         div()
@@ -745,15 +766,15 @@ pub(crate) fn row(
                         .text_color(ink(TXT, if on { 1. } else { 0.85 }))
                         .child(title.to_string()),
                 )
-                .child(
+                .children((!sub.is_empty()).then(|| {
                     div()
                         .truncate()
                         .font_family(BODY)
                         .text_size(ui::ts(S_SMALL))
                         .line_height(ui::ts(S_SMALL + 6.))
                         .text_color(ink(MUTED, 0.8))
-                        .child(sub.to_string()),
-                ),
+                        .child(sub.to_string())
+                })),
         )
         .child(
             div()
@@ -830,7 +851,7 @@ pub fn verb(label: &str) -> Div {
         .bg(rgb(bg))
         .font_family(LABEL)
         .font_weight(gpui::FontWeight::BOLD)
-        .text_size(ui::ts(S_SMALL - 1.))
+        .text_size(ui::ts(S_SMALL))
         .text_color(rgb(fg))
         .child(name)
 }
@@ -873,7 +894,9 @@ pub fn display_rows(lines: &[DLine]) -> Vec<Div> {
                 .w_full()
                 .overflow_hidden()
                 .px(px(12.))
-                .bg(ink(PK, 0.06))
+                .bg(ink(0x010A18, 0.55))
+                .border_l_2()
+                .border_color(ink(PK, 0.45))
                 .font_family(CODE)
                 .font_weight(if d.head {
                     gpui::FontWeight::BOLD
@@ -896,7 +919,7 @@ pub fn display_rows(lines: &[DLine]) -> Vec<Div> {
             DKind::Output => div()
                 .overflow_hidden()
                 .font_family(CODE)
-                .text_size(ui::ts(S_CODE - 1.))
+                .text_size(ui::ts(S_SMALL))
                 .line_height(ui::ts(S_CODE + 7.))
                 .text_color(rgb(0x5F95B8))
                 .whitespace_nowrap()
@@ -907,11 +930,13 @@ pub fn display_rows(lines: &[DLine]) -> Vec<Div> {
                 .text_color(rgb(GD))
                 .child(text),
             _ => div()
-                .max_h(px(LH_BODY * 3.))
+                .max_h(ui::ts(27. * 4.))
                 .overflow_hidden()
-                .line_height(ui::ts(LH_BODY))
-                .text_size(ui::ts(S_BODY))
-                .text_color(ink(0xBFE6F7, 0.95))
+                .font_family(LABEL)
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .line_height(ui::ts(27.))
+                .text_size(ui::ts(S_BIG))
+                .text_color(ink(0xDDF8FF, 0.95))
                 .child(text),
         };
         out.push(

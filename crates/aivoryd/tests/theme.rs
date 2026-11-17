@@ -499,3 +499,66 @@ fn old_settings_without_the_key_load() {
     let s: aivory_protocol::Settings = serde_json::from_value(v).unwrap();
     assert_eq!(s.display.custom_theme, None);
 }
+
+#[test]
+fn add_select_and_remove_send_theme_changed() {
+    let e = env();
+    e.fake.release("v1.0.0", zip_of(&sample("1.0.0")));
+    let d = Daemon::with_demo(config()).with_themes(e.svc.clone());
+    let (out, rx) = Outbox::new(16);
+    let line = |m: &str, p: Value| {
+        json!({ "jsonrpc": "2.0", "id": 1, "method": m, "params": p }).to_string()
+    };
+    let sync = d.handle_line(&line("theme/sync", json!({})), &out).unwrap();
+    assert_eq!(sync["result"]["themes"].as_array().unwrap().len(), 0);
+    let notes = |rx: &std::sync::mpsc::Receiver<aivoryd::outbox::Out>| -> Vec<Value> {
+        rx.try_iter()
+            .filter_map(|o| match o {
+                aivoryd::outbox::Out::Message(v) => Some(v),
+                aivoryd::outbox::Out::Close => None,
+            })
+            .collect()
+    };
+
+    let i: Inspected = serde_json::from_value(rpc_job(
+        &d,
+        "theme/inspect",
+        json!({ "source": "github:acme/neon" }),
+    ))
+    .unwrap();
+    d.handle_line(&line("theme/add", json!({ "token": i.token })), &out)
+        .unwrap();
+    let n = notes(&rx);
+    assert_eq!(n.len(), 1, "{n:?}");
+    assert_eq!(n[0]["method"], "theme/changed");
+    assert_eq!(n[0]["params"]["reason"], "add");
+    assert_eq!(n[0]["params"]["id"], "neon-night");
+    assert_eq!(n[0]["params"]["themes"][0]["id"], "neon-night");
+    assert_eq!(
+        n[0]["params"]["themes"][0]["sha256"]
+            .as_str()
+            .unwrap()
+            .len(),
+        64
+    );
+    let rev = n[0]["params"]["revision"].clone();
+    assert_eq!(ok(&d, "theme/sync", json!({}))["revision"], rev);
+
+    d.handle_line(
+        &line(
+            "settings/set",
+            json!({ "key": "display.customTheme", "value": "neon-night" }),
+        ),
+        &out,
+    )
+    .unwrap();
+    let n = notes(&rx);
+    assert_eq!(n.len(), 1, "{n:?}");
+    assert_eq!(n[0]["params"]["reason"], "select");
+
+    d.handle_line(&line("theme/remove", json!({ "id": "neon-night" })), &out)
+        .unwrap();
+    let n = notes(&rx);
+    let reasons: Vec<_> = n.iter().map(|v| v["params"]["reason"].clone()).collect();
+    assert_eq!(reasons, vec![json!("remove"), json!("select")], "{n:?}");
+}

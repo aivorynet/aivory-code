@@ -143,12 +143,33 @@ fn stamp(img: &mut RgbaImage, dirt: &RgbaImage, at: (i32, i32), r: i32, shade: f
 
 /// A picture on the ground by its center.
 fn lay(img: &mut RgbaImage, sp: &RgbaImage, x: i32, y: i32) {
-    imageops::overlay(
-        img,
-        sp,
-        i64::from(x) - i64::from(sp.width() / 2),
-        i64::from(y) - i64::from(sp.height() / 2),
-    );
+    // Raw rows: the generic `imageops` calls are compiled without optimization in a debug build,
+    // and a map has millions of pixels. The ground is opaque, so the alpha stays 255.
+    let (w, h) = (img.width() as i64, img.height() as i64);
+    let (sw, sh) = (i64::from(sp.width()), i64::from(sp.height()));
+    let (ox, oy) = (i64::from(x) - sw / 2, i64::from(y) - sh / 2);
+    let (x0, x1) = (ox.max(0), (ox + sw).min(w));
+    if x0 >= x1 {
+        return;
+    }
+    let src = sp.as_raw();
+    let dst: &mut [u8] = &mut *img;
+    for py in oy.max(0)..(oy + sh).min(h) {
+        let s = &src[((py - oy) * sw + (x0 - ox)) as usize * 4..][..(x1 - x0) as usize * 4];
+        let d = &mut dst[(py * w + x0) as usize * 4..][..(x1 - x0) as usize * 4];
+        for (d, s) in d.chunks_exact_mut(4).zip(s.chunks_exact(4)) {
+            match s[3] {
+                0 => {}
+                255 => d.copy_from_slice(s),
+                a => {
+                    let (a, b) = (u32::from(a), 255 - u32::from(a));
+                    for k in 0..3 {
+                        d[k] = ((u32::from(s[k]) * a + u32::from(d[k]) * b + 127) / 255) as u8;
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn ground(l: &Layout) -> RgbaImage {
@@ -156,9 +177,15 @@ pub fn ground(l: &Layout) -> RgbaImage {
     let s = sprites();
     let mut img = RgbaImage::new(w, h);
     let (tw, th) = s.ground.dimensions();
-    for y in (0..h).step_by(th as usize) {
-        for x in (0..w).step_by(tw as usize) {
-            imageops::replace(&mut img, &s.ground, i64::from(x), i64::from(y));
+    {
+        let (tw, th, w) = (tw as usize, th as usize, w as usize);
+        let tile = s.ground.as_raw();
+        let buf: &mut [u8] = &mut img;
+        for (y, row) in buf.chunks_exact_mut(w * 4).enumerate() {
+            let t = &tile[(y % th) * tw * 4..][..tw * 4];
+            for part in row.chunks_mut(tw * 4) {
+                part.copy_from_slice(&t[..part.len()]);
+            }
         }
     }
     let mut r = Rng(0x9E37_79B9_7F4A_7C15);
@@ -310,10 +337,36 @@ pub fn ground(l: &Layout) -> RgbaImage {
     img
 }
 
+/// Every `step`-th pixel of a large image, by raw rows (fast in a debug build).
+fn pick(img: &RgbaImage, step: u32) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    let (nw, nh) = ((w / step).max(1), (h / step).max(1));
+    let src = img.as_raw();
+    let mut out = RgbaImage::new(nw, nh);
+    let dst: &mut [u8] = &mut out;
+    for (y, row) in dst.chunks_exact_mut(nw as usize * 4).enumerate() {
+        let at = (y as u32 * step).min(h - 1) as usize * w as usize;
+        for (x, d) in row.chunks_exact_mut(4).enumerate() {
+            let i = (at + (x as u32 * step).min(w - 1) as usize) * 4;
+            d.copy_from_slice(&src[i..i + 4]);
+        }
+    }
+    out
+}
+
 /// The ground scaled down for the radar.
 pub fn radar(ground: &RgbaImage, max_w: u32, max_h: u32) -> RgbaImage {
     let (w, h) = ground.dimensions();
     let s = (max_w as f32 / w as f32).min(max_h as f32 / h as f32);
+    // A cheap pick of pixels first (the full map has millions), then a smooth scale.
+    let step = (1. / s / 3.) as u32;
+    let coarse;
+    let ground = if step >= 2 {
+        coarse = pick(ground, step);
+        &coarse
+    } else {
+        ground
+    };
     let mut small = imageops::resize(
         ground,
         ((w as f32 * s) as u32).max(1),

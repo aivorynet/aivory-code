@@ -45,3 +45,51 @@ pub struct HelloReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
+
+/// The first request on a mesh connection (ALPN [`crate::MESH_ALPN`]).
+pub const MESH_HELLO_METHOD: &str = "mesh/hello";
+
+/// A peer asks who the other machine is now. Result: `aivory_protocol::mesh::MeshInfo`.
+pub const MESH_PING_METHOD: &str = "mesh/ping";
+
+/// Params of `mesh/hello`: a daemon says who it is to a peer daemon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeshHello {
+    /// The code of the invite link. Needed only on the first connection (`peers/join`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// The node id of the caller (64 hex). It must be the key that the QUIC handshake proved.
+    pub key: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub os: String,
+    #[serde(default)]
+    pub version: String,
+    /// The current direct addresses of the caller (`ip:port`).
+    #[serde(default)]
+    pub direct: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay: Option<String>,
+}
+
+/// Result of `mesh/hello`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeshHelloReply {
+    pub node: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub os: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub direct: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay: Option<String>,
+    /// `true` when this connection paired the two machines.
+    #[serde(default)]
+    pub newly_paired: bool,
+}
