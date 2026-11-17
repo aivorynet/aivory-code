@@ -297,8 +297,8 @@ impl TasksScreen {
                     Err(e) => {
                         eprintln!("aivory: tasks/list failed: {e:#}");
                         this.model.update(cx, |m, cx| {
-                            // While the daemon starts, the screen says so: no toast.
-                            if m.link == crate::model::Link::Running {
+                            // Before the first connect the screen says so: no toast.
+                            if m.info.is_some() {
                                 m.notify_user(crate::notice::failure("tasks/list", &e), cx)
                             }
                         });

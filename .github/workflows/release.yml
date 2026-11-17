@@ -39,6 +39,9 @@ jobs:
           # sherpa-onnx-sys downloads its native libs here; a cached build script output
           # points at them, so the folder must be in the cache too.
           cache-directories: target/sherpa-onnx-prebuilt
+      # Run the sherpa-onnx-sys build script again: a cached build output can point at native
+      # libs that the cache did not keep (the v2026.2.0 Windows build failed that way).
+      - run: cargo clean --release --target ${{ matrix.target }} -p sherpa-onnx-sys
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} -p aivoryd -p aivory-desktop
       - name: Install cargo-packager

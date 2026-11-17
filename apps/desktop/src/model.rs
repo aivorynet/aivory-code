@@ -371,8 +371,8 @@ impl Model {
     {
         let endpoint = self.endpoint.clone();
         let drafts = self.drafts.clone();
-        // While the daemon starts, the screens say so: no toast per failed call.
-        let quiet = self.link != Link::Running;
+        // Before the first connect the screens say "Starting aivoryd": no toast per failed call.
+        let quiet = self.info.is_none();
         cx.background_executor().spawn(async move {
             match daemon::call::<M>(&endpoint, &params) {
                 Ok(result) => Some(result),

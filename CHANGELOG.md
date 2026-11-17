@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026.2.1
+
+- Pair a phone from every look: a "Pair a phone" key in the settings of Bridge, Holo, Neon, Operator,
+  Tactical and Command opens the pairing card with a fresh code. Settings > "Devices and pairing"
+  shows the pairing card first.
+- First start: the window says "Starting aivoryd…" while the app starts the daemon, without error
+  messages, and connects within a second.
+- The coffee mug of aivory.net/coffee next to "Buy Paul a coffee".
+
 ## 2026.2.0
 
 - Start with the system: a switch in Settings > Daemons and devices starts aivoryd when you sign in

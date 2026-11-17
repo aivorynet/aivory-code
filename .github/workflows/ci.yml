@@ -35,6 +35,8 @@ jobs:
           # sherpa-onnx-sys downloads its native libs here; a cached build script output
           # points at them, so the folder must be in the cache too.
           cache-directories: target/sherpa-onnx-prebuilt
+      # Run the sherpa-onnx-sys build script again (see release.yml).
+      - run: cargo clean -p sherpa-onnx-sys
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
