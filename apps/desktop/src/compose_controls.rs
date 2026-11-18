@@ -314,8 +314,8 @@ impl Controls {
             m = m.child(
                 div()
                     .id(SharedString::from(format!("{id}-mi-{menu:?}-{i}")))
-                    .h(px(26.))
-                    .px(px(10.))
+                    .h(ui::sw(26.))
+                    .px(ui::sw(10.))
                     .flex()
                     .items_center()
                     .rounded(px(style.radius.unwrap_or(5.)))
@@ -427,8 +427,11 @@ fn pill(
     let hover = style.pill_hover;
     div()
         .id(id)
-        .h(px(style.text.map_or(24., |t| (t * 1.8).max(20.).ceil())))
-        .px(px(if style.text.is_some() { 8. } else { 9. }))
+        // Height and padding grow with the text size, so large text stays inside the pill.
+        .h(ui::sw(
+            style.text.map_or(24., |t| (t * 1.8).max(20.).ceil()),
+        ))
+        .px(ui::sw(if style.text.is_some() { 8. } else { 9. }))
         .flex()
         .flex_none()
         .items_center()

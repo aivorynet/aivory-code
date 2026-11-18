@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-agents"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "aivory-sessions",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-coord"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-index",
  "aivory-syntax",
@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-desktop"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "aivory-syntax",
@@ -168,7 +168,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-diag"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-syntax",
  "ast-grep-config",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-engine"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "rusqlite",
@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-index"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-syntax",
  "blake3",
@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-link"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-map"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "globset",
@@ -251,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-protocol"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "schemars",
  "serde",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-sessions"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "base64 0.22.1",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-syntax"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "blake3",
  "serde",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-theme"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-protocol",
  "serde",
@@ -317,7 +317,7 @@ dependencies = [
 
 [[package]]
 name = "aivory-vcs"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "rusqlite",
  "serde",
@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "aivoryd"
-version = "2026.2.1"
+version = "2026.2.2"
 dependencies = [
  "aivory-agents",
  "aivory-coord",

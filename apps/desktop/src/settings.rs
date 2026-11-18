@@ -1135,6 +1135,20 @@ impl SettingsScreen {
             .child(control)
     }
 
+    /// A row whose help text is long: the label wraps and the control keeps its size.
+    fn wrap_row(&self, first: bool, label: Div, control: impl IntoElement) -> Div {
+        let narrow = self.narrow;
+        div()
+            .flex()
+            .when(narrow, |d| d.flex_col().items_start().gap(px(10.)))
+            .when(!narrow, |d| d.items_center().justify_between().gap(px(16.)))
+            .px(px(20.))
+            .py(px(14.))
+            .when(!first, |d| d.border_t_1().border_color(rgba(ROW_LINE)))
+            .child(label.flex_1().min_w(px(0.)))
+            .child(div().flex_none().child(control))
+    }
+
     // ---- Controls ----
 
     fn toggle(
@@ -2303,7 +2317,7 @@ impl SettingsScreen {
             ))
             .child(self.pair_card(cx))
             .child(self.daemon_card(&view.daemons, view.settings.autopilot.max_running, cx))
-            .child(card().child(self.row(
+            .child(card().child(self.wrap_row(
                 true,
                 row_label(
                     "Start with the system",

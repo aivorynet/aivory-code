@@ -241,9 +241,10 @@ impl BridgeFocus {
                 div()
                     .absolute()
                     .left(px(3.))
-                    .top(px(top))
+                    // Measured window pixels: the art scale of `px` must not grow them again.
+                    .top(gpui::px(top))
                     .w(px(16.))
-                    .h(px(th))
+                    .h(gpui::px(th))
                     .rounded_full()
                     .bg(rgb(PE))
                     .cursor_pointer()

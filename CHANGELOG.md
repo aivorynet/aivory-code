@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.2.2
+
+- Bridge session screen on a large window: the chat scroll bar stays in its track and no longer
+  runs behind Attach and Send.
+- Plan, Edit, Auto and the model pickers: the pills grow with the text size, so large text stays
+  inside them.
+- Settings > Start with the system: the help text wraps, and the switch keeps its place.
+
 ## 2026.2.1
 
 - Pair a phone from every look: a "Pair a phone" key in the settings of Bridge, Holo, Neon, Operator,
